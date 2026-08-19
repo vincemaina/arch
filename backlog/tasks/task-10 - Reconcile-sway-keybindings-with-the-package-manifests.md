@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 19:26'
+updated_date: '2026-08-19 19:42'
 labels:
   - foundation
   - desktop
@@ -26,7 +26,7 @@ Several bindings in setup/dotfiles/dot_config/sway/config call commands the inst
 - [ ] #1 Media keys control playback on a fresh install
 - [ ] #2 Both screenshot bindings save a file successfully on a fresh install
 - [ ] #3 A GUI action requiring elevated privileges shows a working authentication prompt
-- [ ] #4 Every external command referenced by the sway config resolves to a package listed in a manifest
+- [x] #4 Every external command referenced by the sway config resolves to a package listed in a manifest
 - [x] #5 The check for the criterion above is automated so future drift is caught rather than discovered in use
 <!-- AC:END -->
 
@@ -56,4 +56,8 @@ checks/sway-commands.sh lives outside setup/ as repository tooling. It resolves 
 Verified: extraction produces the expected command set from all three surfaces, with set variables expanded ($term to foot, $menu to wofi). The resolution logic was exercised against stubs across all five branches - repo helper present, repo helper missing, command not installed, owned by an undeclared package, owned by no package at all - producing exactly the expected four failures. The missing-header rule was tested separately and correctly fails a script without one.
 
 AC #1, #2 and #3 need the VM: whether media keys, both screenshot bindings and a privilege prompt actually work end to end. AC #4 is verified only as far as the checker logic goes; running it for real needs pacman and pactree.
+
+checks/sway-commands.sh run by the user on the VM against a real package database: all referenced commands accounted for, exit clean. That verifies AC #4 directly, and implies the new packages are installed, since the check resolves every command through command -v before looking up its owning package - playerctl, xdg-user-dir, polkit-gnome and libpulse would each have failed as "not installed" otherwise.
+
+Still outstanding: AC #1, #2 and #3 are behavioural rather than resolvable by the checker. A command existing and being declared does not prove the binding fires, that grim writes a file, or that the agent renders a prompt.
 <!-- SECTION:NOTES:END -->

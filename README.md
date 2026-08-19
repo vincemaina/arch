@@ -146,6 +146,16 @@ session units, and helper scripts — is provided by a package declared in
 drift apart silently: media keys called `playerctl`, which was never installed, so
 the keys simply did nothing and nothing reported an error.
 
+```bash
+./checks/session.sh
+```
+
+This one checks the running machine rather than the configuration: that swap is
+active, the OOM handler is running, the session components are supervised and
+would restart if they died, and the boot path is set up as intended. It is
+read-only, and it finishes by listing the few things only a human can confirm —
+whether a keypress really takes a screenshot, whether a password prompt appears.
+
 ## Design
 
 The setup is intentionally:
