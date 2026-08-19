@@ -134,3 +134,11 @@ repo
 That answers: what should Vince's user environment look like?
 
 This is exactly where your Sway shortcuts, border settings, GB keyboard layout, Wofi binding, screenshot shortcuts, Waybar appearance, Mako startup, etc. should live.
+
+
+## Chezmoi
+
+`.chezmoiroot` tells chezmoi: "The Git repo is here, but only `dotfiles/` represents files that should go into my home directory."
+
+That's an official chezmoi feature specifically for repos that contain more that
+just dotfiles.
