@@ -207,6 +207,66 @@ GRUB has more features and broader compatibility. If the machine later develops 
 
 ---
 
+## Early microcode via the mkinitcpio hook
+
+**Decision:** Install both `intel-ucode` and `amd-ucode`, and load microcode through
+the mkinitcpio `microcode` hook rather than a separate `initrd` line in the boot entry.
+
+### Why
+
+Microcode updates carry CPU errata and security fixes. Arch treats them as required
+for every installation, and a machine without them runs known-broken silicon.
+
+Current Arch practice bundles microcode into the initramfs through the `microcode`
+hook, replacing the older approach of listing a `*-ucode.img` as the first `initrd`
+in the boot entry. Following the current approach keeps the boot entries
+vendor-agnostic: nothing in them mentions Intel or AMD at all.
+
+Both vendor packages are installed rather than detecting the CPU during install.
+The kernel loads only the image matching the running processor and ignores the
+other, so carrying both costs a few megabytes and removes an entire branch from
+the installer.
+
+`03-system.sh` confirms the hook is present rather than assuming it. It is part of
+the default `HOOKS`, so the check normally does nothing — but if that ever changes,
+the installer fails loudly instead of quietly producing a machine without microcode.
+
+### Alternatives considered
+
+Listing `initrd /intel-ucode.img` before the main initramfs in each boot entry is
+the older documented method and still works. It was rejected because it puts
+vendor-specific detail into every boot entry and duplicates what the hook already
+does during image generation.
+
+---
+
+## A fallback boot entry
+
+**Decision:** Generate a second systemd-boot entry using
+`initramfs-linux-fallback.img` alongside the default entry.
+
+### Why
+
+The default initramfs is built with `autodetect`, so it contains only the modules
+needed by the hardware present when it was generated. That makes it small and quick
+to load, and it is the right default — but it also means a hardware change, or a
+kernel or initramfs update that goes wrong, can leave the machine unbootable.
+
+mkinitcpio already builds the fallback image on every update at no extra cost.
+Not offering it as a boot entry meant the recovery path existed on disk but could
+not be reached without the install media.
+
+Boot entries are now rendered from every template in `system/loader/entries/`
+rather than by naming files individually, so adding a future entry is a matter of
+adding a file.
+
+### Trade-off
+
+The boot menu lists two entries instead of one. `loader.conf` still defaults to the
+normal entry with a short timeout, so this costs nothing until it is needed.
+
+---
+
 # Networking
 
 ## NetworkManager

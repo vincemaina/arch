@@ -6,3 +6,5 @@ networkmanager
 sudo
 vim
 git
+intel-ucode
+amd-ucode
