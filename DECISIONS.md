@@ -631,6 +631,78 @@ The individual scripts remain separate for maintainability and debugging, but th
 
 ---
 
+## A separate entrypoint for machines that already exist
+
+**Decision:** Add a second root entrypoint alongside the installer:
+
+```bash
+./sync.sh
+```
+
+`install.sh` builds a machine from the live ISO. `sync.sh` applies the repository
+to a machine that is already running it.
+
+### Why
+
+The repository could previously only build a machine from scratch. Every change,
+however small, could therefore only be validated by rebuilding — which is the right
+test for reproducibility but far too slow to be the only loop available while tuning
+a desktop day to day.
+
+Separating the two keeps each honest about what it is:
+
+- installation is destructive, runs once, and needs the live ISO;
+- syncing is idempotent, runs constantly, and must never touch the disk.
+
+Keeping them apart means the repeatable operation cannot accidentally inherit a
+destructive step. `sync.sh` references none of the numbered install stages.
+
+### Trade-off
+
+There are now two ways to apply the repository, and a change that only works
+through one of them is a bug that will not necessarily be caught. Fresh-install
+tests remain the stronger check, as recorded under Testing Strategy; `sync.sh` is
+for iteration speed, not for proving reproducibility.
+
+---
+
+## `sync.sh` is one flat script
+
+**Decision:** Write the sync path as a single script rather than the numbered
+stages used by the installer.
+
+### Why
+
+The installer is split into five stages because they are genuinely distinct,
+run in two different environments, and are destructive enough that a failure
+needs to be traceable to a specific step.
+
+Syncing has neither property. It reconciles packages and applies dotfiles, both
+of which are safe and repeatable, and both run as the same user in the same
+place. Splitting that into stages would add indirection without making anything
+easier to inspect or debug.
+
+If the sync path grows genuinely separate concerns, this should be revisited.
+
+---
+
+## Packages are added but never removed by sync
+
+**Decision:** `sync.sh` installs declared packages that are missing and does not
+remove anything that is installed but undeclared.
+
+### Why
+
+Removal is the one part of reconciliation that can destroy a working system. A
+package missing from a manifest is more likely to be an omission in the
+repository than a mistake on the machine, and acting on that assumption
+automatically would be the wrong default.
+
+Reporting drift rather than fixing it keeps the manifests honest without making
+the safe, everyday command capable of breaking the desktop.
+
+---
+
 ## `setup/` as the installation payload
 
 **Decision:** Keep everything required to construct Arch under:

@@ -30,7 +30,7 @@ Do not edit Backlog task, draft, document, decision, or milestone markdown files
 
 A version-controlled, reproducible **Arch Linux system build** — package manifests, install scripts, system config and user dotfiles. It is not an application: there is no build system, no test suite, no linter and no package manager for the repo itself. Everything here is Bash, plain text manifests, and config files.
 
-The only "run" is installing an operating system onto a disk, which is destructive.
+There are two entrypoints: `install.sh` builds a machine from the live ISO and is destructive; `sync.sh` applies the repository to a machine already running it and is safe to repeat. Reach for `sync.sh` when iterating — a change is not worth a full rebuild until it is worth a reproducibility test.
 
 ### `setup/` is the only thing that becomes the Arch system
 
@@ -52,6 +52,10 @@ Two consequences worth holding onto:
 ```bash
 # Full install. Run as root from a booted Arch live ISO. ERASES the target disk.
 ./install.sh /dev/vda        # or /dev/nvme0n1 on real hardware
+
+# Update a machine that is already running this setup. Safe and repeatable.
+# Run as the normal user, never root. --dry-run previews without changing anything.
+./sync.sh
 
 # Backlog task management (see the CRITICAL_INSTRUCTION block above)
 backlog task list
@@ -81,6 +85,8 @@ Individual stages under `setup/install/` can be run on their own for debugging, 
 So stages 3–5 must only reference paths under `/opt/arch-setup`, and only the contents of `setup/` exist inside the chroot — the repo-level files are deliberately not copied (see the boundary note above).
 
 Stage responsibilities: 01 partitions and mounts, 02 `pacstrap`s base + writes fstab, 03 configures locale/hostname/user/sudo/NetworkManager and installs systemd-boot, 04 installs desktop + dev packages, 05 applies dotfiles.
+
+`sync.sh` is the third context: it runs on a fully installed machine, as the normal user, from a git clone. It must never reference the numbered stages — anything it calls has to be safe to run repeatedly on a live system.
 
 ### `setup/install.conf`
 

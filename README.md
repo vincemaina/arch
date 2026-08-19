@@ -95,6 +95,37 @@ After logging in:
 sway
 ```
 
+## Keeping a machine up to date
+
+`install.sh` builds a machine. `sync.sh` updates one that already exists.
+
+Once a machine is running, clone this repository onto it and run:
+
+```bash
+./sync.sh
+```
+
+That installs any package declared in `setup/packages/` that is missing,
+re-applies the dotfiles, and reports what changed along with anything that
+needs to restart before the change takes effect.
+
+To see what it would do without changing anything:
+
+```bash
+./sync.sh --dry-run
+```
+
+Run it as your normal user, not as root — the dotfiles belong to your user, and
+it uses `sudo` only to install packages.
+
+It is safe to run repeatedly, and it never partitions disks, installs a
+bootloader or creates users. Those belong to a fresh install. It also never
+removes packages: anything installed by hand and not declared in
+`setup/packages/` is left alone.
+
+This is the normal day-to-day loop. Change the repository, run `sync.sh`, see
+the result — no rebuild required.
+
 ## Design
 
 The setup is intentionally:
@@ -120,4 +151,6 @@ The project itself contains documentation, development notes and backlog items. 
 | `setup/system/`   | Machine-wide OS configuration              | Scripts and templates           |
 | `setup/dotfiles/` | User environment and desktop configuration | chezmoi                         |
 
-The root [`install.sh`](./install.sh) orchestrates these components into a complete installation.
+The root [`install.sh`](./install.sh) orchestrates these components into a complete
+installation. The root [`sync.sh`](./sync.sh) applies the same components to a machine
+that is already running.
