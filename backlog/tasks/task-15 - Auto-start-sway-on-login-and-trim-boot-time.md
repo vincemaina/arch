@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 23:17'
+updated_date: '2026-08-19 23:31'
 labels:
   - session
   - performance
@@ -85,4 +85,22 @@ Both files now document the interaction, including the general hazard that anyth
 Added a guard to checks/session.sh: for any offered session whose Exec names a .desktop ID, it resolves that ID the same way and fails if it lands on a hidden entry or resolves to nothing. Verified it flags the exact Exec that caused the lockout and passes the corrected one.
 
 Recovery path worked as designed: greetd holds only VT 1, so Ctrl+Alt+F2 reached a console. Worth noting that the escape hatch stopped this being unrecoverable, which is the argument for keeping it.
+
+Login works after the Exec fix, but waybar does not start.
+
+Eliminated the first hypothesis by reading uwsm source rather than guessing: in start mode CompGlobals.id is os.path.basename of the first argument after --, so the id is sway and -N only sets the display name. The target is wayland-session@sway.target as intended and the -N change did not affect it.
+
+Current hypothesis, awaiting evidence: waybar is the only session component still using its packaged unit, which declares Requisite=graphical-session.target and After=graphical-session.target. Our three units were retargeted and now require the sway target instead. If wayland-session@sway.target is reached before graphical-session.target becomes active, waybar requisite is unmet and systemd declines to start it, while the other three are unaffected. That predicts mako, swayidle and polkit-agent all running with only waybar missing.
+
+If confirmed, the fix is a drop-in at waybar.service.d rather than a copied unit, resetting Requisite, After and PartOf to the sway target while keeping the packaged ExecStart and Restart.
+
+Root cause found, and it was not the requisite failure predicted. The journal shows a systemd ordering cycle:
+
+  graphical-session.target after wayland-session@sway.target after waybar.service after graphical-session.target
+
+uwsm orders graphical-session.target after wayland-session@sway.target. Waybar packaged unit declares After=graphical-session.target, which is correct while that target is what pulls it in, but our enable symlink moved it under the sway target instead, closing the loop. systemd resolves a cycle by deleting a job from it, and it chose waybar start, so the bar silently never ran. Our own three units avoided this only because retargeting them rewrote their After= as well.
+
+Fixed with a drop-in at waybar.service.d rather than copying the unit, so ExecStart, the SIGUSR2 reload and Restart=on-failure stay as packaged. Empty assignments reset the inherited lists before the compositor target is set.
+
+Separately, removed the polkit cgroup check added earlier. It inferred registration from the agent living outside a logind session scope, and the user has since confirmed pkexec produces a password dialog while that check reports failure. The theory was wrong and the check was failing a working system, so it is gone; registration is only confirmable by actually requesting an authentication, which the manual list already covers.
 <!-- SECTION:NOTES:END -->
