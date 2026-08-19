@@ -122,6 +122,22 @@ else
 fi
 
 # ----------------------------------------------------------------------
+# Machine-wide configuration
+# ----------------------------------------------------------------------
+
+echo
+echo "==> Applying machine-wide configuration"
+
+# The same script the installer runs, so a change under setup/system/ reaches
+# a running machine instead of only ever arriving on a freshly installed one.
+# --activate makes it take effect now rather than at the next boot.
+if $DRY_RUN; then
+    echo "    Would run system/apply-config.sh --activate as root"
+else
+    sudo "$SETUP_SOURCE/system/apply-config.sh" --activate
+fi
+
+# ----------------------------------------------------------------------
 # Dotfiles
 # ----------------------------------------------------------------------
 

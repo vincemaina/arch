@@ -23,8 +23,14 @@ fi
 
 # xdg-user-dir reports the configured pictures directory, which is not
 # necessarily ~/Pictures and is not necessarily in English.
+#
+# When the user directories have never been set up, xdg-user-dir answers with
+# $HOME rather than failing, which would scatter screenshots loose across the
+# home directory. Treat that answer as "not configured".
 DIR="$(xdg-user-dir PICTURES 2>/dev/null || true)"
-[[ -n "$DIR" ]] || DIR="$HOME/Pictures"
+if [[ -z "$DIR" || "$DIR" == "$HOME" ]]; then
+    DIR="$HOME/Pictures"
+fi
 
 mkdir -p "$DIR"
 

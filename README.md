@@ -111,9 +111,10 @@ Once a machine is running, clone this repository onto it and run:
 ./sync.sh
 ```
 
-That installs any package declared in `setup/packages/` that is missing,
-re-applies the dotfiles, and reports what changed along with anything that
-needs to restart before the change takes effect.
+That installs any package declared in `setup/packages/` that is missing, applies
+machine-wide configuration from `setup/system/`, re-applies the dotfiles, and
+reports what changed along with anything that needs to restart before the change
+takes effect.
 
 To see what it would do without changing anything:
 
@@ -125,7 +126,9 @@ Run it as your normal user, not as root — the dotfiles belong to your user, an
 it uses `sudo` only to install packages.
 
 It is safe to run repeatedly, and it never partitions disks, installs a
-bootloader or creates users. Those belong to a fresh install. It also never
+bootloader or creates users. Boot entries in particular stay install-time only:
+they are rendered with the machine's root UUID, and rewriting them on a running
+system is a good way to make it unbootable. Those belong to a fresh install. It also never
 removes packages: anything installed by hand and not declared in
 `setup/packages/` is left alone.
 

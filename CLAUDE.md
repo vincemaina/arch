@@ -98,6 +98,18 @@ The desktop is launched with `uwsm start -- sway`, which starts `graphical-sessi
 
 Helper scripts in `dot_local/bin/` must carry a `# requires:` header listing the external commands they call; `checks/sway-commands.sh` fails if one does not.
 
+### System configuration has one source of truth
+
+`setup/system/apply-config.sh` owns the mapping from repository file to `/etc`
+destination. Both `03-system.sh` (during install) and `sync.sh` (with `--activate`)
+call it, so a new system config file is added in exactly one place and reaches both
+paths. Adding one to only the installer means it can never reach a running machine —
+that was a real bug, caught by `checks/session.sh`.
+
+Bootloader templates under `setup/system/loader/` are the exception: they are
+rendered with the machine's root UUID at install time and must never be applied by
+sync.
+
 ### `setup/install.conf`
 
 Single source of machine identity (`USERNAME`, `HOSTNAME`, `TIMEZONE`, `LOCALE`, `KEYMAP`), `source`d by `03-system.sh` and `05-dotfiles.sh`. Add new machine-level variables here rather than hardcoding them in a stage. Passwords are intentionally interactive, never stored.

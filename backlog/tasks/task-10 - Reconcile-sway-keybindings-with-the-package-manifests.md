@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 19:42'
+updated_date: '2026-08-19 20:46'
 labels:
   - foundation
   - desktop
@@ -60,4 +60,6 @@ AC #1, #2 and #3 need the VM: whether media keys, both screenshot bindings and a
 checks/sway-commands.sh run by the user on the VM against a real package database: all referenced commands accounted for, exit clean. That verifies AC #4 directly, and implies the new packages are installed, since the check resolves every command through command -v before looking up its owning package - playerctl, xdg-user-dir, polkit-gnome and libpulse would each have failed as "not installed" otherwise.
 
 Still outstanding: AC #1, #2 and #3 are behavioural rather than resolvable by the checker. A command existing and being declared does not prove the binding fires, that grim writes a file, or that the agent renders a prompt.
+
+checks/session.sh on the VM found the screenshot helper writing to /home/vincemaina/ rather than a pictures directory. Cause: when XDG user directories have never been set up, xdg-user-dir answers with $HOME instead of failing, and the fallback only triggered on an empty answer. Fixed by treating an answer equal to $HOME as unconfigured. Verified against a stub xdg-user-dir that returns $HOME, which now lands the file in ~/Pictures.
 <!-- SECTION:NOTES:END -->
