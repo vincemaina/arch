@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 23:03'
+updated_date: '2026-08-19 23:12'
 labels:
   - session
   - performance
@@ -63,4 +63,14 @@ checks/session.sh now tests for the sway-specific target and additionally fails 
 Verified locally: every script parses; the config file mapping still parses correctly with comments inside the bash array, producing seven entries; the sway configuration is untouched by this work.
 
 Not verifiable here, and the main risks for the VM: whether ReGreet reads /usr/local/share/wayland-sessions rather than only /usr/share, whether the Hidden entry actually suppresses the packaged sway.desktop, and whether cage -s is the right invocation. The first two fail loudly rather than silently - either no sway entry appears, or two do.
+
+Greeter offered a session named Sway that did not use uwsm. Root cause found by reading ReGreet 0.5.0 source rather than guessing.
+
+ReGreet derives its session search path from XDG_DATA_DIRS and falls back to a compiled-in default of /usr/share/xsessions:/usr/share/wayland-sessions when it is unset. Under greetd the greeter user has no environment, so /usr/local/share was never scanned and the packaged sway.desktop was offered instead. Both entries are named Sway, so the dropdown looked exactly as intended while running the wrong command - the naming choice hid the diagnosis.
+
+The masking mechanism itself was sound: a Hidden or NoDisplay entry inserts its name into found_session_names before skipping, so it does suppress a later duplicate of the same filename. It only needed its directory scanned first.
+
+Fixed by setting XDG_DATA_DIRS=/usr/local/share:/usr/share in the greetd command, via an env prefix since greetd execs the command without a shell.
+
+Added a check that replicates ReGreet discovery - the same search path derivation, first-match-wins dedup by type and filename, and Hidden claiming the name before being skipped - and reports each offered session with its Exec, failing on any that bypasses uwsm. Verified against a fake tree: it reproduces the bug exactly before the fix, one session named Sway running plain sway, and passes after, one session named Sway running uwsm start -- sway.desktop. This runs without rebooting, so the same class of failure is now caught before it reaches a boot.
 <!-- SECTION:NOTES:END -->

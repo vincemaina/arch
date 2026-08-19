@@ -7,5 +7,14 @@
 vt = 1
 
 [default_session]
-command = "cage -s -- regreet"
+# XDG_DATA_DIRS must be set explicitly. ReGreet derives its session directories
+# from it, and falls back to a compiled-in default of /usr/share only. The
+# greeter user has no environment of its own, so without this the entries in
+# /usr/local/share/wayland-sessions are never read: the packaged sway.desktop
+# would be offered instead, starting sway without uwsm and giving a desktop
+# with no bar, notifications or idle handling.
+#
+# /usr/local/share comes first so our entries are found before the packaged
+# ones, which is what lets a Hidden entry suppress the stock sway session.
+command = "env XDG_DATA_DIRS=/usr/local/share:/usr/share cage -s -- regreet"
 user = "greeter"

@@ -169,6 +169,68 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Login screen (TASK-15)"
+
+# Replicates how ReGreet discovers sessions, so a greeter that would offer the
+# wrong session is caught here rather than at the next boot. ReGreet derives its
+# search path from XDG_DATA_DIRS, falling back to /usr/share alone; the first
+# match for a given <type>/<filename> wins; and a Hidden or NoDisplay entry
+# claims that name before being skipped, which is how a local entry suppresses a
+# packaged one.
+
+GREETD_CONF=/etc/greetd/config.toml
+
+if [[ ! -r "$GREETD_CONF" ]]; then
+    skip "cannot read $GREETD_CONF"
+else
+    greeter_cmd="$(grep -E '^command[[:space:]]*=' "$GREETD_CONF" | head -1 | cut -d= -f2-)"
+
+    if [[ "$greeter_cmd" =~ XDG_DATA_DIRS=([^[:space:]\"]+) ]]; then
+        parents="${BASH_REMATCH[1]}"
+        pass "greeter searches $parents"
+    else
+        parents="/usr/share"
+        fail "greeter sets no XDG_DATA_DIRS, so it only scans /usr/share and will miss local session entries"
+    fi
+
+    declare -A claimed=()
+    offered=0
+    non_uwsm=0
+
+    IFS=':' read -ra parent_dirs <<<"$parents"
+    for parent in "${parent_dirs[@]}"; do
+        for kind in xsessions wayland-sessions; do
+            dir="$parent/$kind"
+            [[ -d "$dir" ]] || continue
+            for entry in "$dir"/*.desktop; do
+                [[ -e "$entry" ]] || continue
+                key="$kind/$(basename "$entry")"
+                [[ -n "${claimed[$key]:-}" ]] && continue
+                claimed[$key]=1
+                if grep -qiE '^(Hidden|NoDisplay)[[:space:]]*=[[:space:]]*true' "$entry"; then
+                    continue
+                fi
+                name="$(grep -m1 '^Name=' "$entry" | cut -d= -f2-)"
+                exec_cmd="$(grep -m1 '^Exec=' "$entry" | cut -d= -f2-)"
+                offered=$((offered + 1))
+                if [[ "$exec_cmd" == *uwsm* ]]; then
+                    pass "offers \"$name\" -> $exec_cmd"
+                else
+                    non_uwsm=$((non_uwsm + 1))
+                    fail "offers \"$name\" -> $exec_cmd, which bypasses uwsm and yields a session with no components"
+                fi
+            done
+        done
+    done
+
+    if [[ $offered -eq 0 ]]; then
+        fail "the greeter would offer no sessions at all"
+    elif [[ $non_uwsm -eq 0 ]]; then
+        pass "every session the greeter offers goes through uwsm"
+    fi
+fi
+
+# ----------------------------------------------------------------------
 section "Screenshot helper (TASK-10)"
 
 if [[ -x "$HOME/.local/bin/sway-screenshot" ]]; then
