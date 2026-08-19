@@ -3,9 +3,13 @@ swaybg
 swayidle
 swaylock
 waybar
+
+# Terminal
 foot
+
+# Application launcher
 wofi
-mako
+
 xorg-xwayland
 polkit
 pipewire
@@ -13,17 +17,39 @@ pipewire-pulse
 wireplumber
 xdg-desktop-portal
 xdg-desktop-portal-wlr
+
+# Screenshots?
 grim
 slurp
+
+# Clipboard tool
 wl-clipboard
+
+# Brightness
 brightnessctl
+
+# ?
 pavucontrol
+
 network-manager-applet
+
+# Notifications
+mako
 libnotify
+
+# Fonts
 noto-fonts
 noto-fonts-emoji
+ttf-jetbrains-mono-nerd
+
 ttf-dejavu
+
+# File explorer
 thunar
 gvfs
-qutebrowser
+
+# System monitor
 btop
+
+# Web browser
+qutebrowser
