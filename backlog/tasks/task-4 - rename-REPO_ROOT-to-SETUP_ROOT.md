@@ -1,14 +1,15 @@
 ---
 id: TASK-4
 title: rename REPO_ROOT to SETUP_ROOT
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-19 16:13'
+updated_date: '2026-08-19 16:21'
 labels: []
 dependencies: []
 priority: low
 type: chore
-ordinal: 4000
+ordinal: 1000
 ---
 
 ## Description
