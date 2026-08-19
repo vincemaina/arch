@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 23:12'
+updated_date: '2026-08-19 23:17'
 labels:
   - session
   - performance
@@ -73,4 +73,16 @@ The masking mechanism itself was sound: a Hidden or NoDisplay entry inserts its 
 Fixed by setting XDG_DATA_DIRS=/usr/local/share:/usr/share in the greetd command, via an env prefix since greetd execs the command without a shell.
 
 Added a check that replicates ReGreet discovery - the same search path derivation, first-match-wins dedup by type and filename, and Hidden claiming the name before being skipped - and reports each offered session with its Exec, failing on any that bypasses uwsm. Verified against a fake tree: it reproduces the bug exactly before the fix, one session named Sway running plain sway, and passes after, one session named Sway running uwsm start -- sway.desktop. This runs without rebooting, so the same class of failure is now caught before it reaches a boot.
+
+Locked the machine out of the desktop. Logging in reported the sway desktop entry as hidden and returned to the login screen.
+
+Cause: Exec was uwsm start -- sway.desktop, which makes uwsm resolve sway.desktop as a desktop entry ID through the XDG data hierarchy. /usr/local/share precedes /usr/share there, so uwsm found the Hidden masking entry placed next to our session entry - the one whose only job is to suppress the stock session in the login screen - and refused to start a hidden session. The mask intended for the greeter also shadowed the entry the session needed.
+
+Fixed by naming the compositor binary directly: uwsm start -N Sway -D sway -- sway. That avoids the ID lookup entirely, with -N and -D supplying the metadata the entry would have provided. The compositor id stays sway, so wayland-session@sway.target is unchanged and the units still bind correctly.
+
+Both files now document the interaction, including the general hazard that anything resolving the sway.desktop ID gets the mask rather than the packaged entry.
+
+Added a guard to checks/session.sh: for any offered session whose Exec names a .desktop ID, it resolves that ID the same way and fails if it lands on a hidden entry or resolves to nothing. Verified it flags the exact Exec that caused the lockout and passes the corrected one.
+
+Recovery path worked as designed: greetd holds only VT 1, so Ctrl+Alt+F2 reached a console. Worth noting that the escape hatch stopped this being unrecoverable, which is the argument for keeping it.
 <!-- SECTION:NOTES:END -->

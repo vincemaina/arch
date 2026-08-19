@@ -215,6 +215,30 @@ else
                 offered=$((offered + 1))
                 if [[ "$exec_cmd" == *uwsm* ]]; then
                     pass "offers \"$name\" -> $exec_cmd"
+
+                    # An Exec that names a .desktop ID is resolved through the
+                    # XDG hierarchy, where /usr/local/share precedes /usr/share.
+                    # If that lands on one of our own Hidden masking entries the
+                    # session refuses to start and the login screen loops, with
+                    # no way in. This locked a machine out once.
+                    if [[ "$exec_cmd" =~ ([A-Za-z0-9._+-]+\.desktop) ]]; then
+                        ref="${BASH_REMATCH[1]}"
+                        resolved=""
+                        for p in /usr/local/share /usr/share; do
+                            for k in xsessions wayland-sessions; do
+                                if [[ -z "$resolved" && -e "$p/$k/$ref" ]]; then
+                                    resolved="$p/$k/$ref"
+                                fi
+                            done
+                        done
+                        if [[ -z "$resolved" ]]; then
+                            fail "  ...but $ref resolves to nothing, so the session cannot start"
+                        elif grep -qiE '^(Hidden|NoDisplay)[[:space:]]*=[[:space:]]*true' "$resolved"; then
+                            fail "  ...but $ref resolves to $resolved, which is hidden; the session will refuse to start and bounce back to the login screen"
+                        else
+                            pass "  and $ref resolves to $resolved"
+                        fi
+                    fi
                 else
                     non_uwsm=$((non_uwsm + 1))
                     fail "offers \"$name\" -> $exec_cmd, which bypasses uwsm and yields a session with no components"
