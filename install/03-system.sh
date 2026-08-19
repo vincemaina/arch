@@ -33,3 +33,24 @@ passwd "$USERNAME"
 
 echo
 echo "System configuration complete."
+
+
+
+
+bootctl install
+
+install -Dm644 \
+  "$REPO_ROOT/system/loader/loader.conf" \
+  /boot/loader/loader.conf
+
+ROOT_DEVICE="$(findmnt -no SOURCE /)"
+ROOT_DEVICE="${ROOT_DEVICE%%\[*}"
+
+ROOT_UUID="$(blkid -s UUID -o value "$ROOT_DEVICE")"
+
+sed \
+  "s/__ROOT_UUID__/$ROOT_UUID/" \
+  "$REPO_ROOT/system/loader/arch.conf" \
+  > /boot/loader/entries/arch.conf
+
+bootctl status
