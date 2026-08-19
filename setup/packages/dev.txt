@@ -8,3 +8,4 @@ zip
 man-db
 man-pages
 less
+chezmoi
