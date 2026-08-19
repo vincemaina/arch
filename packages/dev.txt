@@ -1,0 +1,10 @@
+neovim
+ripgrep
+fd
+fzf
+tree
+unzip
+zip
+man-db
+man-pages
+less
