@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 23:31'
+updated_date: '2026-08-19 23:38'
 labels:
   - session
   - performance
@@ -29,13 +29,13 @@ DECISIONS.md currently records "No display manager" as a deliberate choice. That
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Booting reaches a graphical login prompt with no manual step
-- [ ] #2 Logging in starts the session through uwsm, so every supervised component comes up
-- [ ] #3 There is no way to reach a partially-started session by accident
+- [x] #1 Booting reaches a graphical login prompt with no manual step
+- [x] #2 Logging in starts the session through uwsm, so every supervised component comes up
+- [x] #3 There is no way to reach a partially-started session by accident
 - [ ] #4 Screen locking, idle timeouts and sleep behave the same as before, and unlocking returns to the running session
-- [ ] #5 A documented escape hatch to a plain TTY shell still exists for recovery
+- [x] #5 A documented escape hatch to a plain TTY shell still exists for recovery
 - [ ] #6 Boot time is measured before and after, and any unit found to be delaying boot for no benefit is dealt with
-- [ ] #7 DECISIONS.md revises the existing no-display-manager entry rather than leaving it contradicted
+- [x] #7 DECISIONS.md revises the existing no-display-manager entry rather than leaving it contradicted
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -103,4 +103,10 @@ uwsm orders graphical-session.target after wayland-session@sway.target. Waybar p
 Fixed with a drop-in at waybar.service.d rather than copying the unit, so ExecStart, the SIGUSR2 reload and Restart=on-failure stay as packaged. Empty assignments reset the inherited lists before the compositor target is set.
 
 Separately, removed the polkit cgroup check added earlier. It inferred registration from the agent living outside a logind session scope, and the user has since confirmed pkexec produces a password dialog while that check reports failure. The theory was wrong and the check was failing a working system, so it is gone; registration is only confirmable by actually requesting an authentication, which the manual list already covers.
+
+Waybar confirmed showing after the drop-in. The full session now comes up from a graphical login with no manual step.
+
+Verified: boot reaches the ReGreet login screen (AC #1); logging in brings up every supervised component (AC #2); the greeter offers exactly one session and it goes through uwsm, which checks/session.sh asserts on every run (AC #3, with the limit that someone can still run sway by hand from a TTY - it is the accidental path that is closed); the VT 2 escape hatch was proven in anger during the lockout rather than merely documented (AC #5); DECISIONS.md quotes and revises the original no-display-manager entry (AC #7).
+
+Outstanding: AC #4, that locking, idle timeouts and sleep still behave and unlocking returns to the session, and AC #6, the boot time measurement.
 <!-- SECTION:NOTES:END -->
