@@ -7,6 +7,16 @@ Idle CPU usage is basically 0%.
 And everything is snappy and instant.
 
 
+## Get Started
+
+```bash
+git clone <repo-url> Arch
+cd Arch
+./install.sh /dev/vda
+```
+`install.sh` handles everything else.
+
+
 ## What each dir is for
 
 | Area        | Question it answers                        | Managed by              |
