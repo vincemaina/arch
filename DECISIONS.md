@@ -155,6 +155,88 @@ It is a useful default for a general-purpose development machine and requires no
 
 ---
 
+## zram instead of a disk swapfile
+
+**Decision:** Provide swap as a compressed block device in RAM, sized
+`min(ram / 2, 8192)` with zstd, and no swap on disk.
+
+### Why
+
+The install previously had no swap of any kind. Without it, memory pressure means
+the kernel thrashes the page cache and the desktop stops responding well before
+the OOM killer intervenes — the whole-system freeze this setup is meant to avoid.
+
+Compressing pages into RAM costs far less than writing them to the SSD, so the
+machine gains usable headroom without a disk write path, and without consuming
+space on a 500 GB drive. It also avoids writing memory contents to persistent
+storage, which matters more given there is no full-disk encryption.
+
+The size is an expression rather than a figure because the same repository has
+to work on both a 16 GB machine and a VM with a fraction of that. Half the
+memory, capped at 8 GB.
+
+Two sysctl settings accompany it. `vm.swappiness` is raised well above the
+default, which is tuned for the assumption that swapping means touching a disk.
+`vm.page-cluster` is set to 0 because swap read-ahead exists to amortise seeks,
+and zram has none.
+
+### Alternatives considered
+
+A **swapfile on the Btrfs root** would survive hibernation and provide more
+capacity. It was rejected because hibernation is not a requirement here, and the
+failure mode being fixed is responsiveness under pressure, where a disk swapfile
+is markedly worse. Nothing stops one being added later: zram is given
+`swap-priority = 100` so it would still be preferred.
+
+### Trade-off
+
+zram consumes real memory to provide swap, so it is not free capacity — it trades
+CPU for effective memory. It also cannot support hibernation.
+
+---
+
+## earlyoom rather than systemd-oomd
+
+**Decision:** Run earlyoom as the userspace out-of-memory handler.
+
+### Why
+
+zram alone delays the problem rather than solving it. Something still has to act
+when memory genuinely runs out, and the kernel OOM killer acts far too late.
+
+earlyoom watches `MemAvailable` directly. That signal stays meaningful alongside
+zram, whereas approaches that infer pressure from swap usage are misled by a zram
+device sitting near-full as a matter of course, which is its normal state rather
+than a warning sign.
+
+It is also small and predictable: one process, a hard 50 MB memory cap in its own
+unit, and behaviour that can be described in a sentence. For a machine whose goal
+is not freezing, a handler that is easy to reason about has real value.
+
+It requires both available memory and free swap to be below their thresholds
+before killing, which is the correct interaction with zram: a full zram device
+only signifies trouble when memory is low too.
+
+### Alternatives considered
+
+**systemd-oomd** needs no extra package, which is a genuine point in its favour
+given the preference for minimalism, and its cgroup and PSI-based approach is the
+more modern design. It was rejected because its swap-based rules misfire with
+zram and have to be avoided, leaving pressure-based rules that are harder to
+reason about and tune than a memory threshold.
+
+**nohang** is more capable than either but is a larger dependency for a problem
+that does not need it.
+
+### Trade-off
+
+earlyoom kills a process without asking, and currently does so without notifying
+anyone, so an application can vanish with no explanation. The `--avoid` list
+keeps the session itself safe and `--prefer` aims at the browser first, but
+surfacing the kill to the user is worth adding later.
+
+---
+
 ## No full-disk encryption
 
 **Decision:** Do not enable disk encryption by default.
