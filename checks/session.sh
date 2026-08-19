@@ -88,6 +88,15 @@ section "Session components (TASK-11)"
 
 if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
     skip "not running inside a Wayland session; run this from a terminal in sway"
+elif ! systemctl --user is-active --quiet graphical-session.target; then
+    # Check this first and stop. Without the session target nothing below can
+    # have started, and reporting four separate failures obscures the single
+    # cause. A plain `sway` gives a working compositor with no session layer
+    # at all, and nothing on screen says so.
+    fail "this session was not started through uwsm, so no session components are running"
+    echo "        Launch it with:  uwsm start -- sway"
+    echo "        Plain 'sway' gives a compositor with no bar, notifications,"
+    echo "        idle handling or authentication agent, and looks fine."
 else
     for unit in waybar mako swayidle polkit-agent; do
         if systemctl --user is-active --quiet "$unit"; then

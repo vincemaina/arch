@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 22:28'
+updated_date: '2026-08-19 22:36'
 labels:
   - foundation
   - desktop
@@ -82,4 +82,12 @@ That also exposes a defect in the check itself, now fixed: it asserted the agent
 Leading hypothesis is that the agent has no logind session to register against. Under uwsm, user units live in user@UID.service rather than the session-N.scope that logind tracks, and polkit-gnome 0.105 has no fallback for that case. The check now inspects the agent cgroup to distinguish the two, which will confirm or eliminate this before any fix is attempted.
 
 Diagnostics requested from the user: the unit journal, the agent cgroup, and loginctl session state.
+
+Hypothesis was wrong. The agent is not failing to register: it is not running at all.
+
+loginctl session-status shows sway as a direct child of the login shell inside session-3.scope. Under uwsm it would sit under user@UID.service, so this session was started with plain sway, graphical-session.target was never reached, and nothing started the agent for it. The journal entries are from the previous uwsm session at 21:55, whose agent lingered holding a dead Wayland connection until it got a broken pipe at 23:27 and exited. MainPID is now 0, which is why reading its cgroup failed.
+
+AC #3 is therefore untested rather than failing, and needs a re-test from a uwsm session.
+
+The more useful finding is that the failure is invisible. A plain sway launch produces a perfectly usable-looking desktop that is missing its entire session layer, with nothing on screen indicating it. The check now detects that condition first and reports one clear cause instead of four separate component failures. TASK-15 removes the footgun properly by making login start the session.
 <!-- SECTION:NOTES:END -->
