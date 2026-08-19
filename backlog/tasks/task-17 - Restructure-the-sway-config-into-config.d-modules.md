@@ -1,11 +1,11 @@
 ---
 id: TASK-17
 title: Restructure the sway config into config.d modules
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:16'
-updated_date: '2026-08-19 18:50'
+updated_date: '2026-08-19 19:08'
 labels:
   - desktop
   - maintainability
@@ -26,7 +26,7 @@ setup/dotfiles/dot_config/sway/config is a 256-line copy of the upstream default
 - [x] #1 The main config only sets variables and includes config.d fragments
 - [x] #2 Fragments are split by concern - at least input, output, keybindings, window rules, startup and appearance
 - [x] #3 Upstream boilerplate comments that do not describe our own choices are removed
-- [ ] #4 The restructure is behaviour-preserving and verified against a running session
+- [x] #4 The restructure is behaviour-preserving and verified against a running session
 - [x] #5 Adding a new binding or window rule touches exactly one fragment
 <!-- AC:END -->
 
@@ -56,4 +56,12 @@ AC #4 is only partly satisfied. The mechanical check above is done, but the live
   sway --validate            # config parses with no errors
   swaymsg reload             # apply without restarting the session
 then confirm a binding from each fragment still works - a workspace switch, the resize mode, a media key, and that the wallpaper and border width are unchanged.
+
+Live-session verification completed by the user on the VM: sway --validate parses the split config and the session behaves as before. Unrelated libEGL "failed to create dri2 screen" warnings were observed during validation; tracked separately as TASK-26, since nothing in this change touches outputs, renderers or EGL.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced the 256-line copy of the upstream default with a 26-line main config of variables and two includes, plus eight numbered config.d fragments: input, output, appearance, window rules, keybindings, modes, media keys and startup. Adding a binding, window rule or startup process now touches exactly one file. Upstream boilerplate removed; comments explaining our own choices kept, including a note that mod+b and mod+e shadow the split verbs for TASK-2. System fragments in /etc/sway/config.d now load before ours so a local setting always wins, which changes no behaviour today as nothing conflicts. Verified mechanically by normalising old and new to sorted directive lists - 100 directives before, 101 after, the only difference the new include - and confirmed on the VM by the user with sway --validate and a working session.
+<!-- SECTION:FINAL_SUMMARY:END -->
