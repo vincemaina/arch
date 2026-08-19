@@ -368,6 +368,79 @@ This is configured explicitly so a new installation behaves correctly immediatel
 
 # Desktop Components
 
+## uwsm for session management
+
+**Decision:** Launch the compositor through the Universal Wayland Session Manager:
+
+```bash
+uwsm start -- sway
+```
+
+Session components — the bar, notifications, idle handling — are systemd user
+units bound to `graphical-session.target`, not sway `exec` lines.
+
+### Why
+
+Waybar was previously started by hand after login and appeared nowhere in this
+repository, so a freshly installed machine came up with no bar at all. The
+immediate fix would have been an `exec waybar` line, but sway's `exec` is
+fire-and-forget: a component that dies stays dead until the session is restarted,
+and nothing orders startup or shuts things down cleanly.
+
+uwsm wraps the compositor in systemd units and starts the standard
+`graphical-session.target`, which gives:
+
+- supervision, so a crashed component restarts rather than silently disappearing;
+- ordering, through the normal target dependencies;
+- clean shutdown, because everything is `PartOf` the session;
+- one obvious place to look for what runs alongside the compositor.
+
+Waybar already ships a systemd user unit with `Restart=on-failure`, so it only
+needed enabling. mako and swayidle got matching units following the same pattern.
+
+uwsm is in the official `extra` repository, so this needs no AUR support.
+
+### Alternatives considered
+
+**Plain `exec` lines** in the sway config. One line, no dependencies, and the
+obvious first instinct. Rejected because there is no supervision: the failure
+mode we were trying to fix is precisely a component not running.
+
+**Hand-rolled systemd units** with our own session target, started from the sway
+config. No new package, and it was tempting given the preference for keeping
+things minimal. Rejected because it reimplements what uwsm already does, and the
+maintenance would be ours.
+
+**sway-systemd**, which solves exactly this problem, is only in the AUR. Adding
+AUR support is a much larger decision than this task warranted.
+
+### Trade-off
+
+Starting `sway` directly no longer produces a complete desktop. That is a real
+footgun until the session starts automatically on login, which is tracked
+separately. It is also one more component between login and a working desktop.
+
+---
+
+## Enabling user units by symlink rather than systemctl
+
+**Decision:** Enable session units with symlinks committed under
+`dotfiles/dot_config/systemd/user/graphical-session.target.wants/` rather than by
+running `systemctl --user enable` during installation.
+
+### Why
+
+`systemctl --user enable` needs a user session to talk to, which does not exist
+inside the installer chroot. Enabling a unit is only a symlink into a `.wants`
+directory, so committing the symlink achieves the same thing with no special case
+in the installer.
+
+It also keeps which units are enabled visible in the repository and applied by the
+same chezmoi run as everything else, rather than being machine state set once
+during installation and invisible afterwards.
+
+---
+
 ## Waybar
 
 **Decision:** Use Waybar as the status bar.

@@ -4,6 +4,10 @@ swayidle
 swaylock
 waybar
 
+# Session management: wraps the compositor in systemd units so the bar,
+# notifications and idle handling are supervised rather than fire-and-forget
+uwsm
+
 # Terminal
 foot
 

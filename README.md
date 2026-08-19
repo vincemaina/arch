@@ -92,8 +92,14 @@ When installation finishes, the machine powers off. Remove the Arch installation
 After logging in:
 
 ```bash
-sway
+uwsm start -- sway
 ```
+
+The session is launched through [uwsm](https://wiki.archlinux.org/title/Universal_Wayland_Session_Manager),
+which wraps the compositor in systemd units. That is what starts the bar,
+notifications and idle handling, restarts them if they fail, and shuts them down
+cleanly. Starting `sway` directly still gives a working compositor, but none of
+those components will come up.
 
 ## Keeping a machine up to date
 
