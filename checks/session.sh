@@ -63,15 +63,21 @@ section "Out-of-memory handling (TASK-9)"
 
 if systemctl is-active --quiet earlyoom; then
     pass "earlyoom is running"
-    args="$(systemctl show earlyoom --property=ExecStart --value 2>/dev/null)"
-    if grep -q -- "--avoid" <<<"$args"; then
-        if grep -q -- "--avoid '" <<<"$args"; then
-            fail "earlyoom regexes are quoted; systemd passes the quotes through literally"
-        else
-            pass "earlyoom has unquoted avoid/prefer patterns"
-        fi
+
+    # Inspect the running process, not `systemctl show ExecStart`: that
+    # reports the command line as written in the unit file, where the
+    # arguments are still the literal string $EARLYOOM_ARGS. Only the process
+    # itself shows what the expansion actually produced.
+    cmdline="$(ps -C earlyoom -o args= 2>/dev/null | head -1)"
+
+    if [[ -z "$cmdline" ]]; then
+        skip "could not read the earlyoom command line"
+    elif ! grep -q -- '--avoid' <<<"$cmdline"; then
+        fail "earlyoom is running without its avoid/prefer patterns; is /etc/default/earlyoom applied?"
+    elif grep -qE -- "--avoid[[:space:]]+['\"]" <<<"$cmdline"; then
+        fail "earlyoom's regexes arrived quoted, so they will never match"
     else
-        fail "earlyoom is running without the configured avoid/prefer patterns"
+        pass "earlyoom is running with its avoid/prefer patterns"
     fi
 else
     fail "earlyoom is not running"
@@ -125,7 +131,7 @@ if [[ -e "${entries[0]}" ]]; then
     if [[ -e /boot/loader/entries/arch-fallback.conf ]]; then
         pass "both boot entries exist (${#entries[@]} total)"
     else
-        fail "no fallback boot entry; found: ${entries[*]##*/}"
+        fail "no fallback boot entry (found: ${entries[*]##*/}); boot entries are install-time only, so this needs a machine built by the current install.sh"
     fi
 else
     skip "/boot/loader/entries is empty or unreadable; needs a fresh install"

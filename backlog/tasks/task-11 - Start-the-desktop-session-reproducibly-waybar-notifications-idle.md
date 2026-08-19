@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 19:22'
+updated_date: '2026-08-19 21:03'
 labels:
   - foundation
   - session
@@ -28,7 +28,7 @@ Rather than patching in an exec line, decide how the session should be supervise
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A fresh install reaches a complete desktop - bar, notifications and idle handling - with no manual startup step
+- [x] #1 A fresh install reaches a complete desktop - bar, notifications and idle handling - with no manual startup step
 - [ ] #2 A crashed bar or notification daemon is restarted automatically rather than leaving the session degraded
 - [x] #3 Session components are declared in one obvious place under setup/
 - [x] #4 DECISIONS.md records the comparison between plain exec, sway-systemd and uwsm, and why the chosen option won
@@ -62,4 +62,6 @@ The swayidle invocation moved out of the sway config into ~/.local/bin/sway-idle
 Verified: sway directive comparison before and after shows the swayidle exec as the only removal and nothing else changed; symlink targets and unit ExecStart paths checked; sway-idle passes bash -n.
 
 AC #1 and #2 need the VM: whether a fresh session brings everything up, and whether killing waybar or mako actually gets them restarted.
+
+Verified on the VM: after uwsm start -- sway, waybar, mako, swayidle and polkit-agent are all running with Restart=on-failure, and graphical-session.target is active. A session launched through uwsm brings the whole desktop up with no manual startup step, which was the failure this task existed to fix - waybar previously had to be started by hand and appeared nowhere in the repository.
 <!-- SECTION:NOTES:END -->

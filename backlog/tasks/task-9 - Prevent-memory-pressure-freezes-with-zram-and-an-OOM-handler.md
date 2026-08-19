@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 19:30'
+updated_date: '2026-08-19 21:03'
 labels:
   - foundation
   - performance
@@ -61,4 +61,8 @@ Second, --avoid and --prefer match comm, which is the first 15 bytes of the proc
 Verified: 03-system.sh passes bash -n; zram sizing computed across 1-32 GB showing half of RAM up to the 8 GB cap; EARLYOOM_ARGS split into the exact 10-argument vector systemd will produce; and both regexes checked against every name they are meant to match plus near-misses like swaybg and node_modules, which correctly do not match.
 
 AC #3 needs the VM: whether a deliberate memory hog actually gets killed with the session staying interactive.
+
+Verified on the VM after sync applied the system configuration: zram active as swap at 1.9G with zstd, which is min(ram / 2, 8192) on that machine and confirms the sizing expression scales rather than being pinned to the 16 GB target. vm.swappiness 180 and vm.page-cluster 0 both applied. earlyoom running.
+
+The check initially reported earlyoom running without its avoid/prefer patterns. That was a defect in the check, not the configuration: systemctl show --property=ExecStart reports the command line as written in the unit, where the arguments are still the literal string $EARLYOOM_ARGS, so the patterns could never appear there. Fixed to inspect the running process instead.
 <!-- SECTION:NOTES:END -->

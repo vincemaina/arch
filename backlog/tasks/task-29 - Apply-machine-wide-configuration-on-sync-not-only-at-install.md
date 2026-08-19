@@ -1,11 +1,11 @@
 ---
 id: TASK-29
 title: 'Apply machine-wide configuration on sync, not only at install'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 20:44'
-updated_date: '2026-08-19 20:46'
+updated_date: '2026-08-19 21:03'
 labels:
   - repo
   - workflow
@@ -27,11 +27,11 @@ The install path and the sync path must not drift, so the list of what gets inst
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A change under setup/system/ reaches an already-installed machine through the normal sync command
+- [x] #1 A change under setup/system/ reaches an already-installed machine through the normal sync command
 - [x] #2 The mapping from repository file to system destination is defined once and used by both the installer and sync
 - [x] #3 Bootloader configuration remains install-time only and is not applied by sync
 - [x] #4 Re-running sync leaves an already-correct machine unchanged
-- [ ] #5 Configuration that needs a service restart or reboot to take effect either takes effect or is reported, never silently deferred
+- [x] #5 Configuration that needs a service restart or reboot to take effect either takes effect or is reported, never silently deferred
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -46,4 +46,12 @@ An in-use zram device cannot be resized, which is correct as it holds swapped-ou
 Bootloader templates stay install-time only and are deliberately not in the mapping.
 
 Verified: both scripts pass bash -n; the root guard rejects a non-root run; the mapping parses to the three intended destinations and every file under setup/system is accounted for as mapped, an install-time template, or the script itself; sync.sh dry run reports the step without acting and the real run invokes it through sudo with --activate; and no code path in either script touches the bootloader.
+
+Verified end to end on the VM. Before the fix the same check reported no zram, swappiness 60, page-cluster 3 and earlyoom not running, with all of that configuration present in the repository. After sync.sh applied setup/system/ through apply-config.sh --activate, every one of those is correct on the running machine, and the settings took effect immediately rather than waiting for a reboot.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Extracted setup/system/apply-config.sh as the single owner of the repository-file to /etc-destination mapping, called by 03-system.sh during install and by sync.sh with --activate on a running machine. Fixes a gap in TASK-12 where machine-wide configuration could only ever reach a machine during a fresh install, leaving all of the zram and earlyoom work inert. Bootloader templates stay install-time only since they are rendered with the machine root UUID. Verified on the VM: configuration that was previously absent is now applied and active immediately, confirmed by checks/session.sh going from four failures in that area to none.
+<!-- SECTION:FINAL_SUMMARY:END -->
