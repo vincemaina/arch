@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 20:46'
+updated_date: '2026-08-19 22:21'
 labels:
   - foundation
   - desktop
@@ -24,7 +24,7 @@ Several bindings in setup/dotfiles/dot_config/sway/config call commands the inst
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Media keys control playback on a fresh install
-- [ ] #2 Both screenshot bindings save a file successfully on a fresh install
+- [x] #2 Both screenshot bindings save a file successfully on a fresh install
 - [ ] #3 A GUI action requiring elevated privileges shows a working authentication prompt
 - [x] #4 Every external command referenced by the sway config resolves to a package listed in a manifest
 - [x] #5 The check for the criterion above is automated so future drift is caught rather than discovered in use
@@ -62,4 +62,16 @@ checks/sway-commands.sh run by the user on the VM against a real package databas
 Still outstanding: AC #1, #2 and #3 are behavioural rather than resolvable by the checker. A command existing and being declared does not prove the binding fires, that grim writes a file, or that the agent renders a prompt.
 
 checks/session.sh on the VM found the screenshot helper writing to /home/vincemaina/ rather than a pictures directory. Cause: when XDG user directories have never been set up, xdg-user-dir answers with $HOME instead of failing, and the fallback only triggered on an empty answer. Fixed by treating an answer equal to $HOME as unconfigured. Verified against a stub xdg-user-dir that returns $HOME, which now lands the file in ~/Pictures.
+
+User confirms volume and media keys working, and notes volume was working before this change. That is correct, and worth recording precisely because the original task description conflated the two.
+
+The volume keys call pactl, provided by libpulse, which pipewire-pulse has always pulled in as a dependency. They were never broken. Adding libpulse to desktop.txt is manifest honesty about a command the config invokes directly, not a fix.
+
+The playback keys call playerctl, which was in no manifest and not installed, so those genuinely could not have worked. The failure was invisible because play-pause does nothing observable unless an MPRIS-capable player is running, which makes a missing binary and an idle system look identical.
+
+AC #1 is therefore only partly verified: the volume half is confirmed, and playerctl is confirmed installed and resolvable by checks/sway-commands.sh, but controlling actual playback has not been observed against a running player.
+
+Print and Shift+Print confirmed working by the user, verifying AC #2: both screenshot bindings save a file. That covers the binding path as well as the helper, which the check exercises directly.
+
+Remaining: the polkit agent. checks/session.sh can confirm the agent process is running but not that polkit actually routes a request to it, which needs an interactive prompt. The manual step now names the exact command, pkexec --disable-internal-agent true, rather than describing the situation vaguely. The flag matters: plain pkexec on a tty falls back to its own text-mode agent and would say nothing about the graphical one.
 <!-- SECTION:NOTES:END -->

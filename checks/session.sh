@@ -170,9 +170,15 @@ Still needs a human, because no script can observe them:
   2. Press Print, then Shift+Print.             Expect: a file appears in your
                                                 pictures directory; Shift+Print
                                                 lets you drag a region first.
-  3. Do something needing a password in a GUI   Expect: a password dialog.
-     app, e.g. change a setting in pavucontrol
-     that needs privileges.
+  3. Run:  pkexec --disable-internal-agent true  Expect: a graphical password
+                                                dialog. Entering your password
+                                                exits silently; cancelling says
+                                                "Request dismissed". Either one
+                                                proves the polkit agent is wired
+                                                up. Without the flag, pkexec
+                                                uses its own text prompt and
+                                                tells you nothing about the
+                                                graphical agent.
   4. Open a terminal and run:  tail /dev/zero   Expect: it gets killed after a
                                                 while and the desktop stays
                                                 responsive throughout.
