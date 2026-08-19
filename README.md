@@ -1,3 +1,15 @@
+```md
+<p align="center">
+  <img src="./assets/arch-logo.svg" width="180" alt="Arch Linux">
+</p>
+
+<h1 align="center">Arch</h1>
+
+<p align="center">
+  A lightweight, reproducible Arch Linux environment.
+</p>
+```
+
 # Arch
 
 My version-controlled, reproducible Arch Linux setup.
