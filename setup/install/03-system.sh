@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="/root/arch-setup"
+REPO_ROOT="/opt/arch-setup"
 
 source "$REPO_ROOT/install.conf"
 
