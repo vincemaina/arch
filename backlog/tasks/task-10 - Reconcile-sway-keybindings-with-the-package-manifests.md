@@ -1,9 +1,11 @@
 ---
 id: TASK-10
 title: Reconcile sway keybindings with the package manifests
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-19 18:15'
+updated_date: '2026-08-19 19:26'
 labels:
   - foundation
   - desktop
@@ -25,5 +27,33 @@ Several bindings in setup/dotfiles/dot_config/sway/config call commands the inst
 - [ ] #2 Both screenshot bindings save a file successfully on a fresh install
 - [ ] #3 A GUI action requiring elevated privileges shows a working authentication prompt
 - [ ] #4 Every external command referenced by the sway config resolves to a package listed in a manifest
-- [ ] #5 The check for the criterion above is automated so future drift is caught rather than discovered in use
+- [x] #5 The check for the criterion above is automated so future drift is caught rather than discovered in use
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add the missing packages: playerctl for the media keys, xdg-user-dirs so a screenshot directory exists, polkit-gnome as the authentication agent, and libpulse explicitly since the config calls pactl directly even though pipewire-pulse pulls it in as a dependency.
+2. Run the polkit agent as a systemd user unit following the pattern established by TASK-11, rather than as a sway exec line.
+3. Move the three screenshot bindings into a helper script that resolves the pictures directory through xdg-user-dir, creates it if absent, and handles the full-screen, region and clipboard cases. That removes the duplicated date and grim invocations and fixes the actual bug, which is writing to a directory nothing creates.
+4. Write checks/sway-commands.sh, outside setup/ because it is repository tooling rather than machine payload. It extracts every command the session invokes and verifies each is owned by a package declared in a manifest.
+5. Cover three surfaces: exec targets in the sway config with set variables expanded, absolute ExecStart paths in the session units, and the external commands used by helper scripts, which are declared in a "# requires:" header so they can be checked without parsing arbitrary shell.
+6. Make the check enforce its own convention: a helper script with no requires header is a failure, so the declaration cannot be quietly skipped.
+7. Verify extraction offline with a stub pacman, since resolving a command to its owning package needs a real Arch system.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Added playerctl, xdg-user-dirs, polkit-gnome and libpulse to desktop.txt, plus pacman-contrib to dev.txt for pactree, which the check needs to resolve dependency closure.
+
+polkit-gnome runs as a session unit following the TASK-11 pattern. Chosen over the Qt agents because the desktop already pulls GTK3 through Waybar and Thunar; noted in DECISIONS.md that it is unmaintained upstream and mate-polkit is the drop-in replacement if that becomes a problem.
+
+Screenshots moved into ~/.local/bin/sway-screenshot, which resolves the pictures directory through xdg-user-dir, falls back to ~/Pictures, and creates it. That fixes the actual bug and removes the duplicated grim and date invocations across three bindings. Bindings call it by path because ~/.local/bin is not guaranteed to be on the PATH sway inherits, and a binding that silently does nothing is exactly what this replaced.
+
+checks/sway-commands.sh lives outside setup/ as repository tooling. It resolves each command to its owning package with pacman -Qoq and accepts anything within the dependency closure of the manifests via pactree, so coreutils commands like date are correctly accepted through base without being listed.
+
+Verified: extraction produces the expected command set from all three surfaces, with set variables expanded ($term to foot, $menu to wofi). The resolution logic was exercised against stubs across all five branches - repo helper present, repo helper missing, command not installed, owned by an undeclared package, owned by no package at all - producing exactly the expected four failures. The missing-header rule was tested separately and correctly fails a script without one.
+
+AC #1, #2 and #3 need the VM: whether media keys, both screenshot bindings and a privilege prompt actually work end to end. AC #4 is verified only as far as the checker logic goes; running it for real needs pacman and pactree.
+<!-- SECTION:NOTES:END -->

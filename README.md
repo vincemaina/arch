@@ -132,6 +132,20 @@ removes packages: anything installed by hand and not declared in
 This is the normal day-to-day loop. Change the repository, run `sync.sh`, see
 the result — no rebuild required.
 
+## Checks
+
+Repository checks live in [`checks/`](./checks/) and run on an installed machine:
+
+```bash
+./checks/sway-commands.sh
+```
+
+This verifies that every external command the sway session invokes — keybindings,
+session units, and helper scripts — is provided by a package declared in
+`setup/packages/`. It exists because the config and the manifests could otherwise
+drift apart silently: media keys called `playerctl`, which was never installed, so
+the keys simply did nothing and nothing reported an error.
+
 ## Design
 
 The setup is intentionally:

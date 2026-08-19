@@ -22,12 +22,22 @@ wireplumber
 xdg-desktop-portal
 xdg-desktop-portal-wlr
 
+# pactl, used directly by the volume keys. Pulled in by pipewire-pulse as a
+# dependency, but listed because the config depends on the command itself.
+libpulse
+
 # Screenshots?
 grim
 slurp
 
 # Clipboard tool
 wl-clipboard
+
+# Standard user directories, so ~/Pictures and friends exist
+xdg-user-dirs
+
+# Authentication agent, so graphical privilege prompts work at all
+polkit-gnome
 
 # Brightness
 brightnessctl
@@ -40,6 +50,9 @@ network-manager-applet
 # Notifications
 mako
 libnotify
+
+# Media player control, used by the playback keys
+playerctl
 
 # Fonts
 noto-fonts

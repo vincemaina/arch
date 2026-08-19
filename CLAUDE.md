@@ -57,6 +57,10 @@ Two consequences worth holding onto:
 # Run as the normal user, never root. --dry-run previews without changing anything.
 ./sync.sh
 
+# Verify no sway binding or session unit calls a command nothing installs.
+# Needs a real Arch system (uses pacman and pactree).
+./checks/sway-commands.sh
+
 # Backlog task management (see the CRITICAL_INSTRUCTION block above)
 backlog task list
 backlog task create "..."
@@ -86,7 +90,13 @@ So stages 3–5 must only reference paths under `/opt/arch-setup`, and only the 
 
 Stage responsibilities: 01 partitions and mounts, 02 `pacstrap`s base + writes fstab, 03 configures locale/hostname/user/sudo/NetworkManager and installs systemd-boot, 04 installs desktop + dev packages, 05 applies dotfiles.
 
-`sync.sh` is the third context: it runs on a fully installed machine, as the normal user, from a git clone. It must never reference the numbered stages — anything it calls has to be safe to run repeatedly on a live system.
+`sync.sh` is the third context: it runs on a fully installed machine, as the normal user, from a git clone. It must never reference the numbered stages — anything it calls has to be safe to run repeatedly on a live system. `checks/` shares that context: repository tooling that reads `setup/` and inspects the live system, never copied onto it.
+
+### Session components are systemd user units
+
+The desktop is launched with `uwsm start -- sway`, which starts `graphical-session.target`. Waybar, mako, swayidle and the polkit agent are user units in `setup/dotfiles/dot_config/systemd/user/`, enabled by committed symlinks in `graphical-session.target.wants/` rather than `systemctl --user enable` (which has no user session inside the installer chroot). Add a session component as a unit, not a sway `exec` line — an `exec` gets no supervision. Note that a plain `sway` launch reaches no session target, so none of them start.
+
+Helper scripts in `dot_local/bin/` must carry a `# requires:` header listing the external commands they call; `checks/sway-commands.sh` fails if one does not.
 
 ### `setup/install.conf`
 

@@ -9,6 +9,8 @@ set -euo pipefail
 #
 # swayidle runs each of these through `sh -c`, so they are command strings
 # rather than argument lists.
+#
+# requires: swayidle swaylock swaymsg
 
 LOCK_AFTER=300          # seconds of inactivity before locking
 DISPLAYS_OFF_AFTER=600  # seconds of inactivity before powering displays down

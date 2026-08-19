@@ -552,6 +552,58 @@ The WLR backend provides the compositor-specific integration needed by Sway.
 
 ---
 
+## polkit-gnome as the authentication agent
+
+**Decision:** Install `polkit-gnome` and run it as a session unit.
+
+### Why
+
+polkit was installed but no authentication agent ran, so any graphical action
+needing elevated privileges had nothing to present a password prompt and simply
+failed. Sway, unlike a full desktop environment, ships no agent of its own.
+
+`polkit-gnome` depends only on GTK3 and polkit itself. The desktop already pulls
+GTK3 in through Waybar and Thunar, so it adds essentially nothing. The Qt-based
+agents would drag in a second toolkit for one dialog.
+
+### Trade-off
+
+`polkit-gnome` has not seen an upstream release in a long time. It works and Arch
+still ships it, but if that changes, `mate-polkit` is the maintained fork of the
+same code and would be a drop-in replacement.
+
+---
+
+## Helper scripts declare what they call
+
+**Decision:** Scripts in `dotfiles/dot_local/bin/` carry a `# requires:` header
+listing the external commands they use, and a check enforces it.
+
+### Why
+
+The bug this came from was quiet: the media keys called `playerctl`, which was
+never in any manifest, so pressing them did nothing and nothing reported an
+error. Screenshots had the same shape — they wrote to a directory nothing
+created. Both had been that way since the config was first committed.
+
+`checks/sway-commands.sh` closes that gap by resolving every command the session
+invokes back to a declared package. Commands in the sway config and in unit files
+can be extracted mechanically, but working out what an arbitrary shell script
+might run cannot be done reliably by parsing it.
+
+Declaring dependencies in a header keeps them checkable without guessing. The
+check treats a missing header as a failure, so the declaration cannot quietly be
+skipped when a new helper is added.
+
+### Trade-off
+
+The header is maintained by hand and can go stale — a command added to a script
+without updating it escapes the check. That is a real weakness, but a smaller one
+than not checking at all, and the failure is visible in review rather than silent
+in use.
+
+---
+
 ## polkit
 
 **Decision:** Include polkit support in the desktop stack.
