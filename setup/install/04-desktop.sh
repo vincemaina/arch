@@ -1,8 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SETUP_ROOT="/opt/arch-setup"
 
-sudo pacman -Syu --needed
-sudo pacman -S --needed - < "$REPO_ROOT/packages/desktop.txt"
-sudo pacman -S --needed - < "$REPO_ROOT/packages/dev.txt"
+echo "==> Reading desktop package manifest"
+
+mapfile -t DESKTOP_PACKAGES < <(
+    grep -Ev '^[[:space:]]*(#|$)' \
+        "$SETUP_ROOT/packages/desktop.txt"
+)
+
+echo "==> Reading development package manifest"
+
+mapfile -t DEV_PACKAGES < <(
+    grep -Ev '^[[:space:]]*(#|$)' \
+        "$SETUP_ROOT/packages/dev.txt"
+)
+
+echo "==> Installing desktop packages"
+
+pacman -S --needed --noconfirm "${DESKTOP_PACKAGES[@]}"
+
+echo "==> Installing development packages"
+
+pacman -S --needed --noconfirm "${DEV_PACKAGES[@]}"
+
+echo
+echo "Desktop installation complete."
