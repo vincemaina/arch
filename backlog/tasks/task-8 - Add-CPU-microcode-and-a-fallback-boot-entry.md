@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:14'
-updated_date: '2026-08-19 19:18'
+updated_date: '2026-08-19 21:07'
 labels:
   - foundation
   - boot
@@ -58,4 +58,6 @@ Verified: bash -n on 03-system.sh; the hook logic exercised against four HOOKS v
 AC #4 not verified here: booting both entries needs the VM, since nothing in this container can run bootctl or mkinitcpio.
 
 Original AC #2 asked for a microcode initrd line ordered before the main initramfs in the boot entry. That was written from the older documented method, before establishing that Arch now bundles microcode through the mkinitcpio hook and explicitly says the initrd lines can be dropped. The criterion was replaced rather than checked, since satisfying it as written would mean deliberately using the superseded approach.
+
+Microcode half confirmed live on the VM: the hook is present in HOOKS and both ucode packages are installed. The fallback boot entry cannot be confirmed there, since boot entries are rendered at install time and sync deliberately never touches the bootloader; it needs a machine built by the current install.sh.
 <!-- SECTION:NOTES:END -->

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 21:03'
+updated_date: '2026-08-19 21:07'
 labels:
   - foundation
   - performance
@@ -65,4 +65,6 @@ AC #3 needs the VM: whether a deliberate memory hog actually gets killed with th
 Verified on the VM after sync applied the system configuration: zram active as swap at 1.9G with zstd, which is min(ram / 2, 8192) on that machine and confirms the sizing expression scales rather than being pinned to the 16 GB target. vm.swappiness 180 and vm.page-cluster 0 both applied. earlyoom running.
 
 The check initially reported earlyoom running without its avoid/prefer patterns. That was a defect in the check, not the configuration: systemctl show --property=ExecStart reports the command line as written in the unit, where the arguments are still the literal string $EARLYOOM_ARGS, so the patterns could never appear there. Fixed to inspect the running process instead.
+
+Re-run after the check fix confirms earlyoom is running with its avoid/prefer patterns intact, so the unquoted form survives systemd word-splitting as intended. Only the memory-stress test remains.
 <!-- SECTION:NOTES:END -->

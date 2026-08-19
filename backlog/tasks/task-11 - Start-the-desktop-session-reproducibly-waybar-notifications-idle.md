@@ -1,11 +1,11 @@
 ---
 id: TASK-11
 title: 'Start the desktop session reproducibly (waybar, notifications, idle)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 21:03'
+updated_date: '2026-08-19 21:07'
 labels:
   - foundation
   - session
@@ -29,7 +29,7 @@ Rather than patching in an exec line, decide how the session should be supervise
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 A fresh install reaches a complete desktop - bar, notifications and idle handling - with no manual startup step
-- [ ] #2 A crashed bar or notification daemon is restarted automatically rather than leaving the session degraded
+- [x] #2 A crashed bar or notification daemon is restarted automatically rather than leaving the session degraded
 - [x] #3 Session components are declared in one obvious place under setup/
 - [x] #4 DECISIONS.md records the comparison between plain exec, sway-systemd and uwsm, and why the chosen option won
 <!-- AC:END -->
@@ -64,4 +64,12 @@ Verified: sway directive comparison before and after shows the swayidle exec as 
 AC #1 and #2 need the VM: whether a fresh session brings everything up, and whether killing waybar or mako actually gets them restarted.
 
 Verified on the VM: after uwsm start -- sway, waybar, mako, swayidle and polkit-agent are all running with Restart=on-failure, and graphical-session.target is active. A session launched through uwsm brings the whole desktop up with no manual startup step, which was the failure this task existed to fix - waybar previously had to be started by hand and appeared nowhere in the repository.
+
+Restart-on-failure verified behaviourally, not just by property: the user ran systemctl --user kill -s KILL waybar and confirmed the bar reappeared, and the check run immediately afterwards reports waybar running. A SIGKILL is the strongest form of the failure this task was meant to survive, and the session recovered without intervention.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Adopted uwsm so the session runs as systemd units under graphical-session.target. Waybar previously had to be started by hand and appeared nowhere in the repository, so a fresh install produced no bar at all; it now starts with the session, as do mako, swayidle and the polkit agent, each supervised and restarted on failure. Units are enabled by committed symlinks rather than systemctl --user enable, which has no user session inside the installer chroot. The swayidle invocation moved to a script so its quoting could be verified. Verified on the VM: after uwsm start -- sway all four units are active with Restart=on-failure and graphical-session.target is up, and killing waybar with SIGKILL brought it straight back. Alternatives weighed in DECISIONS.md: plain exec lines give no supervision, sway-systemd is AUR-only, and hand-rolled units would reimplement uwsm.
+<!-- SECTION:FINAL_SUMMARY:END -->
