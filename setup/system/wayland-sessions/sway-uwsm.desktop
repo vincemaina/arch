@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Sway
+Comment=Tiling Wayland compositor, session managed by uwsm
+Exec=uwsm start -- sway.desktop
+TryExec=uwsm
+DesktopNames=sway
+Type=Application

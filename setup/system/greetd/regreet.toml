@@ -1,0 +1,13 @@
+# ReGreet, installed to /etc/greetd/regreet.toml
+#
+# ReGreet reads session entries from the wayland-sessions directories, which is
+# what gives a session picker without maintaining a list of commands by hand.
+# That is also what will make a second desktop selectable if one is ever added.
+
+[background]
+path = "/usr/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png"
+fit = "Cover"
+
+[GTK]
+application_prefer_dark_theme = true
+font_name = "JetBrainsMono Nerd Font 12"

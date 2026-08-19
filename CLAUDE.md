@@ -94,7 +94,9 @@ Stage responsibilities: 01 partitions and mounts, 02 `pacstrap`s base + writes f
 
 ### Session components are systemd user units
 
-The desktop is launched with `uwsm start -- sway`, which starts `graphical-session.target`. Waybar, mako, swayidle and the polkit agent are user units in `setup/dotfiles/dot_config/systemd/user/`, enabled by committed symlinks in `graphical-session.target.wants/` rather than `systemctl --user enable` (which has no user session inside the installer chroot). Add a session component as a unit, not a sway `exec` line — an `exec` gets no supervision. Note that a plain `sway` launch reaches no session target, so none of them start.
+The machine boots to greetd/ReGreet, which launches `uwsm start -- sway.desktop`. Waybar, mako, swayidle and the polkit agent are user units in `setup/dotfiles/dot_config/systemd/user/`, enabled by committed symlinks in `wayland-session@sway.target.wants/` rather than `systemctl --user enable` (which has no user session inside the installer chroot).
+
+Bind session components to **`wayland-session@sway.target`, never `graphical-session.target`** — the generic target is reached by every compositor, so a unit wanted by it would also start under a different desktop. Add a session component as a unit, not a sway `exec` line; an `exec` gets no supervision. A plain `sway` launch reaches no session target at all, so nothing starts — which is why login is graphical.
 
 Helper scripts in `dot_local/bin/` must carry a `# requires:` header listing the external commands they call; `checks/sway-commands.sh` fails if one does not.
 

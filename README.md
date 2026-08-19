@@ -81,7 +81,7 @@ The installer handles the rest, including:
 * Locale, timezone and users
 * NetworkManager
 * systemd-boot
-* Sway and desktop packages
+* Sway, the graphical login and desktop packages
 * Development utilities
 * User configuration and dotfiles
 
@@ -89,17 +89,15 @@ It will prompt for any information that should not be hardcoded, such as passwor
 
 When installation finishes, the machine powers off. Remove the Arch installation media and boot from the newly installed system.
 
-After logging in:
-
-```bash
-uwsm start -- sway
-```
+The machine boots to a graphical login screen. Log in and the desktop starts.
 
 The session is launched through [uwsm](https://wiki.archlinux.org/title/Universal_Wayland_Session_Manager),
 which wraps the compositor in systemd units. That is what starts the bar,
 notifications and idle handling, restarts them if they fail, and shuts them down
-cleanly. Starting `sway` directly still gives a working compositor, but none of
-those components will come up.
+cleanly.
+
+If the session will not start, `Ctrl+Alt+F2` reaches a plain text console. The
+login screen only occupies the first virtual terminal.
 
 ## Keeping a machine up to date
 

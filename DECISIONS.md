@@ -410,17 +410,94 @@ The aim here is not to reproduce a full desktop environment. It is to build a sm
 
 ---
 
-## No display manager
+## A display manager, reversing an earlier decision
 
-**Decision:** Do not install a graphical display manager by default.
+**Decision:** Log in graphically through greetd, with ReGreet as the login screen
+hosted by cage. The session is launched as `uwsm start -- sway.desktop`.
+
+This reverses the original decision to have no display manager. That entry is
+reproduced here rather than deleted, because the reasoning was sound at the time
+and it is the change in circumstances that matters:
+
+> **Decision:** Do not install a graphical display manager by default.
+>
+> The current system logs in through a TTY and starts Sway manually. This keeps
+> startup simple and avoids another long-running component. A display manager may
+> be added later if automatic graphical login becomes more valuable than the
+> simplicity of the current approach.
+
+### Why it changed
+
+When that was written, typing `sway` at a TTY was equivalent to any other way of
+starting it. Adopting uwsm made that false. The session now has supervised
+components — the bar, notifications, idle handling, the authentication agent —
+and they only start when the session is launched through uwsm. Typing plain
+`sway` produces a desktop that looks completely normal and is missing all of
+them, with nothing on screen indicating it.
+
+That happened during verification of this very setup, which is the strongest
+argument available: the failure is silent, plausible, and easy to repeat. A
+manual launch is no longer merely inconvenient, it is a way to get a subtly
+broken system.
+
+Removing the typed command removes the failure. Nobody types the launch command,
+so nobody can get it wrong.
+
+### Why greetd and ReGreet
+
+greetd is a login daemon and nothing else: it authenticates and launches whatever
+it is told to. It makes no assumptions about the session, which suits a system
+assembled from parts rather than shipped as a desktop environment.
+
+ReGreet reads session entries from the `wayland-sessions` directories, so the
+session list is derived rather than maintained by hand. That matters for a
+possible second desktop later: adding one becomes installing it, with no login
+configuration to update.
+
+It is also GTK, like Waybar and Thunar, so it introduces no second toolkit, and
+it is styled with ordinary CSS.
+
+### Alternatives considered
+
+**gtkgreet** is smaller and the traditional sway pairing, but takes its session
+list from `/etc/greetd/environments` as literal commands. Every future session
+would be a hand-maintained string.
+
+**SDDM** is the most complete and best-tested option, with themes available off
+the shelf. It was rejected for pulling Qt6 and QML onto an otherwise GTK system
+for the sake of one screen, and because it would close off `cosmic-greeter`,
+which is itself built on greetd.
+
+### Trade-off
+
+There is now a long-running component between boot and the desktop, which is
+exactly what the original decision avoided. The escape hatch is that greetd only
+takes VT 1; the other virtual terminals keep their gettys, so `Ctrl+Alt+F2`
+still reaches a plain shell when the session will not start.
+
+---
+
+## Session components bind to the compositor, not the graphical session
+
+**Decision:** Bind Waybar, mako, swayidle and the polkit agent to
+`wayland-session@sway.target` rather than `graphical-session.target`.
 
 ### Why
 
-The current system logs in through a TTY and starts Sway manually.
+`graphical-session.target` is reached by every graphical session. Units wanted by
+it start under any compositor, which is correct for something generic and wrong
+for everything here: Waybar would try to draw a sway bar on another desktop, and
+the idle script calls `swaymsg`, which would not exist there — so the screen
+would quietly stop locking.
 
-This keeps startup simple and avoids another long-running component.
+uwsm creates a per-compositor target for exactly this. Binding to it means these
+components start under sway and nowhere else.
 
-A display manager may be added later if automatic graphical login becomes more valuable than the simplicity of the current approach.
+Nothing depends on this yet, since sway is the only session installed. It is done
+now because the cost is a few lines today and a confusing, silent breakage the
+day a second desktop is added. The session entry list is already derived from
+`wayland-sessions`, so that day needs no login configuration change — which is
+precisely why the units must be correct before it arrives.
 
 ---
 

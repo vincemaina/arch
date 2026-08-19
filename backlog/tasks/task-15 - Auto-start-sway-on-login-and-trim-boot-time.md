@@ -1,10 +1,11 @@
 ---
 id: TASK-15
 title: Log in graphically and start the session automatically
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 22:53'
+updated_date: '2026-08-19 23:03'
 labels:
   - session
   - performance
@@ -36,3 +37,30 @@ DECISIONS.md currently records "No display manager" as a deliberate choice. That
 - [ ] #6 Boot time is measured before and after, and any unit found to be delaying boot for no benefit is dealt with
 - [ ] #7 DECISIONS.md revises the existing no-display-manager entry rather than leaving it contradicted
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Install greetd with ReGreet as the login screen, hosted by cage. greetd is a login daemon and nothing else, ReGreet reads session entries so the session list is derived rather than hand-maintained, and both are in the official extra repository.
+2. Ship a wayland-sessions entry that launches uwsm start -- sway.desktop, so logging in always goes through uwsm and reaches the session target.
+3. Ship a second entry hiding the packaged sway.desktop, so the plain non-uwsm session cannot be selected from the picker. Both go in /usr/local/share/wayland-sessions, which the desktop entry spec reserves for local entries and which takes precedence over /usr/share, so nothing pacman owns has to be modified.
+4. Retarget the session units from graphical-session.target to wayland-session@sway.target before any second session exists. The generic target is reached by every compositor, so units wanted by it would start under another desktop, where waybar would draw a sway bar and the idle script would call a swaymsg that is not there.
+5. Have chezmoi delete the old graphical-session.target.wants directory through .chezmoiremove, or the stale enable symlinks keep the leak alive on machines that already synced.
+6. Install greetd configuration through apply-config.sh so it reaches both fresh installs and running machines, and enable greetd there. Do not restart greetd on --activate: it owns the running session.
+7. Keep greetd on VT 1 only, so the other virtual terminals keep their gettys and Ctrl+Alt+F2 remains the recovery path.
+8. Revise the no-display-manager entry in DECISIONS.md by quoting it and explaining what changed, rather than deleting it.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented. Boot now reaches ReGreet, which lists sessions read from the wayland-sessions directories, and logging in runs uwsm start -- sway.desktop.
+
+The session units moved to wayland-session@sway.target, confirmed from the uwsm documentation as the per-compositor target name, with the compositor id being sway for both uwsm start -- sway and uwsm start -- sway.desktop. Waybar keeps its packaged unit, which is wanted by graphical-session.target in its own [Install] section; moving only the enable symlink is enough, because a unit starts when something wants it and nothing will want it outside a sway session.
+
+checks/session.sh now tests for the sway-specific target and additionally fails if anything is still enabled under graphical-session.target, so the leak cannot silently return.
+
+Verified locally: every script parses; the config file mapping still parses correctly with comments inside the bash array, producing seven entries; the sway configuration is untouched by this work.
+
+Not verifiable here, and the main risks for the VM: whether ReGreet reads /usr/local/share/wayland-sessions rather than only /usr/share, whether the Hidden entry actually suppresses the packaged sway.desktop, and whether cage -s is the right invocation. The first two fail loudly rather than silently - either no sway entry appears, or two do.
+<!-- SECTION:NOTES:END -->

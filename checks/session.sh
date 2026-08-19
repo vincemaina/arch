@@ -88,7 +88,7 @@ section "Session components (TASK-11)"
 
 if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
     skip "not running inside a Wayland session; run this from a terminal in sway"
-elif ! systemctl --user is-active --quiet graphical-session.target; then
+elif ! systemctl --user is-active --quiet 'wayland-session@sway.target'; then
     # Check this first and stop. Without the session target nothing below can
     # have started, and reporting four separate failures obscures the single
     # cause. A plain `sway` gives a working compositor with no session layer
@@ -111,10 +111,16 @@ else
         fi
     done
 
-    if systemctl --user is-active --quiet graphical-session.target; then
-        pass "graphical-session.target is active (session started through uwsm)"
+    pass "wayland-session@sway.target is active (session started through uwsm)"
+
+    # Session components are bound to the sway-specific target rather than
+    # graphical-session.target, which every compositor reaches. Anything still
+    # wanted by the generic target would start under a different desktop too.
+    leaked="$(ls "$HOME/.config/systemd/user/graphical-session.target.wants" 2>/dev/null)"
+    if [[ -n "$leaked" ]]; then
+        fail "still enabled under graphical-session.target, so these would start under any compositor: ${leaked//$'\n'/ }"
     else
-        fail "graphical-session.target is inactive; was sway started with 'uwsm start -- sway'?"
+        pass "no session units are wanted by the generic graphical-session.target"
     fi
 
     # A running polkit agent is not the same as a registered one. The agent

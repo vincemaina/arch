@@ -8,6 +8,12 @@ waybar
 # notifications and idle handling are supervised rather than fire-and-forget
 uwsm
 
+# Graphical login. greetd authenticates and launches; regreet is the login
+# screen itself; cage is the kiosk compositor that displays it.
+greetd
+greetd-regreet
+cage
+
 # Terminal
 foot
 

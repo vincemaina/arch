@@ -1,0 +1,11 @@
+# greetd, installed to /etc/greetd/config.toml
+#
+# greetd itself only handles authentication and launching. The login screen is
+# ReGreet, which needs a compositor to display it, so cage hosts it as a kiosk.
+
+[terminal]
+vt = 1
+
+[default_session]
+command = "cage -s -- regreet"
+user = "greeter"

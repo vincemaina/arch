@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Sway (do not use)
+Exec=sway
+Type=Application
+Hidden=true
+NoDisplay=true

@@ -31,6 +31,14 @@ CONFIG_FILES=(
     "zram-generator.conf:/etc/systemd/zram-generator.conf"
     "sysctl.d/99-zram.conf:/etc/sysctl.d/99-zram.conf"
     "earlyoom.conf:/etc/default/earlyoom"
+    "greetd/config.toml:/etc/greetd/config.toml"
+    "greetd/regreet.toml:/etc/greetd/regreet.toml"
+    # Local session entries. /usr/local/share is the directory the desktop
+    # entry spec reserves for these, and it takes precedence over /usr/share,
+    # which is what lets sway.desktop hide the packaged entry rather than
+    # replace a file pacman owns.
+    "wayland-sessions/sway-uwsm.desktop:/usr/local/share/wayland-sessions/sway-uwsm.desktop"
+    "wayland-sessions/sway.desktop:/usr/local/share/wayland-sessions/sway.desktop"
 )
 
 for mapping in "${CONFIG_FILES[@]}"; do
@@ -43,6 +51,11 @@ done
 # Enabling works inside the installer chroot; starting does not, because there
 # is no running system there to start anything on.
 systemctl enable earlyoom
+
+# greetd owns VT 1 and replaces the getty there. The other VTs keep theirs, so
+# Ctrl+Alt+F2 remains the way to reach a plain shell if the session will not
+# start.
+systemctl enable greetd
 
 if ! $ACTIVATE; then
     exit 0
@@ -64,6 +77,12 @@ systemctl daemon-reload
 
 if ! systemctl restart earlyoom; then
     echo "    WARNING: could not restart earlyoom" >&2
+fi
+
+# Deliberately not restarted: greetd owns the active session, and restarting it
+# would kill the desktop of whoever is running this.
+if systemctl is-active --quiet greetd; then
+    echo "    greetd is running; login screen changes apply at next boot"
 fi
 
 # zram is created by a generator, so the device only appears after the
