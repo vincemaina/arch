@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 22:21'
+updated_date: '2026-08-19 22:28'
 labels:
   - foundation
   - desktop
@@ -74,4 +74,12 @@ AC #1 is therefore only partly verified: the volume half is confirmed, and playe
 Print and Shift+Print confirmed working by the user, verifying AC #2: both screenshot bindings save a file. That covers the binding path as well as the helper, which the check exercises directly.
 
 Remaining: the polkit agent. checks/session.sh can confirm the agent process is running but not that polkit actually routes a request to it, which needs an interactive prompt. The manual step now names the exact command, pkexec --disable-internal-agent true, rather than describing the situation vaguely. The flag matters: plain pkexec on a tty falls back to its own text-mode agent and would say nothing about the graphical one.
+
+AC #3 fails on the VM: pkexec --disable-internal-agent true reports no authentication agents found, while checks/session.sh reports the polkit-agent unit running. So the process starts and stays up but is not registered with polkitd.
+
+That also exposes a defect in the check itself, now fixed: it asserted the agent was healthy purely from the unit being active, which is a false pass. A polkit agent registers itself against its own logind session, so a process that never registers still runs happily forever and the unit looks fine.
+
+Leading hypothesis is that the agent has no logind session to register against. Under uwsm, user units live in user@UID.service rather than the session-N.scope that logind tracks, and polkit-gnome 0.105 has no fallback for that case. The check now inspects the agent cgroup to distinguish the two, which will confirm or eliminate this before any fix is attempted.
+
+Diagnostics requested from the user: the unit journal, the agent cgroup, and loginctl session state.
 <!-- SECTION:NOTES:END -->

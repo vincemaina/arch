@@ -107,6 +107,22 @@ else
     else
         fail "graphical-session.target is inactive; was sway started with 'uwsm start -- sway'?"
     fi
+
+    # A running polkit agent is not the same as a registered one. The agent
+    # registers itself against its own logind session, and a process under
+    # user@UID.service may have no session to register against - in which case
+    # it runs happily forever while polkit reports no agents at all.
+    agent_pid="$(systemctl --user show polkit-agent --property=MainPID --value 2>/dev/null)"
+    if [[ -n "$agent_pid" && "$agent_pid" != "0" && -r "/proc/$agent_pid/cgroup" ]]; then
+        cgroup="$(cat "/proc/$agent_pid/cgroup")"
+        if grep -q 'session-[0-9]*\.scope' <<<"$cgroup"; then
+            pass "polkit agent is inside a logind session scope"
+        else
+            fail "polkit agent is outside any logind session scope, so it may not be registered with polkit; verify with: pkexec --disable-internal-agent true"
+        fi
+    else
+        skip "could not locate the polkit agent process to check its session"
+    fi
 fi
 
 # ----------------------------------------------------------------------
