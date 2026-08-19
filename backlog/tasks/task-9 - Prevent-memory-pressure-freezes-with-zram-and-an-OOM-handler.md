@@ -1,11 +1,11 @@
 ---
 id: TASK-9
 title: Prevent memory-pressure freezes with zram and an OOM handler
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 21:07'
+updated_date: '2026-08-19 22:52'
 labels:
   - foundation
   - performance
@@ -28,7 +28,7 @@ The install creates no swap of any kind: 01-disk.sh makes only an ESP and a Btrf
 <!-- AC:BEGIN -->
 - [x] #1 A compressed swap device is configured and active after a fresh install
 - [x] #2 A userspace OOM handler is enabled so a runaway process is killed before the desktop stops responding
-- [ ] #3 A deliberate memory-stress test on a VM keeps the session interactive and kills the hog rather than freezing
+- [x] #3 A deliberate memory-stress test on a VM keeps the session interactive and kills the hog rather than freezing
 - [x] #4 Swap and OOM configuration live under setup/ and are applied by the installer, not by hand
 - [x] #5 DECISIONS.md compares zram against a disk swapfile, and compares the OOM handler options considered
 <!-- AC:END -->
@@ -67,4 +67,16 @@ Verified on the VM after sync applied the system configuration: zram active as s
 The check initially reported earlyoom running without its avoid/prefer patterns. That was a defect in the check, not the configuration: systemctl show --property=ExecStart reports the command line as written in the unit, where the arguments are still the literal string $EARLYOOM_ARGS, so the patterns could never appear there. Fixed to inspect the running process instead.
 
 Re-run after the check fix confirms earlyoom is running with its avoid/prefer patterns intact, so the unquoted form survives systemd word-splitting as intended. Only the memory-stress test remains.
+
+AC #3 verified on the VM. tail /dev/zero grew to roughly 3.3 GiB VmRSS on a 3.4 GiB machine and was killed repeatedly while the desktop stayed responsive throughout.
+
+The journal shows the two-tier configuration behaving exactly as intended, which also explains the users observation that the first two runs reported Terminated and later ones Killed. At 23:45:01 available memory was 2.53% and swap 9.24%: below the SIGTERM thresholds but not the SIGKILL ones, so earlyoom sent SIGTERM. By 23:45:13 swap had fallen to 1.86%, crossing the 5% SIGKILL threshold, so it escalated. That is precisely what -m 10,5 -s 10,5 specifies, and it confirms setting both tiers explicitly was worthwhile rather than relying on defaults.
+
+Also visible: earlyoom used process_mrelease to reclaim the memory immediately rather than waiting for exit, each kill completed in 0.1 seconds, and swap recovered to 95% free afterwards, so zram absorbed the pressure and released it cleanly.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added compressed swap and an early OOM handler, so memory pressure no longer means a frozen desktop. zram is sized min(ram / 2, 8192) with zstd, verified to scale correctly by producing 1.9 GB on a 3.4 GB VM rather than a figure pinned to the 16 GB target machine, with swappiness and page-cluster tuned for swap that never touches a disk. earlyoom watches MemAvailable, which stays meaningful alongside zram where swap-usage signals do not, and is configured with explicit SIGTERM and SIGKILL tiers plus avoid and prefer lists so the session survives and the browser is targeted first. Verified end to end: a 3.3 GiB hog on a 3.4 GiB machine was killed repeatedly with the desktop responsive throughout, and the journal shows the escalation from SIGTERM to SIGKILL happening exactly at the configured thresholds. Two silent failures were avoided during implementation - systemd word-splits the argument string without removing quotes, so upstream own quoted example would never have matched, and the patterns match comm rather than a path.
+<!-- SECTION:FINAL_SUMMARY:END -->
