@@ -503,8 +503,9 @@ precisely why the units must be correct before it arrives.
 
 ## One palette, defined once, templated everywhere
 
-**Decision:** Gruvbox Dark, defined in `dotfiles/.chezmoidata/palette.toml`, with
-every themed file a chezmoi template that reads from it.
+**Decision:** A neon palette on a near-black background, defined in
+`dotfiles/.chezmoidata/palette.toml`, with every themed file a chezmoi template
+that reads from it.
 
 ### Why
 
@@ -528,8 +529,12 @@ swapping palettes later does not leave a variable called `orange` holding
 something blue.
 
 The sixteen ANSI terminal colours live in the same file rather than pointing foot
-at its own bundled gruvbox theme, for the same reason: a palette split across two
-places is one someone will half-update.
+at one of its bundled themes, for the same reason: a palette split across two
+places is one someone will half-update. It also means the palette is not limited
+to themes foot happens to ship, which is what broke the terminal originally.
+
+The palette changed once already, from Gruvbox to this, and the cost was editing
+one file. That is the design working.
 
 ### Trade-off
 
@@ -539,6 +544,31 @@ That is mitigated by the failure being loud — chezmoi refuses to apply — and
 being able to render into a scratch directory to check. Doing exactly that caught
 a real bug: swaylock wants its colours without a leading `#`, unlike every other
 consumer.
+
+---
+
+## Saturation is checked, not eyeballed
+
+**Decision:** Every foreground colour is measured against the background, and
+anything below a 4.5:1 contrast ratio is adjusted rather than shipped.
+
+### Why
+
+A near-black background with saturated accents is the palette most likely to
+look striking in a screenshot and be tiring to actually use. The failure is not
+obvious while choosing colours, because the eye is drawn to the bright accents
+and skips over the dim text that will be read all day.
+
+Measuring caught two real problems in the first draft. The muted grey used for
+the cpu and memory readouts came in at 4.45:1, marginally too low for something
+meant to be glanced at constantly. Terminal `bright_black` measured 2.77:1 -
+and most colour schemes use `bright_black` for code comments, so that is a
+palette that makes comments hard to read while looking perfectly fine
+everywhere else.
+
+Both were lightened until they measured above 4.5:1. Bright accents are left
+saturated, since they are used for small marks - a focus border, a workspace
+pill - rather than for text.
 
 ---
 

@@ -1,10 +1,12 @@
 // Waybar.
 //
-// Trimmed to what is worth a permanent place on screen. Removed: cpu, memory
-// and temperature, which btop reports better on the rare occasions they matter
-// and which otherwise just animate; the idle inhibitor and scratchpad
+// Trimmed to what is worth a permanent place on screen. Removed: temperature,
+// which is almost never acted on; the idle inhibitor and scratchpad
 // indicators, which report state that is already obvious; and the backlight,
 // which shows nothing on a machine without one.
+//
+// cpu and memory are kept at the user's request. They are the two readouts
+// worth a glance on a machine tuned around not running out of memory.
 //
 // Also removed a large amount of configuration for modules that were never
 // displayed at all - mpd, a media widget, a power menu, keyboard state, a
@@ -17,7 +19,7 @@
 
     "modules-left": ["sway/workspaces", "sway/mode"],
     "modules-center": ["sway/window"],
-    "modules-right": ["pulseaudio", "battery", "clock", "tray"],
+    "modules-right": ["cpu", "memory", "pulseaudio", "battery", "clock", "tray"],
 
     "sway/workspaces": {
         "disable-scroll": true,
@@ -31,6 +33,18 @@
     "sway/window": {
         "max-length": 60,
         "tooltip": false
+    },
+
+    "cpu": {
+        "format": "cpu {usage}%",
+        "interval": 3,
+        "tooltip": false
+    },
+
+    "memory": {
+        "format": "mem {percentage}%",
+        "interval": 5,
+        "tooltip-format": "{used:0.1f}G of {total:0.1f}G"
     },
 
     "pulseaudio": {

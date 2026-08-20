@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 15:28'
-updated_date: '2026-08-20 01:01'
+updated_date: '2026-08-20 01:14'
 labels:
   - desktop
   - feel
@@ -27,7 +27,7 @@ The waybar stylesheet is already carefully done, but it is the only part of the 
 - [x] #1 A single colour palette and font scale is defined once and referenced everywhere rather than repeated per component
 - [x] #2 Every module shown in the bar justifies its space; the rest are removed rather than left configured-but-hidden
 - [x] #3 Window borders, gaps and focus indication are chosen deliberately and are consistent between tiled and floating windows
-- [ ] #4 The lock screen and any session prompts match the rest of the desktop
+- [x] #4 The lock screen and any session prompts match the rest of the desktop
 - [x] #5 Changing the palette does not require editing more than one place
 <!-- AC:END -->
 
@@ -43,4 +43,12 @@ Waybar trimmed hard: cpu, memory, temperature, idle inhibitor, scratchpad and ba
 Wallpaper replaced with a flat background colour. On a tiling desktop the background is almost never visible, so an image is mostly something you configure and then never see.
 
 Verified by installing chezmoi in the container and rendering the whole source tree into a scratch destination: all 26 files render, no template syntax survives, symlinks resolve. That caught a real bug - swaylock takes its colours without a leading # unlike every other consumer, and the top-level color key had kept its #.
+
+Palette switched from Gruvbox to a neon-on-near-black scheme at the user request, wanting something more modern and futuristic. The switch cost one file, which is the templating design paying off immediately.
+
+Contrast measured rather than eyeballed, which caught two real problems in the first draft. The muted grey behind the cpu and memory readouts measured 4.45:1, marginally below readable, and terminal bright_black measured 2.77:1 - the colour most schemes use for code comments. Both lightened above 4.5:1. Bright accents left saturated since they mark small areas rather than carrying text.
+
+cpu and memory restored to the bar at the user request, styled muted so they can be glanced at without competing with the focus accent. Temperature, idle inhibitor, scratchpad and backlight stay removed.
+
+Rounded window corners investigated and not pursued: sway does not support them and SwayFX, the fork that does, is AUR-only, which would mean teaching the repository to build AUR packages. The user chose to keep everything square rather than take that on.
 <!-- SECTION:NOTES:END -->
