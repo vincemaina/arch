@@ -16,12 +16,40 @@ configuration {
     modes: "combi";
 
     /* drun is applications, window jumps to something already open, calc is
-     * rofi-calc, filebrowser walks the filesystem. */
-    combi-modes: "drun,window,calc,filebrowser";
+     * rofi-calc.
+     *
+     * filebrowser is deliberately NOT here. It walks the tree *inside* the
+     * launcher, so choosing a directory descends rather than opening it, and
+     * the application list sits alongside directory entries the whole time -
+     * two unrelated jobs in one list. File finding lives on its own binding
+     * as recursivebrowser, which searches rather than navigates. */
+    combi-modes: "drun,window,calc";
+
+    /* Fuzzy so a few characters from anywhere in the name are enough, and fzf
+     * ordering so the best match rises rather than the alphabetically first.
+     * Recency is separate and already on: rofi keeps a history per mode
+     * (disable-history is false by default), which is why the last thing
+     * launched sits at the top of an empty prompt. */
+    matching:       "fuzzy";
+    sort:           true;
+    sorting-method: "fzf";
+
+    /* Searches recursively from home and opens the result with xdg-open, so a
+     * file goes to the right program and a directory goes to the file manager.
+     * This is the "find a file" mode; filebrowser is the "walk the tree" one. */
+    recursivebrowser {
+        directory: "~";
+        command:   "xdg-open";
+    }
 
     /* Without this every row is prefixed with the mode that produced it -
      * "drun Firefox" - which is noise when the icon already says as much. */
     combi-hide-mode-prefix: true;
+
+    /* The prompt is rofi's mode name by default, so it read "combi" and
+     * "recursivebrowser" - internal vocabulary on screen. */
+    display-combi:            "run";
+    display-recursivebrowser: "find";
 
     show-icons: true;
     terminal:   "foot";
@@ -44,7 +72,7 @@ configuration {
      * and a state rule beats a plain `element` rule, so overriding `element`
      * alone left the list rendering in rofi's cream. Found by asking
      * `rofi -dump-theme` what it had actually applied. */
-    background:                  @bg;
+    background:                  transparent;
     foreground:                  @text;
     separatorcolor:              @surface-alt;
     lightbg:                     @surface;
@@ -52,24 +80,24 @@ configuration {
     blue:                        @accent;
     red:                         @urgent;
 
-    normal-background:           @bg;
+    normal-background:           transparent;
     normal-foreground:           @text-dim;
-    alternate-normal-background: @bg;
+    alternate-normal-background: transparent;
     alternate-normal-foreground: @text-dim;
     selected-normal-background:  @accent;
     selected-normal-foreground:  @bg;
 
     /* Something already open, rather than something to launch. */
-    active-background:           @bg;
+    active-background:           transparent;
     active-foreground:           @secondary;
-    alternate-active-background: @bg;
+    alternate-active-background: transparent;
     alternate-active-foreground: @secondary;
     selected-active-background:  @secondary;
     selected-active-foreground:  @bg;
 
-    urgent-background:           @bg;
+    urgent-background:           transparent;
     urgent-foreground:           @urgent;
-    alternate-urgent-background: @bg;
+    alternate-urgent-background: transparent;
     alternate-urgent-foreground: @urgent;
     selected-urgent-background:  @urgent;
     selected-urgent-foreground:  @bg;
@@ -80,9 +108,15 @@ configuration {
 }
 
 window {
-    background-color: @bg;
+    /* Slightly transparent, matching the terminals. Alpha is the last two hex
+     * digits: e8 is about 91%. rofi has no blur of its own and cannot get one
+     * here - the word does not appear in rofi-theme(5), and blur needs the
+     * compositor to implement ext-background-effect-v1, which sway does not.
+     * Same answer as foot. */
+    background-color: {{ .palette.bg }}e8;
     border:           2px;
     border-color:     @accent;
+    border-radius:    8px;
     width:            44em;
     padding:          0;
     location:         center;
@@ -90,7 +124,7 @@ window {
 }
 
 mainbox {
-    background-color: @bg;
+    background-color: transparent;
     children:         [ inputbar, listview ];
     padding:          0;
 }
@@ -98,7 +132,7 @@ mainbox {
 /* The prompt reads as one bar rather than a box inside a box: the surface
  * colour separates it from the list without drawing a line. */
 inputbar {
-    background-color: @surface;
+    background-color: {{ .palette.surface }}cc;
     text-color:       @text;
     padding:          12px 14px;
     spacing:          10px;
@@ -119,7 +153,7 @@ entry {
 }
 
 listview {
-    background-color: @bg;
+    background-color: transparent;
     lines:            10;
     padding:          6px;
     scrollbar:        false;
@@ -128,7 +162,7 @@ listview {
 }
 
 element {
-    background-color: @bg;
+    background-color: transparent;
     text-color:       @text-dim;
     padding:          7px 10px;
     spacing:          10px;

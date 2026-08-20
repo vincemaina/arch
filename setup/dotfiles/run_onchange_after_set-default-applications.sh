@@ -25,6 +25,10 @@ set -euo pipefail
 # desktop file : mime types it should handle
 ASSOCIATIONS=(
     "imv.desktop:image/png image/jpeg image/gif image/webp image/bmp image/tiff"
+    # Opening a folder should land in the file manager being used, which is a
+    # terminal one. yazi.desktop declares Terminal=true, so xdg-open starts it
+    # inside a terminal rather than trying to draw a window it does not have.
+    "yazi.desktop:inode/directory"
 )
 
 for entry in "${ASSOCIATIONS[@]}"; do
