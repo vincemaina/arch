@@ -513,6 +513,73 @@ Thin focused-window borders retain the useful visual cue while keeping the inter
 
 ---
 
+## One organising principle for keybindings
+
+**Decision:** `$mod` is for window management, nothing else may take a `$mod`
+chord, and there is one binding per action.
+
+Applications are not bound at all. They are launched from `$mod+space`.
+
+### Why
+
+The bindings had grown by accretion: the upstream defaults, plus a browser and a
+file manager bolted on. Those two took `$mod+b` and `$mod+e`, which were already
+`splith` and `layout toggle split` — so two core layout commands silently stopped
+existing. sway does not warn about a duplicate; the later definition just wins.
+
+The underlying problem is that a finite namespace was being shared between two
+things that grow at different rates. Window management commands are a fixed set
+you learn once. Applications are unbounded. Letting applications into `$mod`
+guarantees the collision recurs, and relocating them to another modifier only
+postpones it.
+
+Not binding applications at all removes the competition. Launching costs one
+extra keystroke through the launcher, and in exchange the layout commands can
+never be shadowed again and the scheme has no growth problem.
+
+The terminal on `$mod+Return` is the deliberate exception: on a tiling desktop it
+is less an application than the thing windows are usually made of.
+
+### The second half: one way to do each thing
+
+Upstream ships arrow keys alongside `h/j/k/l` so newcomers are not stuck before
+learning vim keys. Keeping both is exactly the kind of thing this setup argues
+against elsewhere — the same reasoning applied to a bar module or a package
+would delete it. The arrow duplicates are gone, as is stacking, which does the
+same job as tabbed.
+
+Prev/next workspace stepping duplicated the numbered bindings and is gone too.
+`Alt+Tab`, which had been bound to workspaces, is now unbound: everywhere else in
+computing it means "switch window", and applications sometimes want it.
+`$mod+Tab` returns to the previous workspace, which was the useful part.
+
+This took 80 bindings to 64, but the count is not the point. Every remaining
+binding is there because someone decided it should be.
+
+### How it is enforced
+
+`checks/sway-bindings.sh` fails if any combination is bound twice, comparing
+across all fragments with `set` variables expanded and modifiers sorted, so
+`$mod+Shift+q` and `Shift+$mod+q` are recognised as the same binding. It also
+prints the full table, which is the practical documentation of the scheme: 64
+bindings across four fragments is more than can be held in mind while editing
+one of them.
+
+### Trade-off
+
+Launching a frequently-used application is now two keystrokes and a few letters
+rather than one chord. That is a real cost paid every day, accepted because the
+alternative is a namespace that collides again as soon as a third application
+seems worth binding.
+
+Tapping `$mod` alone to open the launcher would remove even that cost, but sway
+cannot distinguish a tap from a hold: a release binding on the modifier also
+fires after every `$mod` chord. Doing it properly needs a dual-role key daemon
+such as `keyd` intercepting input below the compositor, which was judged too
+much machinery for one keystroke.
+
+---
+
 ## GB keyboard layout
 
 **Decision:** Configure the graphical keyboard layout as UK (`gb`) and the console keymap as `uk`.
