@@ -70,11 +70,17 @@ if $floating; then
     # and the window fits its contents rather than leaving dead space that
     # shifts with any font-size change. fastfetch prints 90 columns by 21 rows;
     # the extra row is the prompt underneath.
-    exec foot \
+    # Launched rather than exec'd, so this script can outlive the launch just
+    # long enough to place the window. foot carries on afterwards as an orphan.
+    foot \
         --app-id=greeting \
         --title=greeting \
         --window-size-chars=92x23 \
-        -e zsh -c 'fastfetch; exec zsh -i'
+        -e zsh -c 'fastfetch; exec zsh -i' &
+
+    # Where there is room, rather than always dead centre - two floating
+    # terminals landing on exactly the same spot are impossible to tell apart.
+    exec "$(dirname "$(readlink -f "$0")")/sway-place-floating" $!
 fi
 
 exec foot -e zsh -c 'fastfetch; exec zsh -i'
