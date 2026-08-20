@@ -1,11 +1,11 @@
 ---
 id: TASK-15
 title: Log in graphically and start the session automatically
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-20 00:00'
+updated_date: '2026-08-20 00:13'
 labels:
   - session
   - performance
@@ -121,4 +121,12 @@ This is a good argument for the fresh-install test recorded under Testing Strate
 Boot measured on the VM at 4.412s total - 842ms kernel, 1.501s initrd, 2.068s userspace - with graphical.target reached at 2.065s. systemd-analyze blame is topped entirely by device units, which is timing noise rather than services stalling, so nothing there needs fixing. NetworkManager-wait-online was enabled; nothing on this system orders after network-online.target, so it buys nothing and can stall boot for many seconds on wireless or a slow lease. It is now disabled by apply-config.sh.
 
 swaylock verified: locking and unlocking returns to the running session rather than to the greeter, which was the plausible regression from greetd owning the session. Idle timeout and suspend not separately observed; swayidle.service is confirmed running and its configuration is unchanged from when the timeout was working.
+
+Fresh VM built from the current installer with no manual steps: boot reaches the graphical login, logging in brings up the full supervised session. The ordering fix holds.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced the TTY login and hand-typed launch command with greetd and ReGreet, hosted by cage, launching the session through uwsm. This was no longer a convenience question: after adopting uwsm, typing sway rather than the uwsm command produced a desktop that looked entirely normal while missing its bar, notifications, idle handling and authentication agent, and that happened during verification. Removing the typed command removes the failure. The greeter offers exactly one session and checks/session.sh asserts on every run that every session offered goes through uwsm. Session components were also moved from graphical-session.target to wayland-session@sway.target so they cannot start under a future second desktop, which is the groundwork for adding one. DECISIONS.md quotes and revises the original no-display-manager entry rather than leaving it contradicted. Boot measured at 4.4s with graphical.target at 2.065s, and NetworkManager-wait-online disabled as a latent stall that buys nothing here. Verified on a fresh VM built from the installer, after three defects found by testing rather than reasoning: a masking entry that shadowed the desktop ID uwsm resolves, causing a login loop; a greeter search path that silently offered the packaged non-uwsm session; and a systemd ordering cycle that made systemd delete waybar start job. The VT 2 escape hatch was load-bearing during the first of those.
+<!-- SECTION:FINAL_SUMMARY:END -->
