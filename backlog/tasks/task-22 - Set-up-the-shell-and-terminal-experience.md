@@ -1,11 +1,11 @@
 ---
 id: TASK-22
 title: Set up the shell and terminal experience
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:16'
-updated_date: '2026-08-20 11:10'
+updated_date: '2026-08-20 13:02'
 labels:
   - dotfiles
   - feel
@@ -54,3 +54,9 @@ git_status is now its own pill and only appears when the tree is dirty, which al
 
 Noted for the user: ls does not show git status because the alias is plain eza; the git column requires long format, which is what ll provides.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced an unconfigured bash with zsh, three official plugin packages sourced directly, and starship. No Oh My Zsh: a self-updating git clone sits outside the manifests this repository is built on, and it would be a framework managing three source lines. Not powerlevel10k either, being AUR-only and in maintenance mode, where starship is a package configured by one templated file that works on any shell. History is large, shared and deduplicated; completion is cached and case-insensitive; fzf, zoxide, eza and bat are wired in, with eza and bat taking ANSI colours so they follow the palette rather than holding a copy of it. Startup measured at 128ms against a 400ms budget the check enforces. The login shell is changed last and only when zsh -n on the zshrc passes, so a syntax error cannot become what greets every login.
+<!-- SECTION:FINAL_SUMMARY:END -->

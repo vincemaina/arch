@@ -1,11 +1,11 @@
 ---
 id: TASK-3
 title: Define the visual design of the desktop
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 15:28'
-updated_date: '2026-08-20 12:14'
+updated_date: '2026-08-20 13:02'
 labels:
   - desktop
   - feel
@@ -74,3 +74,9 @@ The path is an absolute one rendered by chezmoi rather than a bare tilde, since 
 
 Added a check for it. swaybg fails quietly when its image is missing - the output is just left blank, which looks like a plain desktop rather than a fault - so the check verifies the configured file exists, swaybg is installed, and it is actually running.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Gave the desktop one design. A single palette in .chezmoidata/palette.toml drives sway appearance, the bar, foot, swaylock and the prompt through chezmoi templates, so a colour is changed in one place - demonstrated by swapping the whole palette from Gruvbox to neon at a cost of one file. Contrast is measured rather than eyeballed, which caught readouts at 4.45:1 and terminal comments at 2.77:1 before they shipped. The bar carries coloured pills so it can be scanned rather than read, after a first attempt at uniform grey proved austere rather than minimal; that reversal is recorded in DECISIONS.md rather than quietly rewritten. Wallpaper is a generated gradient committed to the dotfiles, chosen after a first set proved too subtle to be worth having.
+<!-- SECTION:FINAL_SUMMARY:END -->

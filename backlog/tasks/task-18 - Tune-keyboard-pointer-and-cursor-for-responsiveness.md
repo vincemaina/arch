@@ -1,11 +1,11 @@
 ---
 id: TASK-18
 title: 'Tune keyboard, pointer and cursor for responsiveness'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:16'
-updated_date: '2026-08-20 00:51'
+updated_date: '2026-08-20 13:02'
 labels:
   - desktop
   - feel
@@ -29,7 +29,7 @@ No input tuning exists at all. The sway config sets only xkb_layout gb; repeat d
 - [x] #1 Key repeat delay and rate are set deliberately and recorded, not left at defaults
 - [x] #2 Touchpad behaviour - tap, natural scroll, disable-while-typing - is configured for laptop machines
 - [x] #3 A cursor theme and size are set and applied consistently across native Wayland, XWayland and GTK applications
-- [ ] #4 Settings are verified against the live session rather than assumed to have applied
+- [x] #4 Settings are verified against the live session rather than assumed to have applied
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,4 +44,12 @@ Cursor set to Adwaita 24 in three places because three different consumers read 
 Added an Input section to checks/session.sh that asks swaymsg -t get_inputs what the compositor actually applied rather than trusting the file, and checks XCURSOR_THEME. The JSON extraction is grep-based to avoid adding jq as a dependency; verified against realistic swaymsg output.
 
 The XCURSOR_THEME check will fail until a fresh login even after a successful sync, because environment.d is read when the user manager starts. The failure message says so.
+
+AC #4 verified on the machine: checks/session.sh reports repeat_delay 250, repeat_rate 40 and XCURSOR_THEME Adwaita at size 24, all read back from the live session via swaymsg and the environment rather than from the files.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Key repeat set to 250ms delay and 40 per second against defaults of 600 and 25, which are tuned for not repeating by accident and cost real time on a keyboard-driven desktop. Touchpad configured without needing a machine profile, since sway input type:touchpad matches only devices that exist. Cursor set to Adwaita 24 in three places because three consumers read three different sources - the sway seat, XCURSOR_THEME for XWayland and user units, and GTK settings which reads neither - and missing one is what makes a cursor change appearance between windows. Verified against the live session rather than the files.
+<!-- SECTION:FINAL_SUMMARY:END -->

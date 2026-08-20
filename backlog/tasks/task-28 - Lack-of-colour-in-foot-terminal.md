@@ -1,11 +1,11 @@
 ---
 id: TASK-28
 title: 'Foot has no colour scheme: its theme include points at a missing file'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 19:41'
-updated_date: '2026-08-20 00:53'
+updated_date: '2026-08-20 13:02'
 labels:
   - desktop
   - feel
@@ -29,9 +29,9 @@ The class of failure is familiar: a config referencing something that does not e
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The terminal has a deliberate colour scheme that actually loads
+- [x] #1 The terminal has a deliberate colour scheme that actually loads
 - [x] #2 A check fails when any dotfile include or referenced path does not exist on the machine
-- [ ] #3 The mixed palettes in the bar stylesheet are resolved rather than left as two
+- [x] #3 The mixed palettes in the bar stylesheet are resolved rather than left as two
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,4 +44,12 @@ Pointed the include at catppuccin-mocha, which foot does ship. Mocha rather than
 Added a Dotfile references section to checks/session.sh which resolves every absolute path a dotfile includes and fails when one is missing. Globs are handled separately, since sway include of /etc/sway/config.d/* matching nothing is legitimate and only its directory needs to exist.
 
 Still outstanding: the mixed palettes in the bar stylesheet, which belongs with TASK-3 rather than being patched piecemeal here.
+
+Confirmed on the machine: the terminal renders in the palette colours, and checks/session.sh reports the foot config valid with no deprecation warnings after the [colors] to [colors-dark] rename. The mixed-palette complaint is resolved by TASK-3 rather than separately - the bar stylesheet is now templated from the single palette file, so the Catppuccin and Nord colours it held are gone by construction.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The terminal had no colour scheme at all: foot.ini included a tokyonight theme foot does not ship, so the path resolved to nothing and foot silently used its defaults. Pointed at real colours, then superseded by TASK-3, which templates foot from the single palette file so the terminal is no longer limited to themes foot happens to ship. Also fixed a second silent failure found on the way, where foot 1.26 renamed [colors] to [colors-dark] and warned on every launch. Two checks came out of it: every absolute path a dotfile includes must resolve, and foot --check-config must be clean.
+<!-- SECTION:FINAL_SUMMARY:END -->
