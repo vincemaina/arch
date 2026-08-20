@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 15:28'
-updated_date: '2026-08-20 11:43'
+updated_date: '2026-08-20 12:14'
 labels:
   - desktop
   - feel
@@ -65,4 +65,12 @@ Two icon problems, same root cause. When the waybar config was rewritten the Ner
 The prompt had the same shape of problem for a different reason. It was built from rounded caps rather than powerline chevrons, and the separators lived inside each module, so they vanished with the module. The reference screenshots the user supplied show the standard preset structure, where separators sit in the top-level format and therefore render regardless: outside a git repo the segment collapses to a sliver of chevron instead of breaking the chain. Rebuilt that way, with a folder icon, the powerline branch glyph and a clock, all written by codepoint.
 
 Added a check for empty icon strings, verified by reintroducing one.
+
+Wallpaper chosen: deep violet, a generated gradient mesh committed to setup/dotfiles/dot_local/share/wallpapers/ so it is applied like any other dotfile rather than being a file the user has to remember to copy.
+
+The first set of candidates was rejected as too subtle - three variations on near-black, when the point of a wallpaper on a deliberately plain desktop is to make it worth looking at. The replacements are built from overlapping soft colour fields with a domain warp so the shapes read as blobs rather than circles, rendered small and upscaled since a smooth gradient has no detail to lose, with noise at full size to prevent banding.
+
+The path is an absolute one rendered by chezmoi rather than a bare tilde, since sway passes it through to swaybg and tilde expansion is not worth relying on there.
+
+Added a check for it. swaybg fails quietly when its image is missing - the output is just left blank, which looks like a plain desktop rather than a fault - so the check verifies the configured file exists, swaybg is installed, and it is actually running.
 <!-- SECTION:NOTES:END -->

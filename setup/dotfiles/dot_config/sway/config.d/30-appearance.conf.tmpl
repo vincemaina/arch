@@ -13,7 +13,14 @@ set $urgent      {{ .palette.urgent }}
 # backgrounds itself: it hands the job to swaybg, which is why swaybg is a
 # declared package rather than an accident. Arch lists it as an optional
 # dependency of sway described as the wallpaper tool.
-output * bg $bg solid_color
+#
+# An absolute path rendered by chezmoi rather than a bare ~, because the path is
+# passed through to swaybg and tilde expansion is not something to rely on here.
+#
+# `fill` scales and crops to cover the output, so the image works on any
+# resolution without letterboxing. The image is a smooth gradient, so cropping
+# loses nothing.
+output * bg {{ .chezmoi.homeDir }}/.local/share/wallpapers/deep-violet.png fill
 
 # Thin borders instead of title bars: the window list belongs in the bar, not
 # repeated above every window. See the Sway section of DECISIONS.md.

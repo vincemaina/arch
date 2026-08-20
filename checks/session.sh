@@ -171,6 +171,25 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Wallpaper (TASK-3)"
+
+# swaybg fails quietly when its image is missing: the output is simply left
+# blank, which looks like a deliberately plain desktop rather than a fault.
+wallpaper="$(grep -oE '^output \* bg [^ ]+' "$HOME/.config/sway/config.d/30-appearance.conf" 2>/dev/null | awk '{print $4}')"
+
+if [[ -z "$wallpaper" ]]; then
+    skip "no wallpaper configured"
+elif [[ ! -s "$wallpaper" ]]; then
+    fail "$wallpaper is configured as the background but is missing or empty"
+elif ! command -v swaybg &>/dev/null; then
+    fail "swaybg is not installed, so sway cannot draw a background at all"
+elif pgrep -x swaybg >/dev/null; then
+    pass "swaybg is running with $(basename "$wallpaper")"
+else
+    fail "swaybg is not running, so the background is not being drawn"
+fi
+
+# ----------------------------------------------------------------------
 section "Input (TASK-18)"
 
 if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
