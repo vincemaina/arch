@@ -1,44 +1,53 @@
 # Prompt. Colours from .chezmoidata/palette.toml, so it matches the desktop.
 #
 # starship rather than powerlevel10k: an official package rather than a git
-# clone, configured by this one file, and it works on any shell, so a future
-# change of shell does not mean a new prompt to learn.
+# clone, configured by this one file, and it works on any shell.
 #
-# Segments are self-contained pills with their own end caps rather than one
-# continuous powerline. A chained powerline has to know what follows it, so
-# when a segment is empty - no git repo, clean tree - it leaves either a stray
-# block of colour or a chevron pointing at nothing. Pills simply do not render.
+# The separators live in this top-level format rather than inside each module.
+# That is what makes the chain connect: a separator here renders whether or not
+# the module beside it has anything to show, so outside a git repo the git
+# segment collapses to a thin sliver of chevron instead of breaking the chain.
+# Putting separators inside modules - which an earlier version of this file did -
+# means they disappear along with the module and the bar falls apart.
 
 "$schema" = 'https://starship.rs/config-schema.json'
 
-# Two lines: context above, cursor below. The command always begins in the same
-# column regardless of path or branch length, which matters more when scanning
-# back through a screen of output than saving a line does.
 format = """
-$directory$git_branch$git_status$cmd_duration$status
+[](fg:{{ .palette.accent }})\
+$directory\
+[](fg:{{ .palette.accent }} bg:{{ .palette.surface_alt }})\
+$git_branch\
+$git_status\
+[](fg:{{ .palette.surface_alt }} bg:{{ .palette.surface }})\
+$cmd_duration\
+$status\
+[](fg:{{ .palette.surface }})
 $character"""
 
 add_newline = true
 
 [directory]
-format = "[](fg:{{ .palette.accent }})[ $path ](bg:{{ .palette.accent }} fg:{{ .palette.bg }} bold)[](fg:{{ .palette.accent }}) "
+style = "bg:{{ .palette.accent }} fg:{{ .palette.bg }} bold"
+format = "[  $path ]($style)"
 truncation_length = 3
 truncate_to_repo = true
 truncation_symbol = "…/"
 
 [git_branch]
-symbol = " "
-format = "[](fg:{{ .palette.surface_alt }})[ $symbol$branch ](bg:{{ .palette.surface_alt }} fg:{{ .palette.text }})[](fg:{{ .palette.surface_alt }}) "
+symbol = ""
+style = "bg:{{ .palette.surface_alt }} fg:{{ .palette.text }}"
+format = "[ $symbol $branch ]($style)"
 
-# Only appears when the tree is not clean, so a clean repo shows just a branch.
+# Counts rather than bare markers: "which files" is usually the next question.
 [git_status]
-format = "[](fg:{{ .palette.warning }})[ $all_status$ahead_behind ](bg:{{ .palette.warning }} fg:{{ .palette.bg }})[](fg:{{ .palette.warning }}) "
+style = "bg:{{ .palette.surface_alt }} fg:{{ .palette.warning }}"
+format = "[$all_status$ahead_behind ]($style)"
 conflicted = "="
 ahead = "⇡${count}"
 behind = "⇣${count}"
 diverged = "⇕⇡${ahead_count}⇣${behind_count}"
 untracked = "?${count}"
-stashed = "$${count}"
+stashed = "*${count}"
 modified = "!${count}"
 staged = "+${count}"
 renamed = "»${count}"
@@ -47,15 +56,15 @@ deleted = "✘${count}"
 # Only reports when something took long enough that you may have looked away.
 [cmd_duration]
 min_time = 2000
-style = "{{ .palette.muted }}"
-format = "took [$duration]($style) "
+style = "bg:{{ .palette.surface }} fg:{{ .palette.muted }}"
+format = "[  $duration ]($style)"
 
-# Silent on success, explicit on failure - the exit code itself, not just a
-# colour, because "which failure" is usually the question.
+# Silent on success, explicit on failure - the code itself, because "which
+# failure" is usually the question.
 [status]
 disabled = false
-style = "{{ .palette.urgent }}"
-format = "[$status]($style) "
+style = "bg:{{ .palette.surface }} fg:{{ .palette.urgent }}"
+format = "[ ✘$status ]($style)"
 
 [character]
 success_symbol = "[❯]({{ .palette.accent }})"

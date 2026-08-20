@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 15:28'
-updated_date: '2026-08-20 11:32'
+updated_date: '2026-08-20 11:43'
 labels:
   - desktop
   - feel
@@ -59,4 +59,10 @@ idle_inhibitor restored - it is the control for stopping the screen locking duri
 The uniform-grey rule is reversed. Every module is now a coloured pill, with colour identifying the readout and state escalating it to warning or urgent. The reference setups the user collected under docs/themes are unanimous on per-module colour, most as filled pills, which is a strong enough signal to override a principle I had derived from first principles. DECISIONS.md records the reversal and why rather than quietly rewriting it.
 
 Windows keep the stricter rule, since there the question genuinely is binary - which window has focus - rather than which of several readouts am I looking at.
+
+Two icon problems, same root cause. When the waybar config was rewritten the Nerd Font glyphs were lost, leaving empty strings in format-icons for the idle inhibitor, volume and battery - which look exactly like configured icons in the file and render as nothing. That is why the bar had fewer icons than before rather than more. Restored by writing every glyph from its codepoint and auditing the file: 14 distinct glyphs now present and verified.
+
+The prompt had the same shape of problem for a different reason. It was built from rounded caps rather than powerline chevrons, and the separators lived inside each module, so they vanished with the module. The reference screenshots the user supplied show the standard preset structure, where separators sit in the top-level format and therefore render regardless: outside a git repo the segment collapses to a sliver of chevron instead of breaking the chain. Rebuilt that way, with a folder icon, the powerline branch glyph and a clock, all written by codepoint.
+
+Added a check for empty icon strings, verified by reintroducing one.
 <!-- SECTION:NOTES:END -->

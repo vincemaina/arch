@@ -384,6 +384,16 @@ elif [[ $missing_refs -eq 0 ]]; then
     pass "every absolute path a dotfile includes exists"
 fi
 
+# An icon that has been lost in editing leaves an empty string, which looks
+# exactly like a configured one in the file and renders as nothing on screen.
+# The bar lost most of its icons this way without anything reporting it.
+if empty_icons="$(grep -rnE '"(format-icons|format-muted|format-charging|format)"[^,]*""' "$DOTFILES" 2>/dev/null)"; then
+    fail "icon strings that are empty, so they render as nothing:"
+    sed 's/^/          /' <<<"$empty_icons"
+else
+    pass "no empty icon strings in the dotfiles"
+fi
+
 # ----------------------------------------------------------------------
 section "Screenshot helper (TASK-10)"
 
