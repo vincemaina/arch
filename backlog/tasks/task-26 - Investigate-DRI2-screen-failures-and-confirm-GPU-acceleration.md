@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 19:08'
-updated_date: '2026-08-20 20:40'
+updated_date: '2026-08-20 23:51'
 labels:
   - foundation
   - performance
@@ -56,6 +56,16 @@ AC #2 is left unchecked deliberately. Whether the same warning appears on real h
 AC #4: mesa is now declared in packages/desktop.txt. Not because declaring it changes rendering - it arrives as a dependency of sway either way - but for the reason polkit is declared: the desktop relies on the capability directly and a dependency-graph change should not be able to remove it quietly. No Vulkan or driver packages were added: there is no hardware path for them to select.
 
 Consequence worth carrying forward: this VM is a poor place to judge anything about smoothness or compositor performance, because it is all CPU-rendered. That matters for TASK-31, which will want a judgement about how a compositor feels.
+
+Resolved on 2026-08-21 by enabling 3D acceleration on the hypervisor, which was the recommendation this task ended with.
+
+Before: "[drm] features: -virgl", "number of cap sets: 0", and the session full of "failed to create dri2 screen" and "Refusing to try glamor on llvmpipe".
+
+After: "[drm] features: +virgl +edid", "+context_init", "number of cap sets: 2", and zero software-rendering messages for the whole boot.
+
+The check added by this task went from SKIP to PASS on its own, which is the point of having written it as a check rather than a note - nobody had to remember to re-verify.
+
+One consequence arrived with it. Enabling acceleration makes wlroots use the virtio GPU cursor plane, whose implementation renders the cursor upside down; the pointer inverted the moment 3D was turned on. Fixed by setting WLR_NO_HARDWARE_CURSORS=1 in environment.d, which makes wlroots composite the cursor itself - the same thing that was happening while everything was software rendered. Worth recording because it looks like an unrelated fault and is a direct consequence of the fix.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
