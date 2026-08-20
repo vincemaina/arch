@@ -1,6 +1,6 @@
 [main]
 font=JetBrainsMono Nerd Font:size=10
-pad=8x8
+pad=16x16
 
 # Stated rather than relied upon. It is the default, but the palette here is
 # dark-only, so being explicit means a change of default cannot quietly leave
@@ -28,6 +28,11 @@ initial-color-theme=dark
 # reading code through a wallpaper.
 alpha=0.90
 
+# The bell flash. warning rather than urgent: the palette reserves urgent for
+# "something is wrong", and a bell is "attention, nothing wrong yet".
+flash={{ .palette.warning | trimPrefix "#" }}
+flash-alpha=0.4
+
 background={{ .palette.bg | trimPrefix "#" }}
 foreground={{ .palette.text | trimPrefix "#" }}
 
@@ -48,3 +53,16 @@ bright4={{ .term.bright_blue }}
 bright5={{ .term.bright_magenta }}
 bright6={{ .term.bright_cyan }}
 bright7={{ .term.bright_white }}
+
+[bell]
+# A terminal that has finished something should be able to say so.
+#
+# visual flashes the window itself, which is the signal when you are looking
+# at it. notify raises a desktop notification through mako, and is the one
+# that matters: it fires only when the window is unfocused, so a long build
+# finishing on another workspace actually reaches you.
+#
+# notify-send comes from libnotify, declared in packages/desktop.txt. Without
+# it, notify would silently do nothing.
+visual=yes
+notify=yes
