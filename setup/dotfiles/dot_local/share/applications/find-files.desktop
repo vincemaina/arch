@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Find Files
+GenericName=File search
+Comment=Search for a file by name and open it with the right program
+Icon=system-search
+Exec=rofi -show recursivebrowser
+Terminal=false
+Categories=Utility;
+Keywords=find;file;files;search;locate;open;

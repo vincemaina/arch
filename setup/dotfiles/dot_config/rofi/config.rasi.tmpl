@@ -15,20 +15,17 @@
 configuration {
     modes: "combi";
 
-    /* One prompt for everything: applications, windows already open, a sum,
-     * and files.
+    /* Applications, windows already open, and a sum. Deliberately not files.
      *
-     * recursivebrowser rather than filebrowser. filebrowser walks the tree
-     * *inside* the launcher, so choosing a directory descends into it rather
-     * than opening it - navigation where a search was wanted, and the reason
-     * it was confusing to have here. recursivebrowser lists files flat and
-     * hands the choice to xdg-open.
+     * Files were merged in here and taken back out. Home holds thousands of
+     * them against 32 applications, so they drown the list however hard it is
+     * filtered - and the filtering itself is a losing game, since every new
+     * application invents another state directory to exclude.
      *
-     * Note the ratio this creates: about 1,200 files against 32 applications
-     * once caches are filtered out. Fuzzy matching plus fzf ranking is what
-     * keeps applications findable in that; without the filter-regex below it
-     * would be 7,000 and they would not be. */
-    combi-modes: "drun,window,calc,recursivebrowser";
+     * Finding a file is instead an entry *in* this list, like Notifications:
+     * type "find" and it opens the file finder. That keeps one thing to
+     * remember while keeping the launcher small enough to be scanned. */
+    combi-modes: "drun,window,calc";
 
     /* Fuzzy so a few characters from anywhere in the name are enough, and fzf
      * ordering so the best match rises rather than the alphabetically first.
@@ -46,10 +43,16 @@ configuration {
         directory: "~";
         command:   "xdg-open";
 
-        /* Repository internals, caches and dependency directories are not
-         * things anyone searches for by name, and they are the bulk of the
-         * file count. Excluding them is what keeps the list usable. */
-        filter-regex: ".*/(\\.git|\\.cache|\\.local/share/claude|\\.mozilla|node_modules|__pycache__)/.*";
+        /* Application state, caches, repository internals and dependency
+         * directories - none of them things anyone searches for by name, and
+         * between them the bulk of the file count.
+         *
+         * .local/share is in the list because that is where applications keep
+         * their working state: searching for "notif" was surfacing
+         * qutebrowser's Platform Notifications LOG, LOCK and MANIFEST files.
+         * Desktop entries live there too but come from drun rather than from
+         * here, so excluding it costs nothing. */
+        filter-regex: ".*/(\.git|\.cache|\.local/share|\.local/state|\.mozilla|\.pki|node_modules|__pycache__|target|\.venv)/.*";
     }
 
     /* Without this every row is prefixed with the mode that produced it -
