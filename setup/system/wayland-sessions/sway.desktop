@@ -1,0 +1,15 @@
+[Desktop Entry]
+# Suppresses the packaged /usr/share/wayland-sessions/sway.desktop in the login
+# screen, so the plain non-uwsm session cannot be selected. Shadowing works
+# because /usr/local/share is searched first and a Hidden entry claims the
+# filename before being skipped.
+#
+# Note the side effect: anything resolving the desktop entry ID "sway.desktop"
+# through the XDG hierarchy finds THIS file, not the packaged one. Nothing may
+# depend on that ID resolving to a startable entry - see sway-uwsm.desktop,
+# which names the binary directly for exactly this reason.
+Name=Sway (stock session, suppressed)
+Exec=sway
+Type=Application
+Hidden=true
+NoDisplay=true

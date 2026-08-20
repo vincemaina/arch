@@ -1,0 +1,6 @@
+# Paths chezmoi should delete from the target if present.
+#
+# Session units moved from graphical-session.target to wayland-session@sway.target
+# so they stop under any compositor other than sway. Without this, the old enable
+# symlinks stay behind on already-installed machines and the leak persists.
+.config/systemd/user/graphical-session.target.wants

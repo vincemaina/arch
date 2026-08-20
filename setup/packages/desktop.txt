@@ -4,6 +4,16 @@ swayidle
 swaylock
 waybar
 
+# Session management: wraps the compositor in systemd units so the bar,
+# notifications and idle handling are supervised rather than fire-and-forget
+uwsm
+
+# Graphical login. greetd authenticates and launches; regreet is the login
+# screen itself; cage is the kiosk compositor that displays it.
+greetd
+greetd-regreet
+cage
+
 # Terminal
 foot
 
@@ -18,12 +28,22 @@ wireplumber
 xdg-desktop-portal
 xdg-desktop-portal-wlr
 
+# pactl, used directly by the volume keys. Pulled in by pipewire-pulse as a
+# dependency, but listed because the config depends on the command itself.
+libpulse
+
 # Screenshots?
 grim
 slurp
 
 # Clipboard tool
 wl-clipboard
+
+# Standard user directories, so ~/Pictures and friends exist
+xdg-user-dirs
+
+# Authentication agent, so graphical privilege prompts work at all
+polkit-gnome
 
 # Brightness
 brightnessctl
@@ -36,6 +56,9 @@ network-manager-applet
 # Notifications
 mako
 libnotify
+
+# Media player control, used by the playback keys
+playerctl
 
 # Fonts
 noto-fonts

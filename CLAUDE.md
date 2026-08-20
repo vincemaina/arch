@@ -30,7 +30,7 @@ Do not edit Backlog task, draft, document, decision, or milestone markdown files
 
 A version-controlled, reproducible **Arch Linux system build** — package manifests, install scripts, system config and user dotfiles. It is not an application: there is no build system, no test suite, no linter and no package manager for the repo itself. Everything here is Bash, plain text manifests, and config files.
 
-The only "run" is installing an operating system onto a disk, which is destructive.
+There are two entrypoints: `install.sh` builds a machine from the live ISO and is destructive; `sync.sh` applies the repository to a machine already running it and is safe to repeat. Reach for `sync.sh` when iterating — a change is not worth a full rebuild until it is worth a reproducibility test.
 
 ### `setup/` is the only thing that becomes the Arch system
 
@@ -52,6 +52,14 @@ Two consequences worth holding onto:
 ```bash
 # Full install. Run as root from a booted Arch live ISO. ERASES the target disk.
 ./install.sh /dev/vda        # or /dev/nvme0n1 on real hardware
+
+# Update a machine that is already running this setup. Safe and repeatable.
+# Run as the normal user, never root. --dry-run previews without changing anything.
+./sync.sh
+
+# Verify no sway binding or session unit calls a command nothing installs.
+# Needs a real Arch system (uses pacman and pactree).
+./checks/sway-commands.sh
 
 # Backlog task management (see the CRITICAL_INSTRUCTION block above)
 backlog task list
@@ -81,6 +89,28 @@ Individual stages under `setup/install/` can be run on their own for debugging, 
 So stages 3–5 must only reference paths under `/opt/arch-setup`, and only the contents of `setup/` exist inside the chroot — the repo-level files are deliberately not copied (see the boundary note above).
 
 Stage responsibilities: 01 partitions and mounts, 02 `pacstrap`s base + writes fstab, 03 configures locale/hostname/user/sudo/NetworkManager and installs systemd-boot, 04 installs desktop + dev packages, 05 applies dotfiles.
+
+`sync.sh` is the third context: it runs on a fully installed machine, as the normal user, from a git clone. It must never reference the numbered stages — anything it calls has to be safe to run repeatedly on a live system. `checks/` shares that context: repository tooling that reads `setup/` and inspects the live system, never copied onto it.
+
+### Session components are systemd user units
+
+The machine boots to greetd/ReGreet, which launches `uwsm start -- sway.desktop`. Waybar, mako, swayidle and the polkit agent are user units in `setup/dotfiles/dot_config/systemd/user/`, enabled by committed symlinks in `wayland-session@sway.target.wants/` rather than `systemctl --user enable` (which has no user session inside the installer chroot).
+
+Bind session components to **`wayland-session@sway.target`, never `graphical-session.target`** — the generic target is reached by every compositor, so a unit wanted by it would also start under a different desktop. Add a session component as a unit, not a sway `exec` line; an `exec` gets no supervision. A plain `sway` launch reaches no session target at all, so nothing starts — which is why login is graphical.
+
+Helper scripts in `dot_local/bin/` must carry a `# requires:` header listing the external commands they call; `checks/sway-commands.sh` fails if one does not.
+
+### System configuration has one source of truth
+
+`setup/system/apply-config.sh` owns the mapping from repository file to `/etc`
+destination. Both `03-system.sh` (during install) and `sync.sh` (with `--activate`)
+call it, so a new system config file is added in exactly one place and reaches both
+paths. Adding one to only the installer means it can never reach a running machine —
+that was a real bug, caught by `checks/session.sh`.
+
+Bootloader templates under `setup/system/loader/` are the exception: they are
+rendered with the machine's root UUID at install time and must never be applied by
+sync.
 
 ### `setup/install.conf`
 

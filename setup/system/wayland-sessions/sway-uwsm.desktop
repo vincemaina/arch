@@ -1,0 +1,19 @@
+[Desktop Entry]
+Name=Sway
+Comment=Tiling Wayland compositor, session managed by uwsm
+# Deliberately NOT `uwsm start -- sway.desktop`.
+#
+# That form makes uwsm resolve sway.desktop as a desktop entry ID through the
+# XDG data hierarchy, where /usr/local/share precedes /usr/share. It therefore
+# finds the Hidden entry next to this file - the one that suppresses the stock
+# session in the login screen - and refuses to start a hidden session, bouncing
+# straight back to the login screen with no way in.
+#
+# Naming the compositor binary directly avoids the lookup entirely. -N and -D
+# supply the metadata the desktop entry would otherwise have provided, and the
+# compositor id stays `sway`, so the session target remains
+# wayland-session@sway.target.
+Exec=uwsm start -N Sway -D sway -- sway
+TryExec=uwsm
+DesktopNames=sway
+Type=Application

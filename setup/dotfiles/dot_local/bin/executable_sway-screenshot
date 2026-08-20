@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Screenshot helper for the sway keybindings.
+#
+# Exists because the bindings previously wrote straight into ~/Pictures,
+# which nothing created, so grim failed and the keypress did nothing at all.
+#
+# requires: grim slurp wl-copy xdg-user-dir date mkdir
+
+usage() {
+    echo "Usage: ${0##*/} [screen|region|clip]" >&2
+    exit 1
+}
+
+MODE="${1:-screen}"
+
+# Region selection and clipboard capture never touch the filesystem.
+if [[ "$MODE" == "clip" ]]; then
+    grim -g "$(slurp)" - | wl-copy
+    exit 0
+fi
+
+# xdg-user-dir reports the configured pictures directory, which is not
+# necessarily ~/Pictures and is not necessarily in English.
+#
+# When the user directories have never been set up, xdg-user-dir answers with
+# $HOME rather than failing, which would scatter screenshots loose across the
+# home directory. Treat that answer as "not configured".
+DIR="$(xdg-user-dir PICTURES 2>/dev/null || true)"
+if [[ -z "$DIR" || "$DIR" == "$HOME" ]]; then
+    DIR="$HOME/Pictures"
+fi
+
+mkdir -p "$DIR"
+
+FILE="$DIR/screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png"
+
+case "$MODE" in
+    screen) grim "$FILE" ;;
+    region) grim -g "$(slurp)" "$FILE" ;;
+    *)      usage ;;
+esac
+
+echo "$FILE"

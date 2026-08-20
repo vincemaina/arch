@@ -155,6 +155,88 @@ It is a useful default for a general-purpose development machine and requires no
 
 ---
 
+## zram instead of a disk swapfile
+
+**Decision:** Provide swap as a compressed block device in RAM, sized
+`min(ram / 2, 8192)` with zstd, and no swap on disk.
+
+### Why
+
+The install previously had no swap of any kind. Without it, memory pressure means
+the kernel thrashes the page cache and the desktop stops responding well before
+the OOM killer intervenes — the whole-system freeze this setup is meant to avoid.
+
+Compressing pages into RAM costs far less than writing them to the SSD, so the
+machine gains usable headroom without a disk write path, and without consuming
+space on a 500 GB drive. It also avoids writing memory contents to persistent
+storage, which matters more given there is no full-disk encryption.
+
+The size is an expression rather than a figure because the same repository has
+to work on both a 16 GB machine and a VM with a fraction of that. Half the
+memory, capped at 8 GB.
+
+Two sysctl settings accompany it. `vm.swappiness` is raised well above the
+default, which is tuned for the assumption that swapping means touching a disk.
+`vm.page-cluster` is set to 0 because swap read-ahead exists to amortise seeks,
+and zram has none.
+
+### Alternatives considered
+
+A **swapfile on the Btrfs root** would survive hibernation and provide more
+capacity. It was rejected because hibernation is not a requirement here, and the
+failure mode being fixed is responsiveness under pressure, where a disk swapfile
+is markedly worse. Nothing stops one being added later: zram is given
+`swap-priority = 100` so it would still be preferred.
+
+### Trade-off
+
+zram consumes real memory to provide swap, so it is not free capacity — it trades
+CPU for effective memory. It also cannot support hibernation.
+
+---
+
+## earlyoom rather than systemd-oomd
+
+**Decision:** Run earlyoom as the userspace out-of-memory handler.
+
+### Why
+
+zram alone delays the problem rather than solving it. Something still has to act
+when memory genuinely runs out, and the kernel OOM killer acts far too late.
+
+earlyoom watches `MemAvailable` directly. That signal stays meaningful alongside
+zram, whereas approaches that infer pressure from swap usage are misled by a zram
+device sitting near-full as a matter of course, which is its normal state rather
+than a warning sign.
+
+It is also small and predictable: one process, a hard 50 MB memory cap in its own
+unit, and behaviour that can be described in a sentence. For a machine whose goal
+is not freezing, a handler that is easy to reason about has real value.
+
+It requires both available memory and free swap to be below their thresholds
+before killing, which is the correct interaction with zram: a full zram device
+only signifies trouble when memory is low too.
+
+### Alternatives considered
+
+**systemd-oomd** needs no extra package, which is a genuine point in its favour
+given the preference for minimalism, and its cgroup and PSI-based approach is the
+more modern design. It was rejected because its swap-based rules misfire with
+zram and have to be avoided, leaving pressure-based rules that are harder to
+reason about and tune than a memory threshold.
+
+**nohang** is more capable than either but is a larger dependency for a problem
+that does not need it.
+
+### Trade-off
+
+earlyoom kills a process without asking, and currently does so without notifying
+anyone, so an application can vanish with no explanation. The `--avoid` list
+keeps the session itself safe and `--prefer` aims at the browser first, but
+surfacing the kill to the user is worth adding later.
+
+---
+
 ## No full-disk encryption
 
 **Decision:** Do not enable disk encryption by default.
@@ -204,6 +286,66 @@ It avoids the broader configuration surface of GRUB when features such as BIOS s
 ### Trade-off
 
 GRUB has more features and broader compatibility. If the machine later develops complex multi-boot requirements, revisiting this choice may make sense.
+
+---
+
+## Early microcode via the mkinitcpio hook
+
+**Decision:** Install both `intel-ucode` and `amd-ucode`, and load microcode through
+the mkinitcpio `microcode` hook rather than a separate `initrd` line in the boot entry.
+
+### Why
+
+Microcode updates carry CPU errata and security fixes. Arch treats them as required
+for every installation, and a machine without them runs known-broken silicon.
+
+Current Arch practice bundles microcode into the initramfs through the `microcode`
+hook, replacing the older approach of listing a `*-ucode.img` as the first `initrd`
+in the boot entry. Following the current approach keeps the boot entries
+vendor-agnostic: nothing in them mentions Intel or AMD at all.
+
+Both vendor packages are installed rather than detecting the CPU during install.
+The kernel loads only the image matching the running processor and ignores the
+other, so carrying both costs a few megabytes and removes an entire branch from
+the installer.
+
+`03-system.sh` confirms the hook is present rather than assuming it. It is part of
+the default `HOOKS`, so the check normally does nothing — but if that ever changes,
+the installer fails loudly instead of quietly producing a machine without microcode.
+
+### Alternatives considered
+
+Listing `initrd /intel-ucode.img` before the main initramfs in each boot entry is
+the older documented method and still works. It was rejected because it puts
+vendor-specific detail into every boot entry and duplicates what the hook already
+does during image generation.
+
+---
+
+## A fallback boot entry
+
+**Decision:** Generate a second systemd-boot entry using
+`initramfs-linux-fallback.img` alongside the default entry.
+
+### Why
+
+The default initramfs is built with `autodetect`, so it contains only the modules
+needed by the hardware present when it was generated. That makes it small and quick
+to load, and it is the right default — but it also means a hardware change, or a
+kernel or initramfs update that goes wrong, can leave the machine unbootable.
+
+mkinitcpio already builds the fallback image on every update at no extra cost.
+Not offering it as a boot entry meant the recovery path existed on disk but could
+not be reached without the install media.
+
+Boot entries are now rendered from every template in `system/loader/entries/`
+rather than by naming files individually, so adding a future entry is a matter of
+adding a file.
+
+### Trade-off
+
+The boot menu lists two entries instead of one. `loader.conf` still defaults to the
+normal entry with a short timeout, so this costs nothing until it is needed.
 
 ---
 
@@ -268,17 +410,94 @@ The aim here is not to reproduce a full desktop environment. It is to build a sm
 
 ---
 
-## No display manager
+## A display manager, reversing an earlier decision
 
-**Decision:** Do not install a graphical display manager by default.
+**Decision:** Log in graphically through greetd, with ReGreet as the login screen
+hosted by cage. The session is launched as `uwsm start -- sway.desktop`.
+
+This reverses the original decision to have no display manager. That entry is
+reproduced here rather than deleted, because the reasoning was sound at the time
+and it is the change in circumstances that matters:
+
+> **Decision:** Do not install a graphical display manager by default.
+>
+> The current system logs in through a TTY and starts Sway manually. This keeps
+> startup simple and avoids another long-running component. A display manager may
+> be added later if automatic graphical login becomes more valuable than the
+> simplicity of the current approach.
+
+### Why it changed
+
+When that was written, typing `sway` at a TTY was equivalent to any other way of
+starting it. Adopting uwsm made that false. The session now has supervised
+components — the bar, notifications, idle handling, the authentication agent —
+and they only start when the session is launched through uwsm. Typing plain
+`sway` produces a desktop that looks completely normal and is missing all of
+them, with nothing on screen indicating it.
+
+That happened during verification of this very setup, which is the strongest
+argument available: the failure is silent, plausible, and easy to repeat. A
+manual launch is no longer merely inconvenient, it is a way to get a subtly
+broken system.
+
+Removing the typed command removes the failure. Nobody types the launch command,
+so nobody can get it wrong.
+
+### Why greetd and ReGreet
+
+greetd is a login daemon and nothing else: it authenticates and launches whatever
+it is told to. It makes no assumptions about the session, which suits a system
+assembled from parts rather than shipped as a desktop environment.
+
+ReGreet reads session entries from the `wayland-sessions` directories, so the
+session list is derived rather than maintained by hand. That matters for a
+possible second desktop later: adding one becomes installing it, with no login
+configuration to update.
+
+It is also GTK, like Waybar and Thunar, so it introduces no second toolkit, and
+it is styled with ordinary CSS.
+
+### Alternatives considered
+
+**gtkgreet** is smaller and the traditional sway pairing, but takes its session
+list from `/etc/greetd/environments` as literal commands. Every future session
+would be a hand-maintained string.
+
+**SDDM** is the most complete and best-tested option, with themes available off
+the shelf. It was rejected for pulling Qt6 and QML onto an otherwise GTK system
+for the sake of one screen, and because it would close off `cosmic-greeter`,
+which is itself built on greetd.
+
+### Trade-off
+
+There is now a long-running component between boot and the desktop, which is
+exactly what the original decision avoided. The escape hatch is that greetd only
+takes VT 1; the other virtual terminals keep their gettys, so `Ctrl+Alt+F2`
+still reaches a plain shell when the session will not start.
+
+---
+
+## Session components bind to the compositor, not the graphical session
+
+**Decision:** Bind Waybar, mako, swayidle and the polkit agent to
+`wayland-session@sway.target` rather than `graphical-session.target`.
 
 ### Why
 
-The current system logs in through a TTY and starts Sway manually.
+`graphical-session.target` is reached by every graphical session. Units wanted by
+it start under any compositor, which is correct for something generic and wrong
+for everything here: Waybar would try to draw a sway bar on another desktop, and
+the idle script calls `swaymsg`, which would not exist there — so the screen
+would quietly stop locking.
 
-This keeps startup simple and avoids another long-running component.
+uwsm creates a per-compositor target for exactly this. Binding to it means these
+components start under sway and nowhere else.
 
-A display manager may be added later if automatic graphical login becomes more valuable than the simplicity of the current approach.
+Nothing depends on this yet, since sway is the only session installed. It is done
+now because the cost is a few lines today and a confusing, silent breakage the
+day a second desktop is added. The session entry list is already derived from
+`wayland-sessions`, so that day needs no login configuration change — which is
+precisely why the units must be correct before it arrives.
 
 ---
 
@@ -307,6 +526,79 @@ This is configured explicitly so a new installation behaves correctly immediatel
 ---
 
 # Desktop Components
+
+## uwsm for session management
+
+**Decision:** Launch the compositor through the Universal Wayland Session Manager:
+
+```bash
+uwsm start -- sway
+```
+
+Session components — the bar, notifications, idle handling — are systemd user
+units bound to `graphical-session.target`, not sway `exec` lines.
+
+### Why
+
+Waybar was previously started by hand after login and appeared nowhere in this
+repository, so a freshly installed machine came up with no bar at all. The
+immediate fix would have been an `exec waybar` line, but sway's `exec` is
+fire-and-forget: a component that dies stays dead until the session is restarted,
+and nothing orders startup or shuts things down cleanly.
+
+uwsm wraps the compositor in systemd units and starts the standard
+`graphical-session.target`, which gives:
+
+- supervision, so a crashed component restarts rather than silently disappearing;
+- ordering, through the normal target dependencies;
+- clean shutdown, because everything is `PartOf` the session;
+- one obvious place to look for what runs alongside the compositor.
+
+Waybar already ships a systemd user unit with `Restart=on-failure`, so it only
+needed enabling. mako and swayidle got matching units following the same pattern.
+
+uwsm is in the official `extra` repository, so this needs no AUR support.
+
+### Alternatives considered
+
+**Plain `exec` lines** in the sway config. One line, no dependencies, and the
+obvious first instinct. Rejected because there is no supervision: the failure
+mode we were trying to fix is precisely a component not running.
+
+**Hand-rolled systemd units** with our own session target, started from the sway
+config. No new package, and it was tempting given the preference for keeping
+things minimal. Rejected because it reimplements what uwsm already does, and the
+maintenance would be ours.
+
+**sway-systemd**, which solves exactly this problem, is only in the AUR. Adding
+AUR support is a much larger decision than this task warranted.
+
+### Trade-off
+
+Starting `sway` directly no longer produces a complete desktop. That is a real
+footgun until the session starts automatically on login, which is tracked
+separately. It is also one more component between login and a working desktop.
+
+---
+
+## Enabling user units by symlink rather than systemctl
+
+**Decision:** Enable session units with symlinks committed under
+`dotfiles/dot_config/systemd/user/graphical-session.target.wants/` rather than by
+running `systemctl --user enable` during installation.
+
+### Why
+
+`systemctl --user enable` needs a user session to talk to, which does not exist
+inside the installer chroot. Enabling a unit is only a symlink into a `.wants`
+directory, so committing the symlink achieves the same thing with no special case
+in the installer.
+
+It also keeps which units are enabled visible in the repository and applied by the
+same chezmoi run as everything else, rather than being machine state set once
+during installation and invisible afterwards.
+
+---
 
 ## Waybar
 
@@ -416,6 +708,58 @@ Wayland applications rely on portals for functionality such as:
 - sandboxed application access.
 
 The WLR backend provides the compositor-specific integration needed by Sway.
+
+---
+
+## polkit-gnome as the authentication agent
+
+**Decision:** Install `polkit-gnome` and run it as a session unit.
+
+### Why
+
+polkit was installed but no authentication agent ran, so any graphical action
+needing elevated privileges had nothing to present a password prompt and simply
+failed. Sway, unlike a full desktop environment, ships no agent of its own.
+
+`polkit-gnome` depends only on GTK3 and polkit itself. The desktop already pulls
+GTK3 in through Waybar and Thunar, so it adds essentially nothing. The Qt-based
+agents would drag in a second toolkit for one dialog.
+
+### Trade-off
+
+`polkit-gnome` has not seen an upstream release in a long time. It works and Arch
+still ships it, but if that changes, `mate-polkit` is the maintained fork of the
+same code and would be a drop-in replacement.
+
+---
+
+## Helper scripts declare what they call
+
+**Decision:** Scripts in `dotfiles/dot_local/bin/` carry a `# requires:` header
+listing the external commands they use, and a check enforces it.
+
+### Why
+
+The bug this came from was quiet: the media keys called `playerctl`, which was
+never in any manifest, so pressing them did nothing and nothing reported an
+error. Screenshots had the same shape — they wrote to a directory nothing
+created. Both had been that way since the config was first committed.
+
+`checks/sway-commands.sh` closes that gap by resolving every command the session
+invokes back to a declared package. Commands in the sway config and in unit files
+can be extracted mechanically, but working out what an arbitrary shell script
+might run cannot be done reliably by parsing it.
+
+Declaring dependencies in a header keeps them checkable without guessing. The
+check treats a missing header as a failure, so the declaration cannot quietly be
+skipped when a new helper is added.
+
+### Trade-off
+
+The header is maintained by hand and can go stale — a command added to a script
+without updating it escapes the check. That is a real weakness, but a smaller one
+than not checking at all, and the failure is visible in review rather than silent
+in use.
 
 ---
 
@@ -628,6 +972,78 @@ The root installer orchestrates the lower-level scripts for:
 5. dotfile application.
 
 The individual scripts remain separate for maintainability and debugging, but the normal user-facing interface is a single command.
+
+---
+
+## A separate entrypoint for machines that already exist
+
+**Decision:** Add a second root entrypoint alongside the installer:
+
+```bash
+./sync.sh
+```
+
+`install.sh` builds a machine from the live ISO. `sync.sh` applies the repository
+to a machine that is already running it.
+
+### Why
+
+The repository could previously only build a machine from scratch. Every change,
+however small, could therefore only be validated by rebuilding — which is the right
+test for reproducibility but far too slow to be the only loop available while tuning
+a desktop day to day.
+
+Separating the two keeps each honest about what it is:
+
+- installation is destructive, runs once, and needs the live ISO;
+- syncing is idempotent, runs constantly, and must never touch the disk.
+
+Keeping them apart means the repeatable operation cannot accidentally inherit a
+destructive step. `sync.sh` references none of the numbered install stages.
+
+### Trade-off
+
+There are now two ways to apply the repository, and a change that only works
+through one of them is a bug that will not necessarily be caught. Fresh-install
+tests remain the stronger check, as recorded under Testing Strategy; `sync.sh` is
+for iteration speed, not for proving reproducibility.
+
+---
+
+## `sync.sh` is one flat script
+
+**Decision:** Write the sync path as a single script rather than the numbered
+stages used by the installer.
+
+### Why
+
+The installer is split into five stages because they are genuinely distinct,
+run in two different environments, and are destructive enough that a failure
+needs to be traceable to a specific step.
+
+Syncing has neither property. It reconciles packages and applies dotfiles, both
+of which are safe and repeatable, and both run as the same user in the same
+place. Splitting that into stages would add indirection without making anything
+easier to inspect or debug.
+
+If the sync path grows genuinely separate concerns, this should be revisited.
+
+---
+
+## Packages are added but never removed by sync
+
+**Decision:** `sync.sh` installs declared packages that are missing and does not
+remove anything that is installed but undeclared.
+
+### Why
+
+Removal is the one part of reconciliation that can destroy a working system. A
+package missing from a manifest is more likely to be an omission in the
+repository than a mistake on the machine, and acting on that assumption
+automatically would be the wrong default.
+
+Reporting drift rather than fixing it keeps the manifests honest without making
+the safe, everyday command capable of breaking the desktop.
 
 ---
 

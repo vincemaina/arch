@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Idle policy for the session, run by swayidle.service.
+#
+# This lives in a script rather than inline in the unit so the quoting is
+# plain shell rather than systemd's, and so the timings are adjustable in
+# one obvious place.
+#
+# swayidle runs each of these through `sh -c`, so they are command strings
+# rather than argument lists.
+#
+# requires: swayidle swaylock swaymsg
+
+LOCK_AFTER=300          # seconds of inactivity before locking
+DISPLAYS_OFF_AFTER=600  # seconds of inactivity before powering displays down
+
+LOCK='swaylock --daemonize --color 000000'
+
+exec swayidle -w \
+    timeout "$LOCK_AFTER" "$LOCK" \
+    timeout "$DISPLAYS_OFF_AFTER" 'swaymsg "output * power off"' \
+        resume 'swaymsg "output * power on"' \
+    before-sleep "$LOCK"
