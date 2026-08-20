@@ -1,5 +1,5 @@
 [Unit]
-Description=System summary shown once when the session starts
+Description=Greet empty workspaces with a system summary
 Documentation=https://github.com/fastfetch-cli/fastfetch
 PartOf=wayland-session@sway.target
 After=wayland-session@sway.target
@@ -7,26 +7,17 @@ Requisite=wayland-session@sway.target
 
 [Service]
 Type=simple
-# The window is sized in CHARACTERS, not pixels, which is the point of
-# --window-size-chars: the grid is derived from the font metrics, so the window
-# fits the output rather than leaving a margin of dead space that changes
-# whenever the font size does. 92x22 is the measured output plus a little
-# slack - fastfetch's widest line is 90 columns over 21 rows.
-#
-# `fastfetch; exec zsh` rather than --hold. --hold keeps a dead terminal on
-# screen that cannot be typed into; running the shell after fastfetch leaves a
-# usable prompt sitting under the summary, so the greeting doubles as the first
-# terminal instead of something to close before opening one.
-#
-# A distinct app_id so 40-window-rules.conf floats this one terminal without
-# floating every terminal.
-ExecStart=/usr/bin/foot --app-id=greeting --title=greeting --window-size-chars=92x22 \
-    -e /usr/bin/zsh -c "/usr/bin/fastfetch; exec /usr/bin/zsh -i"
+# Watches sway for an empty workspace being focused and opens a floating
+# greeting terminal on it. It greets the workspace the session starts on too,
+# so this covers login as well - one mechanism rather than a separate one-shot
+# unit that would race this one to open the first window.
+ExecStart=%h/.local/bin/sway-workspace-greeter
 
-# Restart=no, unlike every other unit here, and deliberately. The others are
-# session components with no legitimate reason to exit; this is a one-shot you
-# are meant to close, and restarting it would make it impossible to dismiss.
-Restart=no
+# Restart=always here, unlike the one-shot this replaces: it is a daemon on the
+# IPC socket now, with no legitimate reason to exit, so the same reasoning
+# applies as to mako and swayidle.
+Restart=always
+RestartSec=1
 
 [Install]
 WantedBy=wayland-session@sway.target

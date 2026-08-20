@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: foot fastfetch zsh
+
+# Opens a terminal that greets you with a system summary.
+#
+#   terminal              a normal terminal, tiled like any other window
+#   terminal --floating   the auto-opened kind: floating, sized to its contents
+#
+# WHY THE SUMMARY LIVES HERE AND NOT IN .zshrc
+#
+# fastfetch belongs to *opening a terminal*, not to *starting a shell*. In
+# .zshrc it would also run for nested shells, subshells and ssh sessions, and
+# would add its time to the 128ms shell startup the checks measure. Here it
+# runs exactly once per window, which is what was wanted.
+#
+# `fastfetch; exec zsh` rather than foot --hold: --hold leaves a dead terminal
+# that cannot be typed into. This way the summary scrolls up as you work,
+# exactly like any other command you have run.
+
+floating=false
+[[ "${1:-}" == "--floating" ]] && floating=true
+
+if $floating; then
+    # A distinct app_id is what 40-window-rules.conf matches to float and
+    # centre this one, without floating every terminal.
+    #
+    # Sized in characters, not pixels, so the grid comes from the font metrics
+    # and the window fits its contents rather than leaving dead space that
+    # shifts with any font-size change. fastfetch prints 90 columns by 21 rows;
+    # the extra row is the prompt underneath.
+    exec foot \
+        --app-id=greeting \
+        --title=greeting \
+        --window-size-chars=92x23 \
+        -e zsh -c 'fastfetch; exec zsh -i'
+fi
+
+exec foot -e zsh -c 'fastfetch; exec zsh -i'

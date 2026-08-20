@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: swaymsg python3
+#
+# `terminal` is deliberately not listed: the requires header is for external
+# commands that must come from a declared package, and that one is our own
+# helper alongside this script, called by absolute path.
+
+# Opens a greeting terminal whenever an empty workspace is focused, so a fresh
+# workspace lands you somewhere useful rather than on a blank screen.
+#
+# This also covers the start of a session: the unit starts once sway is up, and
+# it checks the workspace it finds itself on before waiting for any events.
+#
+# It cannot loop. The terminal it opens lands on the workspace that triggered
+# it, so that workspace is no longer empty. Closing the terminal makes it empty
+# again, which is the point - go back to it later and you are greeted again.
+
+exec python3 - <<'PYEOF'
+import json, subprocess, sys, os
+
+TERMINAL = os.path.expanduser("~/.local/bin/terminal")
+
+def workspace_is_empty(name):
+    """Ask sway, rather than trusting the event payload.
+
+    The event carries a snapshot of the workspace, but a window can arrive
+    between the event being sent and this running - `move container to
+    workspace` followed by a focus is exactly that shape. Re-querying makes a
+    double-open impossible rather than unlikely.
+    """
+    try:
+        tree = json.loads(subprocess.run(
+            ["swaymsg", "-t", "get_tree"],
+            capture_output=True, text=True, check=True).stdout)
+    except Exception:
+        return False
+
+    found = []
+
+    def walk(node):
+        if node.get("type") == "workspace" and node.get("name") == name:
+            found.append(node)
+            return
+        for child in node.get("nodes", []) + node.get("floating_nodes", []):
+            walk(child)
+
+    walk(tree)
+    if not found:
+        return False
+    ws = found[0]
+    return not (ws.get("nodes") or ws.get("floating_nodes"))
+
+def focused_workspace():
+    try:
+        out = subprocess.run(["swaymsg", "-t", "get_workspaces"],
+                             capture_output=True, text=True, check=True).stdout
+        for ws in json.loads(out):
+            if ws.get("focused"):
+                return ws.get("name")
+    except Exception:
+        pass
+    return None
+
+def greet(name):
+    if name and workspace_is_empty(name):
+        subprocess.Popen([TERMINAL, "--floating"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+# The workspace this session started on, before any events arrive.
+greet(focused_workspace())
+
+proc = subprocess.Popen(["swaymsg", "-t", "subscribe", "-m", '["workspace"]'],
+                        stdout=subprocess.PIPE, text=True)
+for line in proc.stdout:
+    try:
+        event = json.loads(line)
+    except ValueError:
+        continue
+    # "focus" covers both switching to an existing empty workspace and landing
+    # on a newly created one; "init" alone would miss the former.
+    if event.get("change") != "focus":
+        continue
+    current = event.get("current") or {}
+    greet(current.get("name"))
+PYEOF

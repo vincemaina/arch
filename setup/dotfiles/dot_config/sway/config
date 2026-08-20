@@ -14,7 +14,11 @@ set $down j
 set $up k
 set $right l
 
-set $term foot
+# Not bare `foot`: every terminal opens with a system summary, which is a
+# property of opening a terminal rather than of starting a shell - see the
+# script for why that distinction matters. Called by path, since ~/.local/bin
+# is not on the PATH sway hands to what it spawns.
+set $term ~/.local/bin/terminal
 
 # The file explorer is a terminal one, so it is a terminal with a distinct
 # app_id - otherwise the window rule that floats it would float every terminal.
