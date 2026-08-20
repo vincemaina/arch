@@ -1,10 +1,11 @@
 ---
 id: TASK-18
 title: 'Tune keyboard, pointer and cursor for responsiveness'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-19 18:16'
-updated_date: '2026-08-19 18:17'
+updated_date: '2026-08-20 00:51'
 labels:
   - desktop
   - feel
@@ -25,8 +26,22 @@ No input tuning exists at all. The sway config sets only xkb_layout gb; repeat d
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Key repeat delay and rate are set deliberately and recorded, not left at defaults
-- [ ] #2 Touchpad behaviour - tap, natural scroll, disable-while-typing - is configured for laptop machines
-- [ ] #3 A cursor theme and size are set and applied consistently across native Wayland, XWayland and GTK applications
+- [x] #1 Key repeat delay and rate are set deliberately and recorded, not left at defaults
+- [x] #2 Touchpad behaviour - tap, natural scroll, disable-while-typing - is configured for laptop machines
+- [x] #3 A cursor theme and size are set and applied consistently across native Wayland, XWayland and GTK applications
 - [ ] #4 Settings are verified against the live session rather than assumed to have applied
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Key repeat set to 250ms delay and 40 per second against defaults of 600 and 25, with the reasoning recorded in the fragment and DECISIONS.md rather than the numbers appearing unexplained.
+
+Touchpad configured with tap, natural scroll, disable-while-typing and middle emulation. No machine profile was needed: sway input type:touchpad matches only devices that exist, so the block is inert on a VM or desktop. That avoids a dependency on TASK-14.
+
+Cursor set to Adwaita 24 in three places because three different consumers read three different sources - the sway seat for the compositor and its windows, XCURSOR_THEME for XWayland and anything started as a user unit, and GTK settings.ini which reads neither. Missing one is what makes a cursor change appearance between windows.
+
+Added an Input section to checks/session.sh that asks swaymsg -t get_inputs what the compositor actually applied rather than trusting the file, and checks XCURSOR_THEME. The JSON extraction is grep-based to avoid adding jq as a dependency; verified against realistic swaymsg output.
+
+The XCURSOR_THEME check will fail until a fresh login even after a successful sync, because environment.d is read when the user manager starts. The failure message says so.
+<!-- SECTION:NOTES:END -->

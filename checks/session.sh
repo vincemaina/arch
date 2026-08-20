@@ -171,6 +171,38 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Input (TASK-18)"
+
+if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+    skip "not in a Wayland session"
+elif ! command -v swaymsg &>/dev/null; then
+    skip "swaymsg not available"
+else
+    # Asks the compositor what it actually applied, rather than trusting that
+    # the file on disk took effect.
+    inputs="$(swaymsg -t get_inputs 2>/dev/null)"
+
+    for want in repeat_delay:250 repeat_rate:40; do
+        name="${want%%:*}"
+        expected="${want#*:}"
+        got="$(grep -o "\"$name\": *[0-9]*" <<<"$inputs" | head -1 | grep -oE '[0-9]+$')"
+        if [[ "$got" == "$expected" ]]; then
+            pass "$name is $got"
+        else
+            fail "$name is ${got:-unreported}, expected $expected; reload sway with \$mod+Shift+c"
+        fi
+    done
+
+    # environment.d is read when the user manager starts, so this stays wrong
+    # until the next login even after a successful sync.
+    if [[ "${XCURSOR_THEME:-}" == "Adwaita" ]]; then
+        pass "XCURSOR_THEME is Adwaita (size ${XCURSOR_SIZE:-unset})"
+    else
+        fail "XCURSOR_THEME is ${XCURSOR_THEME:-unset}; XWayland apps will draw a different cursor. Needs a fresh login."
+    fi
+fi
+
+# ----------------------------------------------------------------------
 section "Login screen (TASK-15)"
 
 # Replicates how ReGreet discovers sessions, so a greeter that would offer the

@@ -60,6 +60,9 @@ libnotify
 # Media player control, used by the playback keys
 playerctl
 
+# Cursor theme, so the pointer looks the same in every application
+adwaita-cursors
+
 # Fonts
 noto-fonts
 noto-fonts-emoji

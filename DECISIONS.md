@@ -595,6 +595,54 @@ much machinery for one keystroke.
 
 ---
 
+## Input tuned for holding keys down
+
+**Decision:** Key repeat at 250ms delay and 40 per second, rather than the
+defaults of 600ms and 25.
+
+### Why
+
+The defaults are conservative because they assume a key held down is usually a
+mistake. On a keyboard-driven desktop the opposite is true: holding a direction
+key to move through a list, or backspace through a line, is routine, and 600ms
+of nothing followed by a slow repeat is felt every time.
+
+250ms is still long enough not to fire on a deliberate single press. 40 per
+second is quick without overshooting the thing being aimed at. Both are worth
+adjusting by feel; the point is that they are now a decision rather than an
+inherited default.
+
+The touchpad block is configured but matches nothing until the setup runs on a
+laptop, since `input type:touchpad` applies only to devices that exist. Natural
+scrolling is the one genuine preference in it and is a single line to flip.
+
+---
+
+## One cursor theme, set in three places
+
+**Decision:** Use Adwaita at size 24, declared in the sway seat, in
+`environment.d`, and in the GTK settings.
+
+### Why
+
+Three declarations look redundant but cover three different consumers. sway
+tells the compositor and the windows it spawns. `XCURSOR_THEME` covers XWayland
+clients and anything started as a user unit rather than by sway. GTK reads its
+own setting and ignores both.
+
+Miss one and the cursor changes size or shape as the pointer crosses between
+windows, which is the sort of small inconsistency that makes a desktop feel
+assembled rather than designed.
+
+Adwaita because GTK applications expect it, and the desktop is already GTK
+through Waybar and Thunar. Choosing anything else would mean overriding a
+default that is otherwise correct everywhere.
+
+Note that `environment.d` is read when the user manager starts, so a change
+there needs a fresh login rather than a config reload.
+
+---
+
 ## GB keyboard layout
 
 **Decision:** Configure the graphical keyboard layout as UK (`gb`) and the console keymap as `uk`.
