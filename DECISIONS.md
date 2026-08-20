@@ -565,6 +565,21 @@ prints the full table, which is the practical documentation of the scheme: 64
 bindings across four fragments is more than can be held in mind while editing
 one of them.
 
+### Shift is reserved for the infrequent
+
+Closing a window is `$mod+q`, not `$mod+Shift+q` as upstream ships it. It is one
+of the most frequent actions there is, and Shift is a real cost when repeated
+all day.
+
+The session bindings keep Shift deliberately: reload on `$mod+Shift+c` and exit
+on `$mod+Shift+e` are rare, and being slightly awkward is a feature when the
+consequence of a mistake is losing the session. Shift here marks "you probably
+meant this", not "this is the second variant".
+
+The cost is that a window is now one easy chord from closing, with no
+confirmation. That is the same bargain every editor makes with its close
+shortcut.
+
 ### Trade-off
 
 Launching a frequently-used application is now two keystrokes and a few letters

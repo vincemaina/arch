@@ -59,4 +59,6 @@ Removed by agreement: the eight arrow-key duplicates of h/j/k/l and their Shift 
 Kept on my recommendation, with an explanation of what each does since they were unfamiliar: splits, tabbed, scratchpad, focus parent, and the full block of ten workspaces.
 
 80 bindings to 64. checks/sway-bindings.sh reports no duplicates.
+
+Kill moved from $mod+Shift+q to $mod+q at the user request. Recorded the resulting asymmetry rather than leaving it looking inconsistent: closing a window is frequent so it gets a bare chord, while reload and exit keep Shift because they are rare and the consequence of a slip is the whole session. Shift marks "you probably meant this", not "second variant".
 <!-- SECTION:NOTES:END -->
