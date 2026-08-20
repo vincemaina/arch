@@ -219,6 +219,30 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Graphics (TASK-26)"
+
+# Whether the desktop is drawn by the GPU or by the CPU. The distinction is
+# invisible until it is not: software rendering works, and then drops frames
+# under load, which is the opposite of the goal here.
+#
+# grep -c rather than grep -q throughout: see the note on swapon above.
+software="$(journalctl --user -b --no-pager 2>/dev/null | grep -ci 'llvmpipe\|swrast')"
+virgl="$(journalctl -b -k --no-pager 2>/dev/null | grep -c '\[drm\] features:.*-virgl')"
+virtio="$(journalctl -b -k --no-pager 2>/dev/null | grep -c 'virtio-vga\|virtio_gpu')"
+
+if [[ "$software" -eq 0 ]]; then
+    pass "no software-rendering fallback reported this session"
+elif [[ "$virgl" -gt 0 ]]; then
+    # Expected, and not a fault to fix from inside the guest: 3D has to be
+    # enabled on the hypervisor side. virt-manager calls it Video virtio with
+    # 3D acceleration, and it needs Display spice with OpenGL on.
+    skip "software rendering, because the virtio GPU reports -virgl (3D off in the VM's configuration, not fixable from in here)"
+elif [[ "$virtio" -gt 0 ]]; then
+    skip "software rendering on a virtio GPU; check whether 3D acceleration is enabled on the host"
+else
+    fail "software rendering on what looks like real hardware - the GPU driver or Mesa is not doing its job, and this is a genuine problem rather than a VM artefact"
+fi
+
 section "Audio (TASK-41)"
 
 if ! command -v wpctl &>/dev/null; then

@@ -115,3 +115,9 @@ rofi-calc
 # session a TUI file manager costs nothing while it is closed. Trial against
 # thunar - see TASK-27.
 yazi
+
+# Mesa, declared rather than inherited. Everything graphical depends on it
+# through sway, so it arrives either way - but the desktop relies on this
+# capability directly, and a dependency-graph change should not be able to
+# remove it quietly. Same reasoning as polkit. See TASK-26.
+mesa

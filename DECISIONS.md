@@ -1496,6 +1496,40 @@ Chezmoi should not interpret the other directories as files that belong in the u
 
 ---
 
+## The VM renders in software, and that is the hypervisor's doing
+
+**Decision:** Accept software rendering inside the virtual machine. Do not chase the `failed to create dri2 screen` warnings from inside the guest.
+
+### Why
+
+Three independent signals agree, so this is established rather than inferred:
+
+```
+[drm] features: -virgl +edid -resource_blob -host_visible     (kernel, at boot)
+Refusing to try glamor on llvmpipe                            (Xwayland)
+libEGL warning: egl: failed to create dri2 screen             (Mesa)
+```
+
+`-virgl` is the cause. The virtio GPU is presented without 3D acceleration, so Mesa has no hardware path to a DRI screen and falls back to llvmpipe, the LLVM software rasteriser. The warnings are the symptom of that, not a fault in the configuration.
+
+Nothing in the guest can fix it. 3D has to be enabled on the hypervisor side - in virt-manager, *Video* set to `virtio` with 3D acceleration, which also requires *Display* `spice` with OpenGL enabled.
+
+The presence of `/dev/dri/renderD128` is a red herring worth recording, because it looks like evidence of acceleration and is not: the render node exists while `number of cap sets: 0` says there is nothing behind it.
+
+### Trade-off
+
+The desktop is drawn by the CPU. It is perfectly usable at this resolution, and it is why this VM is a poor place to judge anything about smoothness, animation or compositor performance. A judgement about how a compositor *feels* - which TASK-31 will need - should not be made here.
+
+### What this means for real hardware
+
+The same warning on a physical machine would mean no acceleration there either, which would be a genuine problem rather than a VM artefact. `checks/session.sh` distinguishes the two: software rendering on a virtio GPU reporting `-virgl` is reported as expected, while software rendering on anything else is a failure.
+
+### Alternatives considered
+
+**Declaring Vulkan or Mesa driver packages** to force a different path. Rejected: there is no hardware path to select. `mesa` is now declared explicitly, but for the reason `polkit` is - the desktop relies on it directly and a dependency change should not remove it silently - not because declaring it changes rendering.
+
+---
+
 ## Workspaces stay per-output, as sway does them
 
 **Decision:** Keep sway's model, where each workspace belongs to exactly one output. Do not script a spanning or synchronised workspace layer on top of it.
