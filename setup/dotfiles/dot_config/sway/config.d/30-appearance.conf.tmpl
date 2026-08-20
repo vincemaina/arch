@@ -9,9 +9,10 @@ set $text_dim    {{ .palette.text_dim }}
 set $accent      {{ .palette.accent }}
 set $urgent      {{ .palette.urgent }}
 
-# A flat background rather than an image. The desktop is almost never visible
-# on a tiling system, so a wallpaper is mostly a thing you configure and then
-# never see; a colour that matches everything else is the honest version.
+# `output bg` is the right place to configure this, but sway does not render
+# backgrounds itself: it hands the job to swaybg, which is why swaybg is a
+# declared package rather than an accident. Arch lists it as an optional
+# dependency of sway described as the wallpaper tool.
 output * bg $bg solid_color
 
 # Thin borders instead of title bars: the window list belongs in the bar, not

@@ -1,0 +1,4 @@
+# Wallpaper candidates are generated for comparison and are large. Only the
+# chosen one is tracked, and it lives under setup/dotfiles/ so it reaches the
+# machine like any other dotfile.
+docs/wallpapers/*.png

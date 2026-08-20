@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 21:07'
+updated_date: '2026-08-20 11:58'
 labels:
   - foundation
   - session
@@ -66,6 +66,10 @@ AC #1 and #2 need the VM: whether a fresh session brings everything up, and whet
 Verified on the VM: after uwsm start -- sway, waybar, mako, swayidle and polkit-agent are all running with Restart=on-failure, and graphical-session.target is active. A session launched through uwsm brings the whole desktop up with no manual startup step, which was the failure this task existed to fix - waybar previously had to be started by hand and appeared nowhere in the repository.
 
 Restart-on-failure verified behaviourally, not just by property: the user ran systemctl --user kill -s KILL waybar and confirmed the bar reappeared, and the check run immediately afterwards reports waybar running. A SIGKILL is the strongest form of the failure this task was meant to survive, and the session recovered without intervention.
+
+Reopened briefly: pkill waybar left the bar dead. Restart=on-failure was doing exactly what it says - pkill sends SIGTERM, waybar exits 0, and a clean exit is not a failure. The earlier SIGKILL test passed because a kill genuinely is one, so the policy looked correct while covering only half the cases.
+
+All four session units are now Restart=always. A session component has no legitimate reason to exit, so a clean exit is as much a fault as a crash; an explicit systemctl --user stop is still honoured.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

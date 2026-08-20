@@ -9,7 +9,7 @@ Requisite=wayland-session@sway.target
 Type=simple
 ExecStart=/usr/bin/mako
 ExecReload=/usr/bin/makoctl reload
-Restart=on-failure
+Restart=always
 RestartSec=1
 
 [Install]
