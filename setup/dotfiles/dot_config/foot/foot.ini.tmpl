@@ -16,6 +16,18 @@ initial-color-theme=dark
 # foot 1.26 renamed [colors] to [colors-dark], pairing it with [colors-light],
 # and warns on every launch if the old name is used.
 [colors-dark]
+# Background translucency, so the wallpaper shows faintly through a terminal.
+#
+# foot's own alpha rather than sway's `opacity`, which are not the same thing.
+# sway fades the whole surface, glyphs included, and the text goes visibly
+# duller for it. alpha fades only cells using the default background colour,
+# so the text stays fully opaque and crisp. Compared side by side at the same
+# 0.85 before choosing.
+#
+# Keep it subtle. The point is a hint of depth behind the terminal, not
+# reading code through a wallpaper.
+alpha=0.85
+
 background={{ .palette.bg | trimPrefix "#" }}
 foreground={{ .palette.text | trimPrefix "#" }}
 
