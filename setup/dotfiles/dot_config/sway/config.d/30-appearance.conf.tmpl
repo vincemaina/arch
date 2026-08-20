@@ -24,8 +24,18 @@ output * bg {{ .chezmoi.homeDir }}/.local/share/wallpapers/deep-violet.png fill
 
 # Thin borders instead of title bars: the window list belongs in the bar, not
 # repeated above every window. See the Sway section of DECISIONS.md.
-default_border pixel 2
-default_floating_border pixel 2
+#
+# 4px rather than 2. The border is not only decoration - it is the target you
+# have to hit to resize a window with the mouse, and sway has no separate
+# setting for that: tiling_drag_threshold is about dragging by a titlebar and
+# is inert when floating_mod is set, which it is here. At 2px the edge was
+# nearly unhittable. Doubling it is the only lever available, and it is still
+# thin enough to read as a line rather than a frame.
+#
+# Worth knowing the alternative that needs no aiming at all: $mod + right-drag
+# resizes from anywhere inside a window, tiled or floating.
+default_border pixel 4
+default_floating_border pixel 4
 
 # Small gaps so adjacent windows read as separate objects rather than one
 # surface split by a line. Enough to see, not enough to waste.

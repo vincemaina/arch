@@ -15,6 +15,11 @@ set $up k
 set $right l
 
 set $term foot
+
+# The file explorer is a terminal one, so it is a terminal with a distinct
+# app_id - otherwise the window rule that floats it would float every terminal.
+set $explorer foot --app-id=explorer -e yazi
+set $browser qutebrowser
 # One prompt, several sources. `combi` merges the modes listed in
 # config.rasi - applications, open windows, files, calculator - so there is a
 # single thing to reach for rather than one launcher per kind of question.
