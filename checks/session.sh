@@ -289,6 +289,50 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Dotfile references (TASK-28)"
+
+# A config that includes a file which is not there fails silently: foot simply
+# uses its default colours and says nothing. That is how the terminal came to
+# have no colour scheme while appearing to be configured for one.
+
+DOTFILES="$REPO_ROOT/setup/dotfiles"
+missing_refs=0
+checked_refs=0
+
+while IFS= read -r ref; do
+    [[ -n "$ref" ]] || continue
+    checked_refs=$((checked_refs + 1))
+
+    # A glob that matches nothing is legitimate - sway's include of
+    # /etc/sway/config.d/* is fine on a machine with no drop-ins - so for those
+    # only the containing directory has to exist.
+    if [[ "$ref" == *[\*\?]* ]]; then
+        if [[ -d "$(dirname "$ref")" ]]; then
+            pass "$ref (directory exists; matching nothing is allowed)"
+        else
+            missing_refs=$((missing_refs + 1))
+            fail "$ref is included by a dotfile but its directory does not exist"
+        fi
+    elif [[ -e "$ref" ]]; then
+        pass "$ref exists"
+    else
+        missing_refs=$((missing_refs + 1))
+        fail "$ref is included by a dotfile but does not exist"
+    fi
+done < <(
+    grep -rhoE '^[[:space:]]*(include[[:space:]]*=[[:space:]]*|include[[:space:]]+)/[^[:space:]]+' \
+        "$DOTFILES" 2>/dev/null |
+        sed -E 's/^[[:space:]]*include[[:space:]]*=?[[:space:]]*//' |
+        sort -u
+)
+
+if [[ $checked_refs -eq 0 ]]; then
+    skip "no absolute include paths found in the dotfiles"
+elif [[ $missing_refs -eq 0 ]]; then
+    pass "every absolute path a dotfile includes exists"
+fi
+
+# ----------------------------------------------------------------------
 section "Screenshot helper (TASK-10)"
 
 if [[ -x "$HOME/.local/bin/sway-screenshot" ]]; then
