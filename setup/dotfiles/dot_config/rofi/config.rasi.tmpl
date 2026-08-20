@@ -15,15 +15,20 @@
 configuration {
     modes: "combi";
 
-    /* drun is applications, window jumps to something already open, calc is
-     * rofi-calc.
+    /* One prompt for everything: applications, windows already open, a sum,
+     * and files.
      *
-     * filebrowser is deliberately NOT here. It walks the tree *inside* the
-     * launcher, so choosing a directory descends rather than opening it, and
-     * the application list sits alongside directory entries the whole time -
-     * two unrelated jobs in one list. File finding lives on its own binding
-     * as recursivebrowser, which searches rather than navigates. */
-    combi-modes: "drun,window,calc";
+     * recursivebrowser rather than filebrowser. filebrowser walks the tree
+     * *inside* the launcher, so choosing a directory descends into it rather
+     * than opening it - navigation where a search was wanted, and the reason
+     * it was confusing to have here. recursivebrowser lists files flat and
+     * hands the choice to xdg-open.
+     *
+     * Note the ratio this creates: about 1,200 files against 32 applications
+     * once caches are filtered out. Fuzzy matching plus fzf ranking is what
+     * keeps applications findable in that; without the filter-regex below it
+     * would be 7,000 and they would not be. */
+    combi-modes: "drun,window,calc,recursivebrowser";
 
     /* Fuzzy so a few characters from anywhere in the name are enough, and fzf
      * ordering so the best match rises rather than the alphabetically first.
@@ -40,6 +45,11 @@ configuration {
     recursivebrowser {
         directory: "~";
         command:   "xdg-open";
+
+        /* Repository internals, caches and dependency directories are not
+         * things anyone searches for by name, and they are the bulk of the
+         * file count. Excluding them is what keeps the list usable. */
+        filter-regex: ".*/(\\.git|\\.cache|\\.local/share/claude|\\.mozilla|node_modules|__pycache__)/.*";
     }
 
     /* Without this every row is prefixed with the mode that produced it -
@@ -49,7 +59,6 @@ configuration {
     /* The prompt is rofi's mode name by default, so it read "combi" and
      * "recursivebrowser" - internal vocabulary on screen. */
     display-combi:            "run";
-    display-recursivebrowser: "find";
 
     show-icons: true;
     terminal:   "foot";
@@ -116,7 +125,10 @@ window {
     background-color: {{ .palette.bg }}e8;
     border:           2px;
     border-color:     @accent;
-    border-radius:    8px;
+    /* Square, like everything else. sway draws flat rectangular borders and
+     * foot has no rounding, so a rounded launcher was the one thing on screen
+     * with a different shape language. */
+    border-radius:    0;
     width:            44em;
     padding:          0;
     location:         center;
