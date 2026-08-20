@@ -1,0 +1,15 @@
+[Unit]
+Description=Pick the sway split direction automatically
+Documentation=https://github.com/nwg-piotr/autotiling
+PartOf=wayland-session@sway.target
+After=wayland-session@sway.target
+Requisite=wayland-session@sway.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/autotiling
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=wayland-session@sway.target

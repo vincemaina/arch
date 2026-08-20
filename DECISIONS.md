@@ -1593,6 +1593,34 @@ Bindings are written with `layer(alt)` rather than `leftcontrol = leftalt`. A ba
 
 ---
 
+## Default applications are set, not declared
+
+**Decision:** Set default applications with `xdg-mime` from a chezmoi `run_onchange_` script, rather than shipping `~/.config/mimeapps.list` as a dotfile.
+
+### Why
+
+`mimeapps.list` is a **shared** file, which is the whole difficulty. This repository wants to say what opens an image. Applications write to the same file at runtime to register themselves - Claude Code puts its `claude-cli://` handler there, and browsers and mail clients do the same on install.
+
+chezmoi owns a file completely. Shipping `mimeapps.list` as a dotfile would mean every `sync.sh` overwrites the live file with the repository's copy, silently deleting anything an application had registered since. Links would stop working and nothing would report it - the failure mode this repository keeps finding, and one that would recur for every future application rather than once.
+
+`xdg-mime default` changes only the entries it is given and leaves the rest of the file alone, which is exactly the semantics a shared file needs.
+
+The alternative of shipping the file *including* the known runtime entries was rejected: it bakes an application's private detail into the system build, and it only works until the next application registers something.
+
+### Trade-off
+
+This is the first thing in `setup/dotfiles/` that executes rather than being copied, so `chezmoi apply` now runs code. That is a real change in what applying dotfiles means, and it was taken deliberately rather than by accident. The mitigations: `run_onchange_` runs the script only when the script itself changes, not on every sync; it is a readable shell script in the repository like everything else; and it fails loudly if a `.desktop` file it names does not exist, rather than setting a default that points at nothing.
+
+Because the file is only edited rather than owned, a mapping changed by hand will not be reverted. That is a feature here - the same reasoning as the machine-local drop-in - but it does mean the repository describes the defaults it sets and not the full state of the file.
+
+### Alternatives considered
+
+**Ship `mimeapps.list` as a dotfile.** Rejected, as above: clobbers runtime registrations.
+
+**Set it by hand once.** Rejected: it is then not reproducible, which is the point of the repository.
+
+---
+
 ## Machine-local dotfile changes
 
 **Decision:** Ship a drop-in the repository does not own. `.zshrc` is fully managed and sources `~/.config/zsh/local.zsh`, which `.chezmoiignore` keeps chezmoi from ever writing, diffing or removing.

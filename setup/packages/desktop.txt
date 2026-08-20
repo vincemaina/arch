@@ -17,8 +17,6 @@ cage
 # Terminal
 foot
 
-# Application launcher
-wofi
 
 xorg-xwayland
 polkit
@@ -87,3 +85,33 @@ qutebrowser
 # XWayland all inherit one configuration rather than four being kept in step.
 # See setup/system/keyd/default.conf.
 keyd
+
+# Picks the sway split direction from the shape of the focused container: a
+# wide one splits beside, a tall one splits below. Removes the need to decide
+# the split before opening each window, which was the friction. It is not full
+# dynamic tiling - no master-and-stack, no automatic placement - see TASK-36.
+autotiling
+
+# An image viewer, so opening a picture does not require a whole browser.
+# Wayland-native and keyboard-driven, and the smallest of the options in the
+# official repositories by some margin.
+imv
+
+# Application launcher, replacing wofi.
+#
+# rofi 2.0 is the first mainline release with the Wayland backend merged in
+# from the rofi-wayland fork, so this needs no AUR support.
+#
+# Chosen over wofi and fuzzel for `combi`, which puts several sources behind
+# one prompt - applications, open windows, files, a calculator - where both of
+# the others show a single list and have no plugin mechanism at all. That one
+# prompt is the whole point; see DECISIONS.md.
+#
+# rofi-calc supplies the calculator through libqalculate. Both are in extra.
+rofi
+rofi-calc
+
+# Terminal file manager. The GUI one is not opened, and in a keyboard-driven
+# session a TUI file manager costs nothing while it is closed. Trial against
+# thunar - see TASK-27.
+yazi
