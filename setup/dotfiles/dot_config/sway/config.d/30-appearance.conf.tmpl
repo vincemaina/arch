@@ -29,11 +29,23 @@ default_floating_border pixel 2
 
 # Small gaps so adjacent windows read as separate objects rather than one
 # surface split by a line. Enough to see, not enough to waste.
-gaps inner 6
+gaps inner 12
 
 font pango:JetBrainsMono Nerd Font 10
 
 # border | background | text | indicator | child_border
+#
+# Only the last two do anything here, and it is worth knowing which. border is
+# the frame around a *title bar*, background is that title bar's fill and text
+# is its label - and `default_border pixel` above means there are no title
+# bars, so all three are inert. child_border is the border actually drawn round
+# the window, and indicator marks the edge where the next window will open.
+#
+# Verified by setting each field to a different colour and looking: the frame
+# came out in the child_border colour and the others appeared nowhere.
+#
+# The inert values are left in place rather than removed, because they become
+# meaningful the moment `default_border normal` is used.
 #
 # Only the focused window gets the accent. Everything else is the same quiet
 # surface colour, so where the focus is can be seen without reading anything.
