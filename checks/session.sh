@@ -219,6 +219,44 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Desktop entries"
+
+# A desktop entry whose Exec cannot be resolved fails silently: Terminal=false
+# means nothing is printed anywhere, so the launcher entry simply does nothing.
+# The trap is that ~/.local/bin is on PATH for interactive shells only - it
+# comes from .zshrc - and not on the PATH sway and rofi hand to what they
+# spawn, so a bare command name works when tested from a terminal and fails
+# from the launcher. Absolute paths are the fix; this is the check.
+shopt -s nullglob
+entries=("$HOME/.local/share/applications"/*.desktop)
+if [[ ${#entries[@]} -eq 0 ]]; then
+    skip "no desktop entries of our own"
+else
+    for entry in "${entries[@]}"; do
+        # Quotes are legal in Exec and some applications use them, so strip
+        # them rather than reporting a perfectly good absolute path as missing.
+        cmd="$(sed -n 's/^Exec=//p' "$entry" | head -1 | awk '{print $1}' | tr -d '"'"'"'"')"
+        name="$(basename "$entry")"
+        [[ -n "$cmd" ]] || { fail "$name has no Exec"; continue; }
+        if [[ "$cmd" == /* ]]; then
+            if [[ -x "$cmd" ]]; then
+                pass "$name -> $cmd"
+            else
+                fail "$name points at $cmd, which is not executable"
+            fi
+        elif command -v "$cmd" &>/dev/null; then
+            # Resolvable here, but this shell has ~/.local/bin on PATH and the
+            # session does not, so a bare name is only safe outside it.
+            case "$(command -v "$cmd")" in
+                "$HOME"/*) fail "$name runs '$cmd' by name, but it lives under \$HOME and will not resolve on the session PATH - use an absolute path" ;;
+                *)         pass "$name -> $cmd" ;;
+            esac
+        else
+            fail "$name runs '$cmd', which does not exist"
+        fi
+    done
+fi
+
 section "Graphics (TASK-26)"
 
 # Whether the desktop is drawn by the GPU or by the CPU. The distinction is

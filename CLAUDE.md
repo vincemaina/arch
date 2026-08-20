@@ -242,6 +242,21 @@ hands over a broken shell.
 legitimate reason to exit, and `pkill` terminates cleanly — which `on-failure`
 correctly does not treat as a failure, so the component stays dead.
 
+## Skills
+
+`.claude/skills/` holds what previous sessions had to work out the hard way, so
+it is not rediscovered a fourth time. They load on demand; read the one that
+matches before starting.
+
+| Skill | Load it when |
+| --- | --- |
+| `desktop-verification` | Changing anything visual. How to screenshot and actually look, test on a throwaway output without disturbing the user's screen, trial keybindings at runtime, and ask each program what it applied. |
+| `sway-capability-limits` | Someone asks for blur, shadows, rounding, an overview, focus-based opacity, HiDPI or workspaces spanning displays. All established as impossible here, with the evidence. |
+| `scripting-traps` | Writing a check, editing a config programmatically, killing a process, or building a menu for rofi. Concrete footguns, each of which produced a confident wrong result rather than an error. |
+
+Like `backlog/` and this file, they are repository tooling and never reach the
+built machine.
+
 ## Reference material
 
 `docs/themes/` holds screenshots of other people's setups, collected as

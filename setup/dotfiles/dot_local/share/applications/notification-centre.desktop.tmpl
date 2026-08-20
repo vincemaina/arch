@@ -1,0 +1,20 @@
+# Exec is an absolute path, rendered by chezmoi, and that is load-bearing.
+#
+# ~/.local/bin is not on the PATH that sway and rofi hand to the things they
+# spawn - it is added by .zshrc, which only applies to interactive shells. A
+# bare `Exec=notification-centre` therefore resolves when tested from a
+# terminal and fails from the launcher, silently, because Terminal=false means
+# nothing is ever shown. The sway config learned the same lesson about
+# keybindings; this is the desktop-entry version of it.
+
+[Desktop Entry]
+Type=Application
+Name=Notifications
+GenericName=Notification centre
+Comment=Everything mako is holding: live notifications and history
+Icon=preferences-desktop-notification
+Exec={{ .chezmoi.homeDir }}/.local/bin/notification-centre
+Terminal=false
+Categories=Utility;
+Keywords=notification;notifications;mako;dnd;disturb;dismiss;history;
+NoDisplay=false
