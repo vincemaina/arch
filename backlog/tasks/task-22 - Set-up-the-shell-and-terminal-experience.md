@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:16'
-updated_date: '2026-08-20 01:42'
+updated_date: '2026-08-20 11:10'
 labels:
   - dotfiles
   - feel
@@ -27,7 +27,7 @@ The user is created with /bin/bash and no shell dotfiles are tracked at all - se
 - [x] #2 The prompt shows working directory, git state and the previous exit status
 - [x] #3 History is large, deduplicated and shared sensibly across concurrent terminals
 - [x] #4 Installed tools are wired into the shell rather than merely present
-- [ ] #5 Shell startup stays fast enough that opening a terminal feels instant, measured not assumed
+- [x] #5 Shell startup stays fast enough that opening a terminal feels instant, measured not assumed
 - [x] #6 The choice of shell is recorded in DECISIONS.md, including whether to stay on bash
 <!-- AC:END -->
 
@@ -45,4 +45,12 @@ Two ordering problems found and fixed by testing rather than reasoning. The logi
 Setting the shell also cannot happen in 03-system.sh at useradd time, since zsh comes from the dev manifest installed in 04 - the same ordering trap that broke greetd.
 
 Not verifiable in this container: the zshrc cannot be syntax-checked without zsh installed, and startup time cannot be measured. checks/session.sh does both on the machine.
+
+Confirmed working on the machine: zsh is the login shell, autosuggestions, Ctrl+R, Ctrl+T, Alt+C, zoxide and bat all behaving. Interactive startup measured at 128ms, comfortably inside the 400ms budget the check enforces.
+
+Prompt rebuilt as powerline segments at the user request, who wanted the p10k style where the context line has coloured backgrounds separating commands. Built as independent pills with their own end caps rather than one continuous chain: a chained powerline has to know what follows it, so an empty segment - no repo, or a clean tree - leaves either a stray block of colour or a chevron pointing at nothing. Pills just do not render.
+
+git_status is now its own pill and only appears when the tree is dirty, which also explains the exclamation mark the user noticed: that is the modified-files indicator, now shown as a count on a coloured pill rather than a bare character.
+
+Noted for the user: ls does not show git status because the alias is plain eza; the git column requires long format, which is what ll provides.
 <!-- SECTION:NOTES:END -->

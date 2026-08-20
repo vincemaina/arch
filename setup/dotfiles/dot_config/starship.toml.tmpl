@@ -1,14 +1,19 @@
 # Prompt. Colours from .chezmoidata/palette.toml, so it matches the desktop.
 #
-# starship rather than powerlevel10k: it is an official package rather than a
-# git clone, it is configured by this one file, and it works on any shell, so a
-# future change of shell does not mean a new prompt to learn.
+# starship rather than powerlevel10k: an official package rather than a git
+# clone, configured by this one file, and it works on any shell, so a future
+# change of shell does not mean a new prompt to learn.
+#
+# Segments are self-contained pills with their own end caps rather than one
+# continuous powerline. A chained powerline has to know what follows it, so
+# when a segment is empty - no git repo, clean tree - it leaves either a stray
+# block of colour or a chevron pointing at nothing. Pills simply do not render.
 
 "$schema" = 'https://starship.rs/config-schema.json'
 
-# Two lines: context above, cursor below. The command always starts in the same
-# column no matter how long the path or branch name is, which matters more when
-# scanning back through a screen of output than saving a line does.
+# Two lines: context above, cursor below. The command always begins in the same
+# column regardless of path or branch length, which matters more when scanning
+# back through a screen of output than saving a line does.
 format = """
 $directory$git_branch$git_status$cmd_duration$status
 $character"""
@@ -16,19 +21,28 @@ $character"""
 add_newline = true
 
 [directory]
-style = "bold {{ .palette.accent }}"
+format = "[](fg:{{ .palette.accent }})[ $path ](bg:{{ .palette.accent }} fg:{{ .palette.bg }} bold)[](fg:{{ .palette.accent }}) "
 truncation_length = 3
 truncate_to_repo = true
 truncation_symbol = "…/"
 
 [git_branch]
 symbol = " "
-style = "{{ .palette.secondary }}"
-format = "on [$symbol$branch]($style) "
+format = "[](fg:{{ .palette.surface_alt }})[ $symbol$branch ](bg:{{ .palette.surface_alt }} fg:{{ .palette.text }})[](fg:{{ .palette.surface_alt }}) "
 
+# Only appears when the tree is not clean, so a clean repo shows just a branch.
 [git_status]
-style = "{{ .palette.warning }}"
-format = "([$all_status$ahead_behind]($style) )"
+format = "[](fg:{{ .palette.warning }})[ $all_status$ahead_behind ](bg:{{ .palette.warning }} fg:{{ .palette.bg }})[](fg:{{ .palette.warning }}) "
+conflicted = "="
+ahead = "⇡${count}"
+behind = "⇣${count}"
+diverged = "⇕⇡${ahead_count}⇣${behind_count}"
+untracked = "?${count}"
+stashed = "$${count}"
+modified = "!${count}"
+staged = "+${count}"
+renamed = "»${count}"
+deleted = "✘${count}"
 
 # Only reports when something took long enough that you may have looked away.
 [cmd_duration]
