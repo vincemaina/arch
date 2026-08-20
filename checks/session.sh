@@ -26,7 +26,13 @@ section() { printf '\n==> %s\n' "$*"; }
 # ----------------------------------------------------------------------
 section "Compressed swap (TASK-9)"
 
-if swapon --show=NAME --noheadings 2>/dev/null | grep -q zram; then
+# grep -c rather than grep -q, deliberately. grep -q exits at the first match
+# and closes the pipe; the writer then takes SIGPIPE and exits 141, and this
+# script sets pipefail, so the pipeline reports failure while the thing being
+# checked is perfectly fine. grep -c reads its input to the end, so there is no
+# early close. This bit only ever passed because swapon's output is one line
+# and it finished writing before grep could exit.
+if [[ "$(swapon --show=NAME --noheadings 2>/dev/null | grep -c zram)" -gt 0 ]]; then
     size="$(swapon --show=NAME,SIZE --noheadings | awk '/zram/ {print $2}')"
     pass "zram is active as swap (${size})"
 
@@ -272,8 +278,14 @@ else
 
     # The daemon can be running and still have grabbed nothing, which looks
     # identical from systemctl and leaves the keyboard unremapped.
-    if journalctl -u keyd -b --no-pager 2>/dev/null | grep -q "DEVICE: match"; then
-        matched="$(journalctl -u keyd -b --no-pager 2>/dev/null | grep -c "DEVICE: match")"
+    # Counted rather than tested with grep -q: see the note on swapon above.
+    # journalctl writes plenty, so grep -q reliably closed the pipe under it and
+    # this check reported that keyd had grabbed nothing while it was working.
+    # Unique device ids, not match lines: keyd logs a match every time it
+    # restarts, so counting lines would claim six keyboards where there is one.
+    matched="$(journalctl -u keyd -b --no-pager 2>/dev/null \
+        | grep "DEVICE: match" | awk '{print $4}' | sort -u | grep -c .)"
+    if [[ "$matched" -gt 0 ]]; then
         pass "keyd grabbed $matched keyboard device(s)"
     else
         fail "keyd matched no input device this boot, so nothing is being remapped"

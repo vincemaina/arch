@@ -181,6 +181,12 @@ That catches template errors, and lets you read what a consumer will actually
 receive. It has already caught a real bug: swaylock takes colours without a
 leading `#`, unlike every other consumer.
 
+**It is not entirely a dry run.** `setup/dotfiles/` now contains a
+`run_onchange_` script, and chezmoi runs scripts regardless of `--destination`.
+Rendering to a scratch directory still executes them against the real system —
+the mime-defaults script really does call `xdg-mime` on your machine. Templates
+are safe to render; scripts are not sandboxed by pointing chezmoi elsewhere.
+
 Nerd Font glyphs must be written **by codepoint**, not pasted. Pasting has lost
 them silently more than once, leaving `""` where an icon should be — which looks
 configured in the file and renders as nothing.
