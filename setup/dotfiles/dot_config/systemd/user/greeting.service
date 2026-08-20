@@ -1,0 +1,23 @@
+[Unit]
+Description=System summary shown once when the session starts
+Documentation=https://github.com/fastfetch-cli/fastfetch
+PartOf=wayland-session@sway.target
+After=wayland-session@sway.target
+Requisite=wayland-session@sway.target
+
+[Service]
+Type=simple
+# --hold keeps the terminal open after fastfetch prints and exits, so the
+# summary stays until it is closed rather than flashing past.
+#
+# A distinct app_id so 40-window-rules.conf can float this one terminal
+# without floating every terminal.
+ExecStart=/usr/bin/foot --app-id=greeting --hold --title=greeting -e /usr/bin/fastfetch
+
+# Restart=no, unlike every other unit here, and deliberately. The others are
+# session components with no legitimate reason to exit; this is a one-shot you
+# are meant to close, and restarting it would make it impossible to dismiss.
+Restart=no
+
+[Install]
+WantedBy=wayland-session@sway.target

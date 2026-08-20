@@ -53,7 +53,13 @@ source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
 ### Tools
 
 eval "$(starship init zsh)"
-eval "$(zoxide init zsh)"
+# --cmd j rather than the default z. Same tool, easier key: z is bottom row
+# under the weakest finger, j is home row under the right index, and this is a
+# command typed dozens of times a day.
+#
+# It renames both: `j <fragment>` jumps to the best match, `ji <fragment>`
+# lists the candidates to pick from.
+eval "$(zoxide init zsh --cmd j)"
 
 # fzf: Ctrl+R for fuzzy history, Ctrl+T for files, Alt+C to change directory.
 source <(fzf --zsh)
