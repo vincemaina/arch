@@ -1,7 +1,7 @@
 ---
 id: TASK-30
 title: 'Track every keyboard shortcut in one place, across all tools'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-20 11:09'
@@ -53,3 +53,9 @@ Currently zero conflicts, which is itself informative: sway lives on Super, the 
 
 Coverage is stated rather than implied. qutebrowser, neovim, wofi and foot are listed as uncovered with the reason, and each becomes coverable by giving it a config this repository owns.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added tools/shortcuts.sh, which lists every shortcut grouped by context and is derived from the configuration rather than maintained by hand. sway bindings come from checks/sway-bindings.sh so the two cannot disagree; shell bindings are computed by difference against a shell started with no configuration, comparing key-and-widget pairs so that rebindings surface - which is what makes Ctrl+R visible, since fzf takes it over from a zsh default. Cross-context conflicts are detected by canonicalising both sides, verified against a deliberately introduced clash; there are none today because sway lives on Super and the shell on Ctrl and Alt. Uncovered tools are named with the reason rather than silently absent.
+<!-- SECTION:FINAL_SUMMARY:END -->
