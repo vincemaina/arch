@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Installs machine-wide configuration from this repository.
 #
-# Called by install/03-system.sh during a fresh install, and by sync.sh on a
+# Called by install/04-desktop.sh during a fresh install, and by sync.sh on a
 # machine that already exists. Defining the destinations once is the point: a
 # change here has to reach both paths, or the two drift and a setting that
 # works on a new machine never arrives on the running one.

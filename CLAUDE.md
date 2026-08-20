@@ -54,12 +54,22 @@ Two consequences worth holding onto:
 ./install.sh /dev/vda        # or /dev/nvme0n1 on real hardware
 
 # Update a machine that is already running this setup. Safe and repeatable.
-# Run as the normal user, never root. --dry-run previews without changing anything.
+# Run as the normal user, never root.
 ./sync.sh
+./sync.sh --dry-run       # preview: the package diff, then a chezmoi diff
 
-# Verify no sway binding or session unit calls a command nothing installs.
+# Does the running machine match what the repo intends? Run this after any change.
+./checks/session.sh
+
+# Does every command the session invokes come from a declared package?
 # Needs a real Arch system (uses pacman and pactree).
 ./checks/sway-commands.sh
+
+# Is any key bound twice? Prints the full binding table.
+./checks/sway-bindings.sh
+
+# A report, not a check: every shortcut, grouped by the context it applies in.
+./tools/shortcuts.sh
 
 # Backlog task management (see the CRITICAL_INSTRUCTION block above)
 backlog task list
@@ -94,7 +104,7 @@ Stage responsibilities: 01 partitions and mounts, 02 `pacstrap`s base + writes f
 
 ### Session components are systemd user units
 
-The machine boots to greetd/ReGreet, which launches `uwsm start -- sway.desktop`. Waybar, mako, swayidle and the polkit agent are user units in `setup/dotfiles/dot_config/systemd/user/`, enabled by committed symlinks in `wayland-session@sway.target.wants/` rather than `systemctl --user enable` (which has no user session inside the installer chroot).
+The machine boots to greetd/ReGreet, which launches `uwsm start -- sway.desktop`. mako, swayidle and the polkit agent are user units in `setup/dotfiles/dot_config/systemd/user/`; Waybar's unit ships with its package, so the repo carries only a `waybar.service.d/override.conf` drop-in. All four are enabled by committed symlinks in `wayland-session@sway.target.wants/` rather than `systemctl --user enable` (which has no user session inside the installer chroot).
 
 Bind session components to **`wayland-session@sway.target`, never `graphical-session.target`** — the generic target is reached by every compositor, so a unit wanted by it would also start under a different desktop. Add a session component as a unit, not a sway `exec` line; an `exec` gets no supervision. A plain `sway` launch reaches no session target at all, so nothing starts — which is why login is graphical.
 
@@ -102,11 +112,24 @@ Helper scripts in `dot_local/bin/` must carry a `# requires:` header listing the
 
 ### System configuration has one source of truth
 
-`setup/system/apply-config.sh` owns the mapping from repository file to `/etc`
-destination. Both `03-system.sh` (during install) and `sync.sh` (with `--activate`)
-call it, so a new system config file is added in exactly one place and reaches both
-paths. Adding one to only the installer means it can never reach a running machine —
-that was a real bug, caught by `checks/session.sh`.
+`setup/system/apply-config.sh` owns everything machine-wide that both paths need,
+which is more than the name suggests: the mapping from repository file to `/etc`
+destination, enabling `earlyoom` and `greetd`, the whole initramfs story (microcode
+hook, re-enabling the `fallback` preset that mkinitcpio v40 stopped shipping, and a
+*conditional* `mkinitcpio -P` because regenerating is slow), and disabling
+`NetworkManager-wait-online`. Machine-wide work belongs here, not in a stage script.
+
+`04-desktop.sh` calls it at the end of a fresh install and `sync.sh` calls it with
+`--activate`, so a new system config file is added in exactly one place and reaches
+both paths. Adding one to only the installer means it can never reach a running
+machine — that was a real bug, caught by `checks/session.sh`.
+
+`--activate` is the whole difference between the two callers. Without it the script
+only writes files and enables units, which is all the installer chroot can do. With
+it, the change also takes effect now — and failures there warn rather than abort,
+because the configuration is already written and one service that will not restart
+should not fail the whole sync. **greetd is deliberately never restarted**: it owns
+the session of whoever is running `sync.sh`.
 
 Bootloader templates under `setup/system/loader/` are the exception: they are
 rendered with the machine's root UUID at install time and must never be applied by
@@ -118,8 +141,9 @@ Single source of machine identity (`USERNAME`, `HOSTNAME`, `TIMEZONE`, `LOCALE`,
 
 ### Package manifests — two different parsers
 
-- `packages/base.txt` is read by `mapfile` **with no filtering**. It must stay one package per line with **no comments and no blank lines**, or pacstrap receives them as package names and fails.
-- `packages/desktop.txt` and `packages/dev.txt` are read through `grep -Ev '^[[:space:]]*(#|$)'`, so comments and blank lines are fine and are used for grouping.
+- `packages/base.txt` is read by `02-base.sh` with a bare `mapfile` and **no filtering**. It must stay one package per line with **no comments and no blank lines**, or pacstrap receives them as package names and fails.
+- `packages/desktop.txt` and `packages/dev.txt` are read by `04-desktop.sh` through `grep -Ev '^[[:space:]]*(#|$)'`, so comments and blank lines are fine and are used for grouping.
+- `sync.sh` is the asymmetry to watch: it globs `packages/*.txt` — `base.txt` included — through the comment-stripping grep. So a comment added to `base.txt` breaks a fresh install while sync keeps working, which means it will not show up on the machine you are testing on.
 
 Manifests list *intentional top-level* packages, not transitive dependencies. A dependency may still be listed explicitly when the system relies on that capability directly (e.g. `polkit`), so a dependency-graph change cannot silently remove it.
 
@@ -215,8 +239,12 @@ correctly does not treat as a failure, so the component stays dead.
 ## Reference material
 
 `docs/themes/` holds screenshots of other people's setups, collected as
-inspiration. `docs/wallpapers/` holds generated wallpaper candidates; only the
-chosen one is tracked, under `setup/dotfiles/`.
+inspiration. Look there before proposing a visual direction: a uniform grey bar
+and a first set of wallpapers were both rejected as lifeless, and both times the
+reference material settled it. `docs/wallpapers/` holds generated wallpaper
+candidates and is gitignored; only the chosen one is tracked, under
+`setup/dotfiles/`. `screenshots/` holds captures of this setup, taken to review
+changes to how it looks.
 
 ## Conventions
 
@@ -230,5 +258,6 @@ chosen one is tracked, under `setup/dotfiles/`.
 ## Known gaps
 
 - `README.md` links to `FLOW.md`, which does not exist yet.
+- `backlog` is not installed on every machine this repository gets worked on, so the CRITICAL_INSTRUCTION at the top of this file can fail with `command not found`. Install it from [MrLesk/Backlog.md](https://github.com/MrLesk/Backlog.md) rather than falling back to editing `backlog/tasks/*.md` by hand — and never add it to `setup/packages/`.
 - `setup/packages/CHATGPT.md` is a raw pasted design conversation, superseded by `packages/README.md` and `DECISIONS.md`; treat it as historical, not authoritative.
 - `claude-best-practices.md` (untracked) holds the user's general working preferences, not project rules.
