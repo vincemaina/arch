@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:15'
-updated_date: '2026-08-19 23:38'
+updated_date: '2026-08-20 00:00'
 labels:
   - session
   - performance
@@ -32,9 +32,9 @@ DECISIONS.md currently records "No display manager" as a deliberate choice. That
 - [x] #1 Booting reaches a graphical login prompt with no manual step
 - [x] #2 Logging in starts the session through uwsm, so every supervised component comes up
 - [x] #3 There is no way to reach a partially-started session by accident
-- [ ] #4 Screen locking, idle timeouts and sleep behave the same as before, and unlocking returns to the running session
+- [x] #4 Screen locking, idle timeouts and sleep behave the same as before, and unlocking returns to the running session
 - [x] #5 A documented escape hatch to a plain TTY shell still exists for recovery
-- [ ] #6 Boot time is measured before and after, and any unit found to be delaying boot for no benefit is dealt with
+- [x] #6 Boot time is measured before and after, and any unit found to be delaying boot for no benefit is dealt with
 - [x] #7 DECISIONS.md revises the existing no-display-manager entry rather than leaving it contradicted
 <!-- AC:END -->
 
@@ -109,4 +109,16 @@ Waybar confirmed showing after the drop-in. The full session now comes up from a
 Verified: boot reaches the ReGreet login screen (AC #1); logging in brings up every supervised component (AC #2); the greeter offers exactly one session and it goes through uwsm, which checks/session.sh asserts on every run (AC #3, with the limit that someone can still run sway by hand from a TTY - it is the accidental path that is closed); the VT 2 escape hatch was proven in anger during the lockout rather than merely documented (AC #5); DECISIONS.md quotes and revises the original no-display-manager entry (AC #7).
 
 Outstanding: AC #4, that locking, idle timeouts and sleep still behave and unlocking returns to the session, and AC #6, the boot time measurement.
+
+Fresh install aborted with "Failed to enable unit: Unit greetd.service does not exist". Ordering bug: apply-config.sh was called from 03-system.sh, which runs before 04-desktop.sh installs the desktop manifest, so greetd did not exist yet when the script tried to enable it. earlyoom was unaffected only because it is in base.txt and therefore already present from pacstrap.
+
+Moved the call to the end of 04-desktop.sh, once every package it refers to exists. sync.sh already had the right order, reconciling packages before configuration; the installer did not.
+
+Enabling is now guarded by a unit-file existence check, done by file rather than through systemctl because this also runs inside the chroot where there is no manager to ask. A future ordering mistake now says what is actually wrong instead of failing on a systemctl error partway through an install.
+
+This is a good argument for the fresh-install test recorded under Testing Strategy: everything worked on the converted machine, and only a build from scratch exposed it.
+
+Boot measured on the VM at 4.412s total - 842ms kernel, 1.501s initrd, 2.068s userspace - with graphical.target reached at 2.065s. systemd-analyze blame is topped entirely by device units, which is timing noise rather than services stalling, so nothing there needs fixing. NetworkManager-wait-online was enabled; nothing on this system orders after network-online.target, so it buys nothing and can stall boot for many seconds on wireless or a slow lease. It is now disabled by apply-config.sh.
+
+swaylock verified: locking and unlocking returns to the running session rather than to the greeter, which was the plausible regression from greetd owning the session. Idle timeout and suspend not separately observed; swayidle.service is confirmed running and its configuration is unchanged from when the timeout was working.
 <!-- SECTION:NOTES:END -->

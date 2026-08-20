@@ -33,13 +33,6 @@ chmod 440 /etc/sudoers.d/wheel
 echo "==> Enabling NetworkManager"
 systemctl enable NetworkManager
 
-echo "==> Installing machine-wide configuration"
-
-# Shared with sync.sh so a change reaches a running machine too, rather than
-# only ever arriving on a freshly installed one. No --activate here: there is
-# no running system inside the chroot to apply anything to.
-"$SETUP_ROOT/system/apply-config.sh"
-
 echo
 echo "Set root password:"
 passwd

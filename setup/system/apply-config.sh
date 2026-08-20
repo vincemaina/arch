@@ -50,12 +50,35 @@ done
 
 # Enabling works inside the installer chroot; starting does not, because there
 # is no running system there to start anything on.
-systemctl enable earlyoom
-
+#
+# A unit only exists once its package is installed, so this must run after the
+# manifests have been applied. Checking first turns an ordering mistake into a
+# clear message rather than an install that aborts partway through with
+# "Unit greetd.service does not exist".
+#
 # greetd owns VT 1 and replaces the getty there. The other VTs keep theirs, so
 # Ctrl+Alt+F2 remains the way to reach a plain shell if the session will not
 # start.
-systemctl enable greetd
+ENABLE_UNITS=(earlyoom greetd)
+
+for unit in "${ENABLE_UNITS[@]}"; do
+    # Checked by file rather than with systemctl, because this also runs inside
+    # the installer chroot where there is no manager to ask.
+    if [[ ! -e "/usr/lib/systemd/system/$unit.service" \
+       && ! -e "/etc/systemd/system/$unit.service" ]]; then
+        echo "Cannot enable $unit: no unit file for it exists." >&2
+        echo "Its package is not installed yet, so this ran too early." >&2
+        exit 1
+    fi
+    systemctl enable "$unit"
+done
+
+# NetworkManager-wait-online holds network-online.target until a connection is
+# up. Nothing on this system orders after that target, so the wait buys nothing
+# and can stall boot for many seconds on wireless or a slow DHCP lease.
+if [[ -e /usr/lib/systemd/system/NetworkManager-wait-online.service ]]; then
+    systemctl disable NetworkManager-wait-online.service
+fi
 
 if ! $ACTIVATE; then
     exit 0
