@@ -1496,6 +1496,30 @@ Chezmoi should not interpret the other directories as files that belong in the u
 
 ---
 
+## XWayland and scaled outputs
+
+**Decision:** Accept that XWayland clients blur on a scaled output, and minimise how many there are rather than trying to fix the scaling.
+
+### Why
+
+`sway-output(5)` states it directly: *"HiDPI isn't supported with Xwayland clients (windows will blur)"*. An X11 client renders at the unscaled size and the compositor scales the buffer up, so on an output at scale 2 it is drawing at half resolution. No compositor setting changes this; it is an upstream limitation, not a missing option.
+
+Measured rather than assumed. On a headless output at 1280x800 scale 2, the same GTK application was launched twice, once with `GDK_BACKEND=wayland` and once with `GDK_BACKEND=x11`, and confirmed to take different paths - sway reported `shell=xdg_shell` against `shell=xwayland`. The XWayland window had visibly softer text, and picked up different icons besides, which suggests the theme resolution differs by backend as well as the scaling.
+
+What can be done is keep applications off XWayland, which `environment.d/10-appearance.conf` already does with `QT_QPA_PLATFORM`, `SDL_VIDEODRIVER` and `MOZ_ENABLE_WAYLAND`. Nothing this setup installs needs XWayland today - qutebrowser, Thunar and pavucontrol all run natively, and XWayland only started at all when one was deliberately forced onto it - so the limitation currently costs nothing.
+
+### Trade-off
+
+The moment an X11-only application is genuinely needed on a scaled display, it will look worse than everything around it and there will be no configuration answer. That is a real cost, deferred rather than avoided.
+
+### Alternatives considered
+
+**`scale_filter nearest`.** Only changes how the upscale looks, not that it happens: sharper but blockier. The default `smart` already uses nearest at integer scales, which is the sensible choice, and reaching for `nearest` would only matter at a fractional scale.
+
+**`xwayland disable`.** Removes the blurry-window problem by removing X11 support entirely. Rejected: it converts a cosmetic problem into an application that simply will not run, and the compositor loads XWayland lazily anyway, so an unused XWayland costs nothing.
+
+---
+
 ## Key remapping with keyd
 
 **Decision:** Swap left Alt and left Control with `keyd`, a system-wide remapping daemon, rather than setting `xkb_options` per context.
