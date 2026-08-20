@@ -289,6 +289,28 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Terminal config (TASK-28)"
+
+# foot validates its own config and reports deprecated options, which is how a
+# renamed section is meant to be caught - rather than by noticing a warning
+# scrolling past every time a terminal opens.
+if command -v foot &>/dev/null; then
+    if foot_out="$(foot --check-config 2>&1)"; then
+        if [[ -n "$foot_out" ]]; then
+            fail "foot config has warnings:"
+            sed 's/^/          /' <<<"$foot_out"
+        else
+            pass "foot config is valid with no deprecation warnings"
+        fi
+    else
+        fail "foot rejected its config:"
+        sed 's/^/          /' <<<"$foot_out"
+    fi
+else
+    skip "foot not installed"
+fi
+
+# ----------------------------------------------------------------------
 section "Dotfile references (TASK-28)"
 
 # A config that includes a file which is not there fails silently: foot simply
