@@ -81,3 +81,30 @@ export BAT_THEME=ansi
 # widget that has been defined.
 
 source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+### PATH
+#
+# ~/.local/bin holds the helper scripts this repository installs - see
+# dot_local/bin/ - alongside anything else installed per-user. Nothing puts it
+# on PATH on its own: /etc/profile only appends /usr/local/bin, and the systemd
+# user environment does not carry it either. Without this, sway-screenshot and
+# sway-idle exist, are executable, and cannot be run by name.
+#
+# Guarded rather than prepended blindly, so a nested shell does not stack
+# duplicate copies onto PATH.
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
+
+### Machine-local configuration
+#
+# Deliberately not managed by chezmoi - see .chezmoiignore, and the "Machine-
+# local dotfile changes" entry in DECISIONS.md. Anything that belongs to this
+# machine alone goes here, so it never turns a managed file into a conflict at
+# sync time.
+#
+# Sourced last so it can override anything above it. The rule for what belongs
+# here: things you are content to lose when the machine is rebuilt. Anything
+# else is universal or per-machine-but-declared, and belongs in the repository.
+[[ -r "$HOME/.config/zsh/local.zsh" ]] && source "$HOME/.config/zsh/local.zsh"

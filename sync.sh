@@ -162,9 +162,38 @@ else
         echo
         chezmoi --source "$SETUP_SOURCE" diff
     else
-        chezmoi --source "$SETUP_SOURCE" apply
+        # chezmoi prompts when a target has been edited since it last wrote it.
+        # That is useful in a terminal and fatal without one: over ssh or from a
+        # script it blocks forever on a question nobody can answer. Fail loudly
+        # instead, naming the file, so the run ends rather than hangs.
+        if [[ -t 0 ]]; then
+            chezmoi --source "$SETUP_SOURCE" apply
+        elif ! chezmoi --source "$SETUP_SOURCE" apply --error-on-conflict; then
+            # --error-on-conflict exits 1 and prints nothing, which under set -e
+            # would end the run with no explanation at all. Say what happened.
+            echo >&2
+            echo "A file above was changed on this machine since chezmoi last" >&2
+            echo "wrote it, and there is no terminal here to ask which version" >&2
+            echo "to keep. Nothing was changed. Either:" >&2
+            echo >&2
+            echo "  * run sync.sh from a terminal and answer the prompt, or" >&2
+            echo "  * keep the local version:  chezmoi --source $SETUP_SOURCE re-add ~/<file>, or" >&2
+            echo "  * discard it:              chezmoi --source $SETUP_SOURCE apply --force ~/<file>" >&2
+            exit 1
+        fi
         echo "    Applied"
     fi
+
+    # A file differs either because the repository moved on, or because it was
+    # edited here. In the second case the change is one command away from being
+    # kept, and otherwise it is one sync away from being lost.
+    echo
+    echo "    If any of those differ because you changed them on this machine:"
+    for file in "${CHANGED[@]}"; do
+        echo "      chezmoi --source $SETUP_SOURCE re-add ~/$file"
+    done
+    echo "    For changes that should stay on this machine only, use"
+    echo "    ~/.config/zsh/local.zsh, which chezmoi deliberately ignores."
 
     for file in "${CHANGED[@]}"; do
         case "$file" in

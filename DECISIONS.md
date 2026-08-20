@@ -1496,6 +1496,38 @@ Chezmoi should not interpret the other directories as files that belong in the u
 
 ---
 
+## Machine-local dotfile changes
+
+**Decision:** Ship a drop-in the repository does not own. `.zshrc` is fully managed and sources `~/.config/zsh/local.zsh`, which `.chezmoiignore` keeps chezmoi from ever writing, diffing or removing.
+
+### Why
+
+Editing a chezmoi-managed file on one machine leaves it diverged with no route back except remembering to fold the change in by hand. The next sync then asks a question at the worst possible moment, and the honest answer is usually "not now".
+
+Three kinds of divergence were being conflated, and only the middle one was expressible:
+
+| Kind | Belongs in | Survives a rebuild |
+| --- | --- | --- |
+| Universal | the repository | yes |
+| Per-machine but declared | chezmoi templates and profiles | yes |
+| Machine-local scratch | `~/.config/zsh/local.zsh` | no |
+
+The third had no mechanism at all, so anything in it had to be typed into a managed file. That is what produced the conflict, and it also hid a real bug: a `PATH` line added by hand was not machine-local at all. `dot_local/bin/` installs executables and nothing ever put that directory on `PATH`, so every machine built from this repository had helper scripts that could not be run by name.
+
+The rule that decides the column: **put things in the local file that you are content to lose when the machine is rebuilt.** Anything you would be annoyed to lose is universal or declared per-machine, and belongs in git.
+
+### Trade-off
+
+Configuration for this machine is deliberately outside version control, so it is not backed up and not reproducible. That is the point of the category, but it means the local file is the one place in this setup where "it works on my machine" is allowed to be true.
+
+### Alternatives considered
+
+**Leave `.zshrc` unmanaged and check only that an import line is present.** Rejected. It gives up the ability to push a shell change to every machine, which is what the repository is for, and enforcing a line inside an unmanaged file needs a `modify_` script - more machinery for less. Inverting it keeps the shared file managed and puts the escape hatch inside it.
+
+**Require every local change to be folded back in.** Rejected as the only option, though `sync.sh` now prints the `chezmoi re-add` command for each differing file so it is one command when it is the right answer. Insisting on it for everything makes the repository the enemy of trying something quickly.
+
+---
+
 # Testing Strategy
 
 ## VM-first development

@@ -1,0 +1,10 @@
+# Paths chezmoi should leave entirely alone in the target.
+#
+# Listed here so chezmoi will not write, diff or remove them. Without this, a
+# machine-local file sitting in a managed directory would either be reported as
+# unmanaged drift or deleted as unknown.
+#
+# dot_zshrc sources this when it exists. It is the escape hatch that keeps
+# .zshrc itself fully managed: machine-local shell configuration goes here
+# rather than being typed into a file the repository owns.
+.config/zsh/local.zsh
