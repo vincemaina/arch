@@ -37,6 +37,16 @@ output * bg {{ .chezmoi.homeDir }}/.local/share/wallpapers/deep-violet.png fill
 default_border pixel 4
 default_floating_border pixel 4
 
+# The title bar that floating windows get in 40-window-rules.conf draws its own
+# border, and it defaults to 1px - so a 4px frame met a 1px bar and the join
+# looked wrong. Matching it makes the outline one continuous thickness.
+#
+# Padding must exceed the border thickness, which sway(5) says outright:
+# "Padding includes titlebar borders so their value should be greater than
+# titlebar_border_thickness".
+titlebar_border_thickness 4
+titlebar_padding 10 6
+
 # Small gaps so adjacent windows read as separate objects rather than one
 # surface split by a line. Enough to see, not enough to waste.
 gaps inner 12
