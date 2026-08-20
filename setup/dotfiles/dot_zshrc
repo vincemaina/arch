@@ -57,9 +57,18 @@ eval "$(starship init zsh)"
 # under the weakest finger, j is home row under the right index, and this is a
 # command typed dozens of times a day.
 #
-# It renames both: `j <fragment>` jumps to the best match, `ji <fragment>`
-# lists the candidates to pick from.
+# `j <fragment>` jumps to the best match.
 eval "$(zoxide init zsh --cmd j)"
+
+# zoxide derives the interactive picker's name from --cmd, so it arrives as
+# `ji` and there is no flag to change just that one. zsh can rename a function
+# by copying its body out of the `functions` array, which is exact - no alias
+# leaving both names live, and no sed against generated code.
+#
+# jf, for find: `jf <fragment>` lists the candidates to choose from rather than
+# jumping straight to the best guess.
+functions[jf]=$functions[ji]
+unfunction ji
 
 # fzf: Ctrl+R for fuzzy history, Ctrl+T for files, Alt+C to change directory.
 source <(fzf --zsh)
