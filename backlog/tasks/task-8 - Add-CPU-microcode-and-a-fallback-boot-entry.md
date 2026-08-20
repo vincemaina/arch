@@ -1,11 +1,11 @@
 ---
 id: TASK-8
 title: Add CPU microcode and a fallback boot entry
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:14'
-updated_date: '2026-08-20 14:02'
+updated_date: '2026-08-20 15:14'
 labels:
   - foundation
   - boot
@@ -28,7 +28,7 @@ The bootloader is currently a single point of failure. setup/packages/base.txt i
 <!-- AC:BEGIN -->
 - [x] #1 intel-ucode and amd-ucode are installed by the base install
 - [x] #2 A second boot entry using initramfs-linux-fallback.img is generated alongside the default entry
-- [ ] #3 A fresh VM install boots successfully from both the default and the fallback entry
+- [x] #3 A fresh VM install boots successfully from both the default and the fallback entry
 - [x] #4 DECISIONS.md records why both microcode packages are installed rather than detecting the CPU vendor
 - [x] #5 Microcode is loaded early by the mkinitcpio microcode hook, and the installer fails loudly rather than silently continuing if that hook is absent
 <!-- AC:END -->
@@ -99,4 +99,14 @@ Tested against five preset shapes: stock v40 (all three lines corrected), alread
 Verified live: initramfs-linux-fallback.img now exists at 212M against the 15M default, the size difference being the observable signature of a build without autodetect. checks/session.sh went from 31 passed 1 failed to 34 passed 0 failed.
 
 AC #3 still open and needs a human: reboot, choose "Arch Linux (fallback initramfs)" at the menu, confirm it boots.
+
+Fallback entry booted and confirmed on the physical machine. /proc/cmdline reports initrd=\initramfs-linux-fallback.img and the EFI variable LoaderEntrySelected reads arch-fallback.conf. An earlier attempt looked successful but both values read arch.conf, so the default had booted - the 3 second menu had elapsed. Worth recording, because a fallback boot is indistinguishable from a normal one by eye: it is the same kernel, root and userspace, and only the initramfs differs. Checking cmdline is the only way to tell.
+
+checks/session.sh reports 40 passed 0 failed while running on the fallback image.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Microcode is installed for both vendors and loaded through the mkinitcpio hook, and a second boot entry using the fallback initramfs is generated alongside the default. The fallback image is now actually built: enabling the preset was not enough, because mkinitcpio v40 also comments out fallback_image and fallback_options, and without a destination it skips the image with a warning and exits 0. fallback_options mattered as much as the path - "-S autodetect" is what makes the image a recovery image rather than a copy of the default carrying only the modules for hardware that was present at build time. apply-config.sh now restores all three, refuses to enable a fallback with no destination, and verifies the images exist after regenerating, since mkinitcpio exit codes say nothing about what was produced. Verified end to end: the image builds at 212M against the 15M default, and the machine has now booted from the fallback entry, confirmed by /proc/cmdline and LoaderEntrySelected rather than by appearance.
+<!-- SECTION:FINAL_SUMMARY:END -->

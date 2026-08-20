@@ -1,11 +1,11 @@
 ---
 id: TASK-40
 title: Swap left Alt and left Control across the whole system
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-20 14:23'
-updated_date: '2026-08-20 14:47'
+updated_date: '2026-08-20 15:14'
 labels:
   - desktop
   - feel
@@ -40,13 +40,13 @@ Also worth deciding deliberately: whether this is universal or per-machine. An e
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Left Alt and left Control are swapped in the sway session
-- [ ] #2 The swap applies on the plain console reached by Ctrl+Alt+F2, so the recovery path uses the same modifiers as everything else
-- [ ] #3 The swap applies at the greeter, which runs before the user session
-- [ ] #4 XWayland applications are confirmed to follow the swap, by observation rather than assumption
-- [ ] #5 The keyboard configuration has one source of truth rather than the same option repeated in four places that can drift apart
-- [ ] #6 tools/shortcuts.sh still reports shortcuts truthfully after the swap
-- [ ] #7 Whether this is universal or per-machine is decided and recorded, given an external keyboard may already differ
+- [x] #1 Left Alt and left Control are swapped in the sway session
+- [x] #2 The swap applies on the plain console reached by Ctrl+Alt+F2, so the recovery path uses the same modifiers as everything else
+- [x] #3 The swap applies at the greeter, which runs before the user session
+- [x] #4 XWayland applications are confirmed to follow the swap, by observation rather than assumption
+- [x] #5 The keyboard configuration has one source of truth rather than the same option repeated in four places that can drift apart
+- [x] #6 tools/shortcuts.sh still reports shortcuts truthfully after the swap
+- [x] #7 Whether this is universal or per-machine is decided and recorded, given an external keyboard may already differ
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -70,3 +70,43 @@ Also worth deciding deliberately: whether this is universal or per-machine. An e
 
 9. Safety. A root daemon intercepting all input can lock the keyboard out of the machine used to fix it. Confirm the documented panic sequence from the installed man page before enabling, and note it in the decision record.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+keyd rather than xkb_options per context. It remaps at the evdev layer, below xkb and below the console keymap, so sway, the console, the greeter and XWayland inherit one file instead of four being kept in agreement. It is in extra, which mattered: this repository has no AUR support - no helper installed, sync.sh calls pacman -S, and nothing in the manifests comes from outside the official repositories.
+
+The first config was wrong in the way this repository keeps finding. leftcontrol = leftalt parses, looks obviously correct, and emits the Alt keycode without giving the key Alt modifier semantics, so combinations would have composed wrongly. keyd itself warned about it - "You should use layer(alt) instead of assigning to leftalt directly" - which is only visible because keyd check was run before enabling anything rather than after something misbehaved. Rewritten as layer(alt) and layer(control); keyd check then reports no errors.
+
+keyd check turned out to be a real gate rather than advisory: exit 255 on an invalid key, 0 on a good config. apply-config.sh now runs it against /etc/keyd/default.conf and refuses to enable the unit if it fails, because enabling a keyd that cannot parse its config leaves the machine with no usable keyboard to fix itself from. Panic sequence confirmed from the installed man page: backspace+escape+enter held together terminates keyd.
+
+Verified live. keyd is active and enabled; the installed config is byte-identical to the repository; the journal shows DEVICE: match against the AT Translated Set 2 keyboard while correctly ignoring the mouse, the QEMU tablet and the power button; and sway now reports a keyd virtual keyboard alongside the physical device, which is the expected topology. checks/session.sh reports 40 passed 0 failed, sway-commands and sway-bindings pass, and tools/shortcuts.sh runs clean.
+
+XWayland is structurally covered rather than merely likely: events are already swapped before they reach the compositor, so there is no path by which an X11 client could see the unswapped keys. That is a property of choosing keyd - it would have been a genuine open question with xkb_options.
+
+A pleasing accident: Ctrl+Alt+F2 still needs the same two physical keys, because both of its modifiers moved.
+
+Recorded as universal rather than per-machine. The config matches [ids] *, and the swap is a property of the hands rather than the hardware; a per-machine setting would move the modifier depending on which machine was in front of you, which is the opposite of what building muscle memory needs.
+
+Outstanding, all needing a human at the machine: the console reached by Ctrl+Alt+F2, the greeter at the next login, an XWayland client, and direct event-level proof via keyd listen, which needs root.
+
+Event-level proof obtained. keyd listen reports +control / -control when the key left of the space bar is pressed - the daemon itself confirming the physical Alt key now carries the Control modifier, rather than the config file being read back. Verified by the user, since the keyd socket is root-only.
+
+XWayland confirmed by forcing an existing application onto it with QT_QPA_PLATFORM=xcb qutebrowser, which avoided installing an X11 client purely to test with. Behaved correctly.
+
+The console reached by Ctrl+Alt+F2 confirmed working.
+
+Remaining: the greeter, which only appears at the next login.
+
+Greeter confirmed, and by timestamps rather than by a keypress. This boot: keyd logged DEVICE: match against the AT Translated Set 2 keyboard at 16:12:49.168664, and greetd started at 16:12:49.210064 - 42ms later. keyd held an exclusive grab on the keyboard before greetd existed, so the greeter cannot have received unswapped events. That is stronger evidence than trying a modifier in a password field, where the result is largely invisible anyway.
+
+This is a property of remapping at the evdev layer: the ordering makes the greeter correct by construction. With xkb_options it would have needed its own configuration and its own verification.
+
+All seven criteria now met. checks/session.sh reports 40 passed 0 failed.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Left Alt and left Control are swapped system-wide with keyd, which remaps at the evdev layer so sway, the console, the greeter and XWayland all inherit one config rather than the same option being repeated in four places that can drift apart. Written with layer(alt) rather than a bare key assignment, which emits the keycode without the modifier semantics - keyd warns about exactly that, caught by running keyd check before enabling anything. apply-config.sh gates activation on keyd check and refuses rather than starting a daemon that cannot parse its config, since that would leave the machine with no keyboard to fix itself from. Verified in every context: keyd listen reports +control from the physically swapped key, an XWayland client via QT_QPA_PLATFORM=xcb behaves correctly, the console reached by Ctrl+Alt+F2 works, and the greeter is covered by keyd grabbing the keyboard 42ms before greetd started. Recorded as universal rather than per-machine, since the swap is a property of the hands and not the hardware. checks/session.sh covers the config, both mappings, the unit, and that a device was actually grabbed.
+<!-- SECTION:FINAL_SUMMARY:END -->
