@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# requires: foot fastfetch zsh
+# requires: foot fastfetch zsh swaymsg python3
 
 # Opens a terminal that greets you with a system summary.
 #
-#   terminal              a normal terminal, tiled like any other window
-#   terminal --floating   the auto-opened kind: floating, sized to its contents
+#   terminal              matches whatever is focused: floating if that is,
+#                         tiled otherwise
+#   terminal --floating   always floating, for the automatic ones
 #
 # WHY THE SUMMARY LIVES HERE AND NOT IN .zshrc
 #
@@ -19,8 +20,47 @@ set -euo pipefail
 # that cannot be typed into. This way the summary scrolls up as you work,
 # exactly like any other command you have run.
 
+# Inherit the focused window's placement unless told otherwise.
+#
+# sway cannot express this itself: for_window rules match static criteria -
+# app_id, class, title - and know nothing about what is focused when a window
+# appears. So the choice has to be made before launching, which means here.
+#
+# The rule is simply "match what you are looking at": open a terminal from a
+# floating one and you get another floating one, open it from a tile and you
+# get a tile. Anything already open is a better guide to what is wanted than a
+# fixed default.
+focused_is_floating() {
+    swaymsg -t get_tree 2>/dev/null | python3 -c '
+import json, sys
+
+try:
+    tree = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+
+def walk(node, floating):
+    if node.get("focused"):
+        print("yes" if floating else "no")
+        sys.exit(0)
+    for child in node.get("nodes", []):
+        walk(child, floating)
+    # Anything below a floating_nodes entry is part of a floating container,
+    # so the flag is carried down rather than checked per node.
+    for child in node.get("floating_nodes", []):
+        walk(child, True)
+
+walk(tree, False)
+sys.exit(1)
+' 2>/dev/null | grep -qx yes
+}
+
 floating=false
-[[ "${1:-}" == "--floating" ]] && floating=true
+if [[ "${1:-}" == "--floating" ]]; then
+    floating=true
+elif focused_is_floating; then
+    floating=true
+fi
 
 if $floating; then
     # A distinct app_id is what 40-window-rules.conf matches to float and
