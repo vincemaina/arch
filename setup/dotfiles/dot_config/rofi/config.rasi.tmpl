@@ -2,75 +2,183 @@
  *
  * Colours come from .chezmoidata/palette.toml. Edit them there, not here.
  *
- * The point of using rofi rather than a simpler launcher is `combi`: several
- * sources behind one prompt, so there is one thing to reach for regardless of
- * whether the answer is an application, a window, a file or a sum.
+ * The point of rofi over a simpler launcher is `combi`: several sources behind
+ * one prompt, so there is one thing to reach for whether the answer is an
+ * application, a window, a file or a sum.
+ *
+ * Every element below sets its own colours explicitly rather than relying on
+ * the `*` block. rofi loads its own theme first and sets colours on *named*
+ * elements, and a named rule beats a wildcard - so a `*` block alone leaves
+ * the list rendering in rofi's stock cream, which is exactly what happened.
  */
 
 configuration {
     modes: "combi";
 
-    /* The sources combi merges. drun is applications by their desktop entry,
-     * window jumps to something already open, calc is rofi-calc, and
-     * filebrowser walks the filesystem. */
+    /* drun is applications, window jumps to something already open, calc is
+     * rofi-calc, filebrowser walks the filesystem. */
     combi-modes: "drun,window,calc,filebrowser";
 
-    show-icons:   true;
-    display-combi: "";
-    terminal:     "foot";
+    /* Without this every row is prefixed with the mode that produced it -
+     * "drun Firefox" - which is noise when the icon already says as much. */
+    combi-hide-mode-prefix: true;
+
+    show-icons: true;
+    terminal:   "foot";
+    drun-display-format: "{name}";
 }
 
 * {
-    bg:       {{ .palette.bg }};
-    surface:  {{ .palette.surface }};
-    text:     {{ .palette.text }};
-    text-dim: {{ .palette.text_dim }};
-    accent:   {{ .palette.accent }};
-    urgent:   {{ .palette.urgent }};
+    bg:        {{ .palette.bg }};
+    surface:   {{ .palette.surface }};
+    surface-alt: {{ .palette.surface_alt }};
+    text:      {{ .palette.text }};
+    text-dim:  {{ .palette.text_dim }};
+    muted:     {{ .palette.muted }};
+    accent:    {{ .palette.accent }};
+    secondary: {{ .palette.secondary }};
+    urgent:    {{ .palette.urgent }};
+
+    /* rofi's own colour variables. Setting these is the point: the stock
+     * theme's rules are state-specific - `element normal.normal` and friends -
+     * and a state rule beats a plain `element` rule, so overriding `element`
+     * alone left the list rendering in rofi's cream. Found by asking
+     * `rofi -dump-theme` what it had actually applied. */
+    background:                  @bg;
+    foreground:                  @text;
+    separatorcolor:              @surface-alt;
+    lightbg:                     @surface;
+    lightfg:                     @text;
+    blue:                        @accent;
+    red:                         @urgent;
+
+    normal-background:           @bg;
+    normal-foreground:           @text-dim;
+    alternate-normal-background: @bg;
+    alternate-normal-foreground: @text-dim;
+    selected-normal-background:  @accent;
+    selected-normal-foreground:  @bg;
+
+    /* Something already open, rather than something to launch. */
+    active-background:           @bg;
+    active-foreground:           @secondary;
+    alternate-active-background: @bg;
+    alternate-active-foreground: @secondary;
+    selected-active-background:  @secondary;
+    selected-active-foreground:  @bg;
+
+    urgent-background:           @bg;
+    urgent-foreground:           @urgent;
+    alternate-urgent-background: @bg;
+    alternate-urgent-foreground: @urgent;
+    selected-urgent-background:  @urgent;
+    selected-urgent-foreground:  @bg;
 
     background-color: transparent;
     text-color:       @text;
+    spacing:          0;
 }
 
 window {
     background-color: @bg;
     border:           2px;
     border-color:     @accent;
-    width:            42em;
+    width:            44em;
+    padding:          0;
+    location:         center;
+    anchor:           center;
+}
+
+mainbox {
+    background-color: @bg;
+    children:         [ inputbar, listview ];
     padding:          0;
 }
 
+/* The prompt reads as one bar rather than a box inside a box: the surface
+ * colour separates it from the list without drawing a line. */
 inputbar {
     background-color: @surface;
-    padding:          10px 12px;
+    text-color:       @text;
+    padding:          12px 14px;
+    spacing:          10px;
     children:         [ prompt, entry ];
 }
 
 prompt {
-    text-color: @accent;
-    padding:    0 8px 0 0;
+    background-color: transparent;
+    text-color:       @accent;
+}
+
+entry {
+    background-color: transparent;
+    text-color:       @text;
+    placeholder:      "search";
+    placeholder-color: @muted;
+    cursor:           text;
 }
 
 listview {
-    lines:   12;
-    padding: 6px;
+    background-color: @bg;
+    lines:            10;
+    padding:          6px;
+    scrollbar:        false;
+    dynamic:          true;
+    fixed-height:     false;
 }
 
 element {
-    padding: 6px 10px;
+    background-color: @bg;
+    text-color:       @text-dim;
+    padding:          7px 10px;
+    spacing:          10px;
+    cursor:           pointer;
 }
 
+/* Only the selected row is loud. Everything else is the same quiet surface,
+ * the same reasoning as the sway borders: where you are should be visible
+ * without reading anything. */
 element selected {
     background-color: @accent;
+    text-color:       @bg;
+}
+
+/* Something already open, as opposed to something to launch. Given the
+ * secondary colour so the two sources are distinguishable at a glance now
+ * that the mode prefix is hidden. */
+element urgent {
+    background-color: @bg;
+    text-color:       @urgent;
+}
+
+element active {
+    background-color: @bg;
+    text-color:       @secondary;
+}
+
+element selected active {
+    background-color: @secondary;
     text-color:       @bg;
 }
 
 element-text {
     background-color: transparent;
     text-color:       inherit;
+    vertical-align:   0.5;
 }
 
 element-icon {
-    size:    1.1em;
-    padding: 0 8px 0 0;
+    background-color: transparent;
+    size:             1.1em;
+    vertical-align:   0.5;
+}
+
+message {
+    background-color: @surface;
+    padding:          10px;
+}
+
+textbox {
+    background-color: @surface;
+    text-color:       @text;
 }
