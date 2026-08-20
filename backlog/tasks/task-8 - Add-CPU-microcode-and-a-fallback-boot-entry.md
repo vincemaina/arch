@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:14'
-updated_date: '2026-08-20 00:15'
+updated_date: '2026-08-20 11:09'
 labels:
   - foundation
   - boot
@@ -66,4 +66,14 @@ Fresh VM built from the current installer and booted successfully, so the defaul
 Fallback entry confirmed present in the boot menu on the fresh VM, which verifies generation. Booting from it is still unobserved.
 
 Added a check that both initramfs images exist and are non-empty. That covers the failure this would otherwise hide - an entry referencing an image mkinitcpio never produced looks correct in the menu and fails only when chosen. What remains unverified is narrow: that the fallback image itself boots, which needs selecting it at the menu once.
+
+checks/session.sh on the fresh VM found /boot/initramfs-linux-fallback.img missing, so the fallback boot entry pointed at an image that does not exist. It would have looked like a working recovery path right up to the moment it was needed.
+
+Cause: mkinitcpio v40 stopped building the fallback image by default, shipping PRESETS=(default) where it previously included fallback. The entry was added on the assumption the image was still generated.
+
+Fixed by enabling the fallback preset. The initramfs logic - microcode hook, preset, regeneration - moved out of 03-system.sh into apply-config.sh so it reaches machines that already exist rather than only freshly installed ones, following the same reasoning as TASK-29. Regeneration is conditional, since it is slow: it runs when the hook or preset was changed, or when an expected image is missing, which is also what repairs a machine installed before this fix.
+
+The preset rewrite was tested against three shapes and only rewrites the exact default-only form, leaving an already-correct or customised preset alone.
+
+Also fixed an unbound REPO_ROOT in the dotfile references section of checks/session.sh, which aborted the check before it finished.
 <!-- SECTION:NOTES:END -->

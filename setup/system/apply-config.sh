@@ -73,6 +73,61 @@ for unit in "${ENABLE_UNITS[@]}"; do
     systemctl enable "$unit"
 done
 
+# ----------------------------------------------------------------------
+# initramfs
+# ----------------------------------------------------------------------
+#
+# Lives here rather than in the installer so a change reaches a machine that
+# already exists. Regenerating takes a while, so it only happens when something
+# actually changed or an expected image is missing.
+
+REGENERATE=false
+
+# Microcode is loaded through the mkinitcpio hook, which bundles it into the
+# initramfs, rather than through a separate initrd line in the boot entry. The
+# hook is part of the default HOOKS, so this usually only confirms it.
+if ! grep -qE '^HOOKS=.*\bmicrocode\b' /etc/mkinitcpio.conf; then
+    echo "    Adding the microcode hook after autodetect"
+    sed -i -E 's/^(HOOKS=.*\bautodetect\b)/\1 microcode/' /etc/mkinitcpio.conf
+    REGENERATE=true
+fi
+
+if ! grep -qE '^HOOKS=.*\bmicrocode\b' /etc/mkinitcpio.conf; then
+    echo "Could not add the microcode hook to /etc/mkinitcpio.conf." >&2
+    grep -E '^HOOKS=' /etc/mkinitcpio.conf >&2
+    exit 1
+fi
+
+# mkinitcpio v40 stopped building the fallback image by default, shipping
+# PRESETS=('default') where it used to include 'fallback'. The bootloader
+# offers a fallback entry, and an entry pointing at an image that does not
+# exist is worse than no entry at all: it looks like a recovery path right up
+# until the moment it is needed.
+for preset in /etc/mkinitcpio.d/*.preset; do
+    [[ -e "$preset" ]] || continue
+    if grep -qE "^PRESETS=\\('default'\\)" "$preset"; then
+        echo "    Enabling the fallback image in $(basename "$preset")"
+        sed -i -E "s/^PRESETS=\\('default'\\)/PRESETS=('default' 'fallback')/" "$preset"
+        REGENERATE=true
+    fi
+done
+
+# Catches the case where the preset is already correct but the image was never
+# built, which is the state a machine installed before this fix is left in.
+for img in /boot/initramfs-linux.img /boot/initramfs-linux-fallback.img; do
+    if [[ ! -s "$img" ]]; then
+        echo "    $img is missing"
+        REGENERATE=true
+    fi
+done
+
+if $REGENERATE; then
+    echo "    Regenerating initramfs"
+    mkinitcpio -P
+else
+    echo "    initramfs images are present and configuration is unchanged"
+fi
+
 # NetworkManager-wait-online holds network-online.target until a connection is
 # up. Nothing on this system orders after that target, so the wait buys nothing
 # and can stall boot for many seconds on wireless or a slow DHCP lease.

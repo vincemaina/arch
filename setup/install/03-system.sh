@@ -42,32 +42,6 @@ echo "Set password for $USERNAME:"
 passwd "$USERNAME"
 
 echo
-echo "==> Ensuring early CPU microcode"
-
-# Current Arch practice loads microcode through the mkinitcpio hook, which
-# bundles it into the initramfs, rather than through a separate initrd line
-# in the bootloader entry. The hook is part of the default HOOKS, so this
-# normally only confirms it; if that ever stops being true we would rather
-# fail here than quietly produce a system with no microcode updates.
-if ! grep -qE '^HOOKS=.*\bmicrocode\b' /etc/mkinitcpio.conf; then
-    echo "    Adding the microcode hook after autodetect"
-    sed -i -E 's/^(HOOKS=.*\bautodetect\b)/\1 microcode/' /etc/mkinitcpio.conf
-fi
-
-if ! grep -qE '^HOOKS=.*\bmicrocode\b' /etc/mkinitcpio.conf; then
-    echo "Could not add the microcode hook to /etc/mkinitcpio.conf." >&2
-    echo "Current HOOKS line:" >&2
-    grep -E '^HOOKS=' /etc/mkinitcpio.conf >&2
-    exit 1
-fi
-
-grep -E '^HOOKS=' /etc/mkinitcpio.conf | sed 's/^/    /'
-
-echo
-echo "==> Regenerating initramfs"
-mkinitcpio -P
-
-echo
 echo "==> Installing systemd-boot"
 bootctl install
 

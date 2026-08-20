@@ -347,7 +347,7 @@ section "Dotfile references (TASK-28)"
 # uses its default colours and says nothing. That is how the terminal came to
 # have no colour scheme while appearing to be configured for one.
 
-DOTFILES="$REPO_ROOT/setup/dotfiles"
+DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/setup/dotfiles"
 missing_refs=0
 checked_refs=0
 
