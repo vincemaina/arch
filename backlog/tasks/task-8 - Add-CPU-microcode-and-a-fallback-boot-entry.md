@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:14'
-updated_date: '2026-08-20 00:13'
+updated_date: '2026-08-20 00:15'
 labels:
   - foundation
   - boot
@@ -62,4 +62,8 @@ Original AC #2 asked for a microcode initrd line ordered before the main initram
 Microcode half confirmed live on the VM: the hook is present in HOOKS and both ucode packages are installed. The fallback boot entry cannot be confirmed there, since boot entries are rendered at install time and sync deliberately never touches the bootloader; it needs a machine built by the current install.sh.
 
 Fresh VM built from the current installer and booted successfully, so the default entry is confirmed and the microcode work is confirmed end to end on a machine built into that state rather than converted. Booting from the fallback entry has not been separately observed - that needs choosing it explicitly at the boot menu.
+
+Fallback entry confirmed present in the boot menu on the fresh VM, which verifies generation. Booting from it is still unobserved.
+
+Added a check that both initramfs images exist and are non-empty. That covers the failure this would otherwise hide - an entry referencing an image mkinitcpio never produced looks correct in the menu and fails only when chosen. What remains unverified is narrow: that the fallback image itself boots, which needs selecting it at the menu once.
 <!-- SECTION:NOTES:END -->

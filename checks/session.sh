@@ -149,6 +149,16 @@ for pkg in intel-ucode amd-ucode; do
     fi
 done
 
+# An entry that references a missing image looks fine in the boot menu and
+# fails only when chosen, which is the worst time to find out.
+for img in /boot/initramfs-linux.img /boot/initramfs-linux-fallback.img; do
+    if [[ -s "$img" ]]; then
+        pass "$(basename "$img") exists ($(du -h "$img" | cut -f1))"
+    else
+        fail "$img is missing or empty, so any entry referencing it will not boot"
+    fi
+done
+
 entries=(/boot/loader/entries/*.conf)
 if [[ -e "${entries[0]}" ]]; then
     if [[ -e /boot/loader/entries/arch-fallback.conf ]]; then
