@@ -137,6 +137,82 @@ Machine-wide configuration is applied by scripts (`setup/system/` templates + `s
 
 GPT/UEFI, 1 GiB FAT32 ESP + Btrfs root, subvolumes `@`, `@home`, `@snapshots`, mounted with `compress=zstd`. `01-disk.sh` detects nvme-style names (trailing digit → `p1`/`p2` suffix). No separate `/home` partition and no full-disk encryption — both are deliberate, see `DECISIONS.md`.
 
+## Theming: one palette, templated
+
+`setup/dotfiles/.chezmoidata/palette.toml` holds every colour, including the
+sixteen ANSI terminal colours. Sway appearance, the Waybar stylesheet, foot,
+swaylock and the starship prompt are all `.tmpl` files reading from it, so
+**changing a colour means editing that one file and running `sync.sh`** — never
+edit a rendered colour in place, it will be overwritten and the others will drift.
+
+Names are by role (`accent`, `urgent`, `muted`), not by colour.
+
+To check a template renders before applying it anywhere:
+
+```bash
+chezmoi --source ./setup --destination /tmp/render apply --force
+```
+
+That catches template errors, and lets you read what a consumer will actually
+receive. It has already caught a real bug: swaylock takes colours without a
+leading `#`, unlike every other consumer.
+
+Nerd Font glyphs must be written **by codepoint**, not pasted. Pasting has lost
+them silently more than once, leaving `""` where an icon should be — which looks
+configured in the file and renders as nothing.
+
+## Checks
+
+Three scripts, run from the repo on the target machine:
+
+| Script | Answers |
+| --- | --- |
+| `checks/sway-commands.sh` | Does every command the session invokes come from a declared package? |
+| `checks/sway-bindings.sh` | Is any key bound twice? Prints the full binding table. |
+| `checks/session.sh` | Does the running machine match what the repo intends? |
+
+`checks/session.sh` is the one to run after any change. It covers swap, the OOM
+handler, session units, the boot path, the greeter's session list, the shell,
+the wallpaper and dotfile references.
+
+## The failure mode this repository keeps hitting
+
+Nearly every bug found here has been **invisible**: configuration that looks
+correct and does nothing. Media keys calling an uninstalled binary. Screenshots
+written to a directory nothing created. polkit with no agent. A theme `include`
+pointing at a file that does not exist. Empty icon strings. A boot entry naming
+an initramfs that was never built. A greeter offering a session that bypassed
+uwsm.
+
+None announced itself; several had been broken since the config was first
+committed. Two consequences for how to work here:
+
+- **Verify against the running system, not the file.** Ask `swaymsg` what it
+  applied, ask `systemctl` what is running, ask the process what arguments it
+  received. `systemctl show` reports the unit file, not the expansion.
+- **When something is wrong, read the log or the source before theorising.**
+  Every wrong guess in this repo's history took longer than the two minutes it
+  would have taken to look.
+
+## Two ordering rules, both learned the hard way
+
+**Packages before configuration.** A unit only exists once its package is
+installed. `apply-config.sh` runs at the end of `04-desktop.sh`, not in `03`,
+because enabling greetd before the desktop manifest is installed aborts the
+install. `sync.sh` reconciles packages, then system config, then dotfiles, then
+the login shell — which is last because switching shells before its rc exists
+hands over a broken shell.
+
+**Session components use `Restart=always`, not `on-failure`.** They have no
+legitimate reason to exit, and `pkill` terminates cleanly — which `on-failure`
+correctly does not treat as a failure, so the component stays dead.
+
+## Reference material
+
+`docs/themes/` holds screenshots of other people's setups, collected as
+inspiration. `docs/wallpapers/` holds generated wallpaper candidates; only the
+chosen one is tracked, under `setup/dotfiles/`.
+
 ## Conventions
 
 - Every stage script starts `set -euo pipefail` and prints `==>` progress banners.
