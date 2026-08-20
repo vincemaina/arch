@@ -149,6 +149,29 @@ for pkg in intel-ucode amd-ucode; do
     fi
 done
 
+# The preset has to be able to produce the fallback at all. Listing it in
+# PRESETS is not enough: mkinitcpio takes the path from fallback_image, and
+# with that unset it skips the image with a warning and still exits 0. Checking
+# only that a file exists passes on configuration that can never rebuild it.
+for preset in /etc/mkinitcpio.d/*.preset; do
+    [[ -e "$preset" ]] || continue
+    grep -qE "^PRESETS=.*'fallback'" "$preset" || continue
+
+    if grep -qE "^fallback_(image|uki)=" "$preset"; then
+        pass "$(basename "$preset") lists the fallback and sets its destination"
+    else
+        fail "$(basename "$preset") lists the fallback preset but sets no fallback_image, so mkinitcpio skips it and exits 0"
+    fi
+
+    # Built with autodetect, the fallback carries modules only for the hardware
+    # present when it was built - the hardware that may be why it is needed.
+    if grep -qE '^fallback_options=.*-S[[:space:]]+[^"]*autodetect' "$preset"; then
+        pass "$(basename "$preset") builds the fallback without autodetect"
+    else
+        fail "$(basename "$preset") does not skip autodetect for the fallback, so it is close to a copy of the default rather than a recovery image"
+    fi
+done
+
 # An entry that references a missing image looks fine in the boot menu and
 # fails only when chosen, which is the worst time to find out.
 for img in /boot/initramfs-linux.img /boot/initramfs-linux-fallback.img; do

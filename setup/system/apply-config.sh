@@ -103,18 +103,58 @@ fi
 # offers a fallback entry, and an entry pointing at an image that does not
 # exist is worse than no entry at all: it looks like a recovery path right up
 # until the moment it is needed.
+# Three lines have to be uncommented, not one. Enabling the preset alone gets
+# the fallback listed and still built nothing: mkinitcpio takes the image path
+# from ${preset}_image, and with that commented out it prints "No image or UKI
+# specified. Skipping image" and carries on, exiting 0. Every visible signal -
+# the preset, the boot entry, this script's own output - said the image existed.
+#
+# fallback_options matters as much as the path. "-S autodetect" is what makes
+# the fallback a fallback: without it the image is built with autodetect and
+# contains modules only for the hardware present at build time, which is
+# precisely the hardware that may have stopped working. A fallback that is a
+# copy of the default is not a recovery path.
+#
+# Each rewrite matches the exact stock commented form, so a preset that is
+# already correct or has been customised by hand is left alone.
 for preset in /etc/mkinitcpio.d/*.preset; do
     [[ -e "$preset" ]] || continue
+
     if grep -qE "^PRESETS=\\('default'\\)" "$preset"; then
-        echo "    Enabling the fallback image in $(basename "$preset")"
+        echo "    Enabling the fallback preset in $(basename "$preset")"
         sed -i -E "s/^PRESETS=\\('default'\\)/PRESETS=('default' 'fallback')/" "$preset"
         REGENERATE=true
+    fi
+
+    # Only meaningful once the preset lists fallback; a preset that genuinely
+    # only wants the default image should not have these forced on.
+    grep -qE "^PRESETS=.*'fallback'" "$preset" || continue
+
+    for setting in fallback_image fallback_options; do
+        if grep -qE "^#${setting}=" "$preset" && ! grep -qE "^${setting}=" "$preset"; then
+            echo "    Uncommenting ${setting} in $(basename "$preset")"
+            sed -i -E "s/^#(${setting}=)/\\1/" "$preset"
+            REGENERATE=true
+        fi
+    done
+
+    # A fallback with no destination is the silent case above. Catch it here,
+    # where it can still be reported, rather than letting mkinitcpio skip it.
+    if ! grep -qE "^fallback_(image|uki)=" "$preset"; then
+        echo "Cannot build the fallback image: $preset lists the fallback" >&2
+        echo "preset but sets no fallback_image or fallback_uki." >&2
+        exit 1
     fi
 done
 
 # Catches the case where the preset is already correct but the image was never
 # built, which is the state a machine installed before this fix is left in.
-for img in /boot/initramfs-linux.img /boot/initramfs-linux-fallback.img; do
+EXPECTED_IMAGES=(
+    /boot/initramfs-linux.img
+    /boot/initramfs-linux-fallback.img
+)
+
+for img in "${EXPECTED_IMAGES[@]}"; do
     if [[ ! -s "$img" ]]; then
         echo "    $img is missing"
         REGENERATE=true
@@ -124,6 +164,18 @@ done
 if $REGENERATE; then
     echo "    Regenerating initramfs"
     mkinitcpio -P
+
+    # mkinitcpio warns rather than fails when it skips a preset, so a zero exit
+    # says nothing about which images were actually produced. Ask the
+    # filesystem instead. This is the check that would have caught the fallback
+    # never being built, months before it was needed.
+    for img in "${EXPECTED_IMAGES[@]}"; do
+        if [[ ! -s "$img" ]]; then
+            echo "mkinitcpio reported success but $img was not produced." >&2
+            echo "Check the preset in /etc/mkinitcpio.d/ for a skipped image." >&2
+            exit 1
+        fi
+    done
 else
     echo "    initramfs images are present and configuration is unchanged"
 fi

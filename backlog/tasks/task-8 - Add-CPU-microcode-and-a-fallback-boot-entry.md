@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 18:14'
-updated_date: '2026-08-20 11:09'
+updated_date: '2026-08-20 14:02'
 labels:
   - foundation
   - boot
@@ -36,12 +36,19 @@ The bootloader is currently a single point of failure. setup/packages/base.txt i
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Add intel-ucode and amd-ucode to base.txt so both are present regardless of CPU vendor. The kernel loads only the image matching the running CPU, so carrying both keeps the installer vendor-agnostic. base.txt is parsed raw by 02-base.sh, so no comments or blank lines.
-2. Follow current Arch practice for early microcode: the mkinitcpio microcode hook bundles it into the initramfs, and separate ucode initrd lines in the bootloader are no longer used. Do not add initrd lines to the loader entries.
-3. In 03-system.sh, verify the microcode hook is present in HOOKS and insert it after autodetect if missing, then re-verify and fail loudly rather than silently producing a system without microcode.
-4. Regenerate the initramfs after the hook check so the images match the final configuration.
-5. Add a second loader entry template for initramfs-linux-fallback.img, which mkinitcpio already generates, and have 03-system.sh render every template in system/loader/entries rather than naming files individually.
-6. Leave loader.conf defaulting to the normal entry; the fallback is there to be chosen from the menu when the default fails.
+1. Diagnosis confirmed on the running machine. apply-config.sh flips PRESETS to include fallback, but mkinitcpio v40 also ships fallback_image and fallback_options commented out. mkinitcpio.d line 713 warns "No image or UKI specified. Skipping image" and continues, so mkinitcpio -P exits 0 and the fallback image is never built while every visible signal - the preset, the boot entry, the script output - says it was.
+
+2. Extend the preset loop in apply-config.sh to uncomment fallback_image and fallback_options alongside PRESETS, each guarded to rewrite only the exact commented stock form so an already-correct or hand-customised preset is left alone, matching how the PRESETS rewrite already behaves.
+
+3. fallback_options="-S autodetect" matters as much as the image path. Without it the fallback is built with autodetect and contains only modules for hardware present at build time, which is exactly the hardware that may have stopped working. A fallback that is a copy of the default is not a recovery path.
+
+4. Make the failure loud. mkinitcpio only warns when a preset has no destination, so after regeneration verify every expected image exists and exit non-zero naming the missing one, rather than reporting success.
+
+5. Strengthen checks/session.sh to assert the preset resolves - fallback listed in PRESETS and an active fallback_image - not merely that a file exists. The current check passes on configuration that cannot produce an image.
+
+6. Apply with sync.sh, then confirm the image exists and is meaningfully larger than the default, which is the observable signature of a build without autodetect.
+
+7. Remaining for AC #3: reboot, choose the fallback entry, confirm it boots. Only a human at the machine can do that.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -76,4 +83,20 @@ Fixed by enabling the fallback preset. The initramfs logic - microcode hook, pre
 The preset rewrite was tested against three shapes and only rewrites the exact default-only form, leaving an already-correct or customised preset alone.
 
 Also fixed an unbound REPO_ROOT in the dotfile references section of checks/session.sh, which aborted the check before it finished.
+
+Reopened on the physical machine: checks/session.sh reported the fallback image missing, so the earlier fix was incomplete rather than merely unverified.
+
+Cause. mkinitcpio v40 comments out three lines, not one: PRESETS, fallback_image and fallback_options. apply-config.sh only restored PRESETS. mkinitcpio takes the destination from ${preset}_image and, finding none, prints "No image or UKI specified. Skipping image" at mkinitcpio line 713 and continues - a warning, not an error. mkinitcpio -P therefore exited 0 and the script reported "Regenerating initramfs" while producing nothing. The preset said fallback, the boot entry referenced the image, the script claimed success, and the file had never existed. Same failure mode as the original bug, one level further down.
+
+fallback_options was the more damaging omission of the two. "-S autodetect" is what makes a fallback a fallback: without it the image is built with autodetect and carries modules only for hardware present at build time, which is the hardware that may be why the fallback is needed. It would have been a 15M copy of the default wearing a recovery entry name.
+
+Fix. apply-config.sh now uncomments fallback_image and fallback_options alongside PRESETS, each guarded to the exact stock commented form so an already-correct or hand-customised preset is untouched, and errors out if a preset lists the fallback with no destination. After mkinitcpio -P it verifies every expected image exists on disk and exits non-zero naming any that is missing, because mkinitcpio exit codes say nothing about which images were produced.
+
+checks/session.sh now asserts the preset can produce the fallback - destination set, autodetect skipped - rather than only that a file exists. The previous check passed on configuration incapable of ever rebuilding the image.
+
+Tested against five preset shapes: stock v40 (all three lines corrected), already correct (no-op, no needless regeneration), hand-customised path and options (untouched), UKI-style (no false failure), and fallback listed with no destination (exits 1 loudly).
+
+Verified live: initramfs-linux-fallback.img now exists at 212M against the 15M default, the size difference being the observable signature of a build without autodetect. checks/session.sh went from 31 passed 1 failed to 34 passed 0 failed.
+
+AC #3 still open and needs a human: reboot, choose "Arch Linux (fallback initramfs)" at the menu, confirm it boots.
 <!-- SECTION:NOTES:END -->
