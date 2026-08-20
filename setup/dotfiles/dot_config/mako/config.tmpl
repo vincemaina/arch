@@ -1,0 +1,50 @@
+# mako.
+#
+# Colours come from .chezmoidata/palette.toml. Edit them there, not here.
+#
+# Until this file existed mako ran on stock defaults, which is why notifications
+# looked like they belonged to a different desktop than the one around them.
+
+font=JetBrainsMono Nerd Font 10
+
+background-color={{ .palette.surface }}
+text-color={{ .palette.text }}
+border-color={{ .palette.accent }}
+border-size=2
+border-radius=0
+
+# Matching the terminal's own padding and the sway gaps, so a notification sits
+# in the same visual grid as everything else rather than near it.
+padding=12
+margin=12
+
+# Top right, above everything. Waybar is at the top, so notifications appear
+# just under it rather than over the workspace list.
+anchor=top-right
+layer=overlay
+
+default-timeout=5000
+
+# Group by application, so a chatty program folds into one stack instead of
+# filling the screen. The bell in foot can fire repeatedly.
+group-by=app-name
+max-visible=5
+
+format=<b>%s</b>\n%b
+
+# Quieter than normal: present, but not asking for anything.
+[urgency=low]
+border-color={{ .palette.muted }}
+text-color={{ .palette.text_dim }}
+
+# Something is wrong, so it uses the palette's urgent colour and does not
+# disappear on its own - dismissing it has to be deliberate.
+[urgency=critical]
+border-color={{ .palette.urgent }}
+default-timeout=0
+
+# Do not disturb. Notifications are still received and still land in the
+# history, they are just not drawn - so nothing is lost by turning this on.
+# Toggled from the notification centre, or with: makoctl mode -t dnd
+[mode=dnd]
+invisible=1
