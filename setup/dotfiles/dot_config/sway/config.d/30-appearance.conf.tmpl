@@ -45,17 +45,20 @@ font pango:JetBrainsMono Nerd Font 10
 
 # border | background | text | indicator | child_border
 #
-# Only the last two do anything here, and it is worth knowing which. border is
-# the frame around a *title bar*, background is that title bar's fill and text
-# is its label - and `default_border pixel` above means there are no title
-# bars, so all three are inert. child_border is the border actually drawn round
-# the window, and indicator marks the edge where the next window will open.
+# Which of these do anything depends on the window, and it is worth knowing.
 #
-# Verified by setting each field to a different colour and looking: the frame
-# came out in the child_border colour and the others appeared nowhere.
+# child_border is the frame drawn round the window, and indicator marks the
+# edge where the next window will open. Those two always apply.
 #
-# The inert values are left in place rather than removed, because they become
-# meaningful the moment `default_border normal` is used.
+# border is the frame around a *title bar*, background is that title bar's fill
+# and text is its label. Tiled windows have no title bar - `default_border
+# pixel` above - so for them those three do nothing, which was verified by
+# setting each to a different colour and looking: the frame came out in the
+# child_border colour and the rest appeared nowhere.
+#
+# Floating windows DO have one, since 40-window-rules.conf gives them
+# `border normal`. So on a floating window all five fields are live, and the
+# title bar is drawn with background behind text, framed by border.
 #
 # Only the focused window gets the accent. Everything else is the same quiet
 # surface colour, so where the focus is can be seen without reading anything.

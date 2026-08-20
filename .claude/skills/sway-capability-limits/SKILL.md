@@ -67,6 +67,12 @@ Verified by setting each field to a different colour and looking at the result:
 the frame came out in the `child_border` colour and the others appeared
 nowhere.
 
+**This is conditional, not absolute.** It holds while a window has no title
+bar. Give one `border normal` — as `40-window-rules.conf` now does for every
+floating window — and all five fields become live on it: the title bar is drawn
+with `background` behind `text`, framed by `border`. So the three "dead" fields
+are dead per-window, not per-config.
+
 ## Resize target = border width
 
 The border is not only decoration. It is the area the pointer has to hit to
