@@ -1,10 +1,11 @@
 ---
 id: TASK-40
 title: Swap left Alt and left Control across the whole system
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-20 14:23'
-updated_date: '2026-08-20 14:23'
+updated_date: '2026-08-20 14:47'
 labels:
   - desktop
   - feel
@@ -47,3 +48,25 @@ Also worth deciding deliberately: whether this is universal or per-machine. An e
 - [ ] #6 tools/shortcuts.sh still reports shortcuts truthfully after the swap
 - [ ] #7 Whether this is universal or per-machine is decided and recorded, given an external keyboard may already differ
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. keyd rather than per-layer configuration. It remaps at the evdev layer, below xkb and below the console keymap, so sway, the console, the greeter and XWayland all inherit one config instead of four being kept in agreement. It is in extra, which matters because this repository has no AUR support at all - no helper installed, sync.sh calls pacman -S, and nothing in the manifests comes from outside the official repositories.
+
+2. Declare keyd in packages/desktop.txt. It is machine-wide input rather than a desktop application, but desktop.txt is where non-base packages live and the manifest is read before apply-config.sh runs, which is the ordering the unit needs.
+
+3. Add setup/system/keyd/default.conf with [ids] * so it applies to every keyboard, and the two-line swap in [main].
+
+4. Install and enable it from apply-config.sh, which is the single owner of machine-wide configuration and already reaches both a fresh install and a running machine. Add keyd to ENABLE_UNITS, and add the config to CONFIG_FILES.
+
+5. Restart keyd on --activate so the swap takes effect without a reboot. Unlike greetd, keyd does not own the session, so restarting it is safe.
+
+6. Verify against the running system rather than the file, per the failure mode this repository keeps hitting. keyd -m reports what the daemon actually emits for a physical keypress, which is the only direct evidence the remap is live. Confirm in the sway session, on a plain console reached by Ctrl+Alt+F2, and in an XWayland client.
+
+7. Extend checks/session.sh: keyd running and restartable, and its config mapping both directions. A swap present in three of four contexts is worse than none, so the check should cover the ones a script can reach.
+
+8. Record the decision in DECISIONS.md, including the udev hwdb alternative, which needs no package at all and was rejected for not growing into the keyboard layer TASK-19 anticipates.
+
+9. Safety. A root daemon intercepting all input can lock the keyboard out of the machine used to fix it. Confirm the documented panic sequence from the installed man page before enabling, and note it in the decision record.
+<!-- SECTION:PLAN:END -->

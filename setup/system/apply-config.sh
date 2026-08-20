@@ -31,6 +31,7 @@ CONFIG_FILES=(
     "zram-generator.conf:/etc/systemd/zram-generator.conf"
     "sysctl.d/99-zram.conf:/etc/sysctl.d/99-zram.conf"
     "earlyoom.conf:/etc/default/earlyoom"
+    "keyd/default.conf:/etc/keyd/default.conf"
     "greetd/config.toml:/etc/greetd/config.toml"
     "greetd/regreet.toml:/etc/greetd/regreet.toml"
     # Local session entries. /usr/local/share is the directory the desktop
@@ -59,7 +60,22 @@ done
 # greetd owns VT 1 and replaces the getty there. The other VTs keep theirs, so
 # Ctrl+Alt+F2 remains the way to reach a plain shell if the session will not
 # start.
-ENABLE_UNITS=(earlyoom greetd)
+# keyd grabs every keyboard on the machine, so a config it cannot parse is the
+# difference between a remapped keyboard and no keyboard at all - on the machine
+# you would need in order to fix it. keyd check is a real gate: it exits
+# non-zero on a bad config. Validate before the unit is ever enabled or started.
+#
+# The panic sequence, should it ever be needed: backspace+escape+enter, held
+# together, forces keyd to terminate and hands the keyboard back.
+if command -v keyd &>/dev/null; then
+    if ! keyd check /etc/keyd/default.conf; then
+        echo "Refusing to enable keyd: /etc/keyd/default.conf does not parse." >&2
+        echo "Enabling it would leave this machine without a usable keyboard." >&2
+        exit 1
+    fi
+fi
+
+ENABLE_UNITS=(earlyoom greetd keyd)
 
 for unit in "${ENABLE_UNITS[@]}"; do
     # Checked by file rather than with systemctl, because this also runs inside
@@ -207,6 +223,13 @@ systemctl daemon-reload
 
 if ! systemctl restart earlyoom; then
     echo "    WARNING: could not restart earlyoom" >&2
+fi
+
+# Safe to restart, unlike greetd: keyd owns no session. It re-grabs the
+# keyboards on start, so the remap applies to the session already running
+# rather than waiting for a reboot.
+if ! systemctl restart keyd; then
+    echo "    WARNING: could not restart keyd; key remapping is unchanged" >&2
 fi
 
 # Deliberately not restarted: greetd owns the active session, and restarting it

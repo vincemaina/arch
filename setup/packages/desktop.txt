@@ -86,3 +86,8 @@ btop
 
 # Web browser
 qutebrowser
+
+# Key remapping, at the evdev layer so the console, the greeter, sway and
+# XWayland all inherit one configuration rather than four being kept in step.
+# See setup/system/keyd/default.conf.
+keyd

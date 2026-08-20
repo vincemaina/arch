@@ -213,6 +213,55 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Key remapping (TASK-40)"
+
+# keyd remaps below xkb and below the console keymap, so this one check covers
+# sway, the console, the greeter and XWayland at once. That is the reason it
+# was chosen over setting xkb_options in four places that can drift apart.
+if ! command -v keyd &>/dev/null; then
+    fail "keyd is not installed, so left Alt and left Control are not swapped anywhere"
+else
+    # keyd check is a real gate - it exits non-zero on a config it cannot
+    # parse - and a config that does not parse means no usable keyboard.
+    if keyd check /etc/keyd/default.conf &>/dev/null; then
+        pass "/etc/keyd/default.conf parses"
+    else
+        fail "/etc/keyd/default.conf does not parse; keyd would leave this machine without a keyboard"
+    fi
+
+    # Both directions, or the swap is a move: one key doubled and the other
+    # function unreachable. layer(...) rather than a bare key assignment,
+    # which emits the keycode without the modifier semantics.
+    for want in "leftcontrol = layer(alt)" "leftalt = layer(control)"; do
+        if grep -qF "$want" /etc/keyd/default.conf 2>/dev/null; then
+            pass "maps ${want}"
+        else
+            fail "/etc/keyd/default.conf does not map ${want}"
+        fi
+    done
+
+    if systemctl is-active --quiet keyd; then
+        pass "keyd is running"
+    else
+        fail "keyd is not running, so the keyboard is unswapped despite the config"
+    fi
+
+    if systemctl is-enabled --quiet keyd 2>/dev/null; then
+        pass "keyd is enabled at boot"
+    else
+        fail "keyd is not enabled, so the swap is lost at the next reboot"
+    fi
+
+    # The daemon can be running and still have grabbed nothing, which looks
+    # identical from systemctl and leaves the keyboard unremapped.
+    if journalctl -u keyd -b --no-pager 2>/dev/null | grep -q "DEVICE: match"; then
+        matched="$(journalctl -u keyd -b --no-pager 2>/dev/null | grep -c "DEVICE: match")"
+        pass "keyd grabbed $matched keyboard device(s)"
+    else
+        fail "keyd matched no input device this boot, so nothing is being remapped"
+    fi
+fi
+
 section "Input (TASK-18)"
 
 if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then

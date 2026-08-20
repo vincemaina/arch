@@ -1496,6 +1496,45 @@ Chezmoi should not interpret the other directories as files that belong in the u
 
 ---
 
+## Key remapping with keyd
+
+**Decision:** Swap left Alt and left Control with `keyd`, a system-wide remapping daemon, rather than setting `xkb_options` per context.
+
+### Why
+
+Left Control is the modifier reached for most often - copy, paste, word-wise motion, terminal signals, every readline binding - and it sits in the far bottom corner under the weakest finger. Left Alt sits under a stronger finger and is used far less.
+
+The swap itself is a stock xkb option. The problem is that four things on this system read a keyboard configuration independently:
+
+| Context | Reads |
+| --- | --- |
+| sway | `xkb_options` in `config.d/10-input.conf` |
+| The console | `/etc/vconsole.conf`, written from `install.conf` |
+| The greeter | its own configuration, before any user session |
+| XWayland | a separate path to the keymap |
+
+Setting the option in each means four places that can drift apart, and getting three of four right is worse than doing nothing: the one most easily forgotten is the console, which is what `Ctrl+Alt+F2` reaches when the session will not start - exactly when muscle memory is least available.
+
+keyd remaps at the evdev layer, below xkb and below the console keymap, so all four inherit one file. It does not keep the four in agreement; it removes three of them. `keyd` is in `extra`, which matters because this repository has no AUR support at all.
+
+A useful property of the swap specifically: `Ctrl+Alt+F2` still needs the same two physical keys, because both of its modifiers moved.
+
+**Universal, not per-machine.** The config matches `[ids] *`, so it applies to every keyboard on every machine built from this repository. The swap is a property of the hands rather than of the hardware, and a per-machine setting would mean the modifier moving depending on which machine was in front of you - the opposite of what building muscle memory needs. An external keyboard that is already laid out differently is the one case that would need its own section, keyed by the device id `keyd -m` reports, and that is a local exception rather than a reason to make the whole setting per-machine.
+
+### Trade-off
+
+A daemon running as root with an exclusive grab on every keyboard. A config it cannot parse means no usable keyboard on the machine you would need in order to fix it, so `apply-config.sh` runs `keyd check` and refuses to enable the unit rather than starting a daemon that would lock the machine out. keyd documents a panic sequence - `backspace+escape+enter` held together - which terminates it and hands the keyboard back.
+
+Bindings are written with `layer(alt)` rather than `leftcontrol = leftalt`. A bare key assignment emits the keycode without the modifier semantics, and keyd warns about exactly this; the direct form would have looked correct and composed wrongly.
+
+### Alternatives considered
+
+**udev hwdb.** A `KEYBOARD_KEY_*` remap in `/etc/udev/hwdb.d/` is also evdev-level and system-wide, and needs no package at all, since it is built into systemd. Rejected because it does not grow: it is a static scancode remap, and TASK-19 anticipates a keyboard-driven interaction layer that would want layers and tap-hold. Paying for the daemon once was judged better than doing hwdb now and migrating later. For a single permanent swap and nothing more, hwdb would have been the more principled choice.
+
+**`xkb_options` in sway alone.** Rejected: it covers the session and leaves the console, the greeter and the recovery path unswapped.
+
+---
+
 ## Machine-local dotfile changes
 
 **Decision:** Ship a drop-in the repository does not own. `.zshrc` is fully managed and sources `~/.config/zsh/local.zsh`, which `.chezmoiignore` keeps chezmoi from ever writing, diffing or removing.

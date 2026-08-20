@@ -16,6 +16,21 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Every name below is the modifier a program receives, which is not necessarily
+# the key under your finger. keyd swaps left Alt and left Control beneath all of
+# this, so "Ctrl" here is physically the key next to the space bar. Reporting
+# the logical name is correct - it is what the binding does - but silently
+# correct is how a report becomes misleading, so say so.
+swap_note() {
+    command -v keyd &>/dev/null || return 0
+    systemctl is-active --quiet keyd 2>/dev/null || return 0
+    grep -qF "leftcontrol = layer(alt)" /etc/keyd/default.conf 2>/dev/null || return 0
+    printf '\n\033[2mkeyd is swapping left Alt and left Control, so the modifiers named below\n'
+    printf 'are the ones programs receive, not the keys where they used to be.\033[0m\n'
+}
+
+swap_note
+
 heading() { printf '\n\033[1m%s\033[0m\n%s\n' "$1" "$(printf '%.0s─' $(seq 1 ${#1}))"; }
 
 # Canonical form so a sway binding and a zsh binding can be compared at all:
