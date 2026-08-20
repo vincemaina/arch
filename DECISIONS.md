@@ -1496,6 +1496,40 @@ Chezmoi should not interpret the other directories as files that belong in the u
 
 ---
 
+## Workspaces stay per-output, as sway does them
+
+**Decision:** Keep sway's model, where each workspace belongs to exactly one output. Do not script a spanning or synchronised workspace layer on top of it.
+
+### Why
+
+The wanted model was the GNOME and macOS one: a workspace spans every display, so it holds a whole task across both screens and one shortcut moves between them. Sway does not work that way, and the difference is structural rather than a setting.
+
+Demonstrated on two real outputs, using `swaymsg create_output` to add a second one without needing physical hardware. Switching to a workspace that lives on the current output behaves as expected. Switching to one that lives on the *other* output does not bring it over - it moves focus to that output instead. The switch sends you to the workspace rather than bringing the workspace to you.
+
+A promising-looking dead end, recorded so it is not tried twice: `workspace <name> output A B` does not span. sway(5) says "the first available will be used" - it is a priority list with failover.
+
+What could be built is a script that switches every output together, giving grouped workspaces on top of sway's model. Rejected for three reasons. This machine has one display, so the problem is anticipated rather than felt, while the number-row reach that prompted the discussion is felt daily. The seams are predictable - workspace naming, the bar, output hotplug, `back_and_forth` - and each is a place for the abstraction to leak. And it would be discarded entirely if the compositor changes, which is an open question in its own right.
+
+### Trade-off
+
+The multi-display complaint is deferred, not answered. When a second display arrives it will still be true that a workspace is half a workspace, and that will have to be faced then - by living with it, by scripting around it, or by changing compositor.
+
+### The cost of the model that was wanted
+
+Worth recording, because the request had not accounted for it. Where workspaces do span displays, both screens switch together: a video or reference document on the second screen cannot stay put while the first changes. KDE has had spanning virtual desktops for two decades and is adding per-screen desktops in Plasma 6.7 after twenty-one years of requests, which is fair evidence that the model has real costs rather than being straightforwardly better.
+
+### Alternatives considered
+
+**niri.** Does not solve this - its workspaces are per-monitor vertical stacks, same as sway in that respect. It does have a first-class overview with workspace reordering, which sway lacks entirely.
+
+**COSMIC.** The only option found that offers the wanted model natively, as an explicit "workspaces span multiple displays" setting, alongside an overview and per-workspace tiling.
+
+**Hyprland.** Per-monitor by default, overview via plugins.
+
+Any of these means changing compositor, which belongs to that decision rather than this one, and has been recorded there.
+
+---
+
 ## XWayland and scaled outputs
 
 **Decision:** Accept that XWayland clients blur on a scaled output, and minimise how many there are rather than trying to fix the scaling.
