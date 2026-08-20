@@ -1,0 +1,83 @@
+# Interactive shell configuration.
+#
+# No framework. Oh My Zsh would add a self-updating git clone, a few hundred
+# milliseconds of startup, and a great deal that is never used, in order to
+# manage what is a handful of `source` lines. The two plugins that matter are
+# packaged, so they are sourced directly and appear in setup/packages/dev.txt
+# like everything else.
+
+### History
+#
+# Large, deduplicated, and shared: a command typed in one terminal is available
+# in the next without waiting for a shell to exit.
+
+HISTFILE="$HOME/.local/state/zsh/history"
+HISTSIZE=50000
+SAVEHIST=50000
+mkdir -p "${HISTFILE:h}"
+
+setopt SHARE_HISTORY          # read and write as commands are run, not on exit
+setopt INC_APPEND_HISTORY
+setopt HIST_IGNORE_ALL_DUPS   # a repeated command keeps only its latest entry
+setopt HIST_IGNORE_SPACE      # a leading space keeps a command out of history
+setopt HIST_REDUCE_BLANKS
+setopt HIST_VERIFY            # expanded !! is shown before it runs, not after
+
+### Completion
+
+autoload -Uz compinit
+# Cache the dump so compinit does not rebuild it on every shell start.
+compinit -d "$HOME/.cache/zsh/zcompdump"
+
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'   # case-insensitive
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*:descriptions' format '%F{blue}%d%f'
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path "$HOME/.cache/zsh/zcompcache"
+
+setopt AUTO_CD                # `..` and bare directory names change directory
+setopt AUTO_PUSHD
+setopt PUSHD_IGNORE_DUPS
+
+bindkey -e                    # emacs keys: Ctrl+A, Ctrl+E, Ctrl+R as expected
+
+### Plugins
+#
+# Not guarded with a file test. These come from declared packages, so if one is
+# missing that is a broken install and should say so on every shell rather than
+# silently dropping a feature. checks/session.sh verifies the paths too.
+
+source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+### Tools
+
+eval "$(starship init zsh)"
+eval "$(zoxide init zsh)"
+
+# fzf: Ctrl+R for fuzzy history, Ctrl+T for files, Alt+C to change directory.
+source <(fzf --zsh)
+
+export FZF_DEFAULT_COMMAND='fd --type f --hidden --exclude .git'
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border=none'
+
+### Aliases
+
+alias ls='eza --group-directories-first'
+alias ll='eza -l --git --group-directories-first'
+alias la='eza -la --git --group-directories-first'
+alias lt='eza --tree --level=2 --group-directories-first'
+alias cat='bat --style=plain --paging=never'
+alias grep='grep --color=auto'
+
+# bat and eza both take their colours from the terminal palette rather than
+# carrying their own, so they follow .chezmoidata/palette.toml for free.
+export BAT_THEME=ansi
+
+### Syntax highlighting
+#
+# Must be sourced last: it wraps the line editor and needs to see every other
+# widget that has been defined.
+
+source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh

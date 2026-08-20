@@ -289,6 +289,36 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Shell (TASK-22)"
+
+if ! command -v zsh &>/dev/null; then
+    fail "zsh is not installed"
+else
+    login_shell="$(getent passwd "$(id -un)" | cut -d: -f7)"
+    if [[ "$login_shell" == "$(command -v zsh)" ]]; then
+        pass "login shell is $login_shell"
+    else
+        fail "login shell is $login_shell, not zsh"
+    fi
+
+    # A shell that takes noticeably long to appear is worse than a plain one.
+    # Measured rather than assumed, because plugins are exactly what makes this
+    # go wrong and the cost creeps up one addition at a time.
+    start_ns="$(date +%s%N)"
+    zsh -i -c exit >/dev/null 2>&1
+    end_ns="$(date +%s%N)"
+    startup_ms=$(( (end_ns - start_ns) / 1000000 ))
+
+    if [[ $startup_ms -lt 200 ]]; then
+        pass "interactive shell starts in ${startup_ms}ms"
+    elif [[ $startup_ms -lt 400 ]]; then
+        pass "interactive shell starts in ${startup_ms}ms (noticeable; worth watching)"
+    else
+        fail "interactive shell takes ${startup_ms}ms, which is felt every time a terminal opens"
+    fi
+fi
+
+# ----------------------------------------------------------------------
 section "Terminal config (TASK-28)"
 
 # foot validates its own config and reports deprecated options, which is how a

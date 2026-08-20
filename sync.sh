@@ -22,7 +22,9 @@ Usage: ./sync.sh [--dry-run]
 Applies this repository to the machine it is run on:
 
   * installs any package listed in setup/packages/ that is missing
+  * applies machine-wide configuration from setup/system/
   * re-applies the dotfiles in setup/dotfiles/ using chezmoi
+  * sets the login shell, once its configuration is in place and valid
   * reports what changed and what must restart for it to take effect
 
 Options:
@@ -178,11 +180,47 @@ else
             .config/foot/*)
                 add_hint "foot: new terminals use the new config; existing windows keep the old one."
                 ;;
-            .bashrc|.bash_profile|.profile|.config/environment.d/*)
-                add_hint "shell: open a new terminal, or log in again for environment changes."
+            .zshrc|.config/starship.toml)
+                add_hint "shell: open a new terminal to pick up the change."
+                ;;
+            .config/environment.d/*)
+                add_hint "environment: read when the user manager starts, so this needs a fresh login."
                 ;;
         esac
     done
+fi
+
+# ----------------------------------------------------------------------
+# Login shell
+# ----------------------------------------------------------------------
+#
+# After the dotfiles, deliberately. Switching the login shell before its
+# configuration is in place would hand the user a shell whose rc file does not
+# exist yet, and the config is checked for syntax errors before the switch so a
+# broken zshrc cannot become the thing that greets them at every login.
+
+echo
+echo "==> Checking the login shell"
+
+# id -un rather than $USER: the environment variable is not guaranteed to be
+# set in every context a script might run in, and an unset one would abort.
+ME="$(id -un)"
+WANT_SHELL="$(command -v zsh || true)"
+HAVE_SHELL="$(getent passwd "$ME" | cut -d: -f7)"
+
+if [[ -z "$WANT_SHELL" ]]; then
+    echo "    zsh is not installed, leaving $HAVE_SHELL alone"
+elif [[ "$HAVE_SHELL" == "$WANT_SHELL" ]]; then
+    echo "    Already $WANT_SHELL"
+elif ! zsh -n "$HOME/.zshrc" 2>/dev/null; then
+    echo "    NOT changing the login shell: ~/.zshrc has a syntax error" >&2
+    zsh -n "$HOME/.zshrc" || true
+elif $DRY_RUN; then
+    echo "    Would change $HAVE_SHELL to $WANT_SHELL"
+else
+    sudo chsh -s "$WANT_SHELL" "$ME"
+    echo "    Changed $HAVE_SHELL to $WANT_SHELL"
+    add_hint "login shell: applies to new login sessions, not this terminal."
 fi
 
 # ----------------------------------------------------------------------

@@ -1,3 +1,17 @@
+# Shell. No framework: the two plugins that matter are packages, sourced
+# directly, which keeps the shell reproducible from the manifest rather than
+# from a self-updating git clone.
+zsh
+zsh-autosuggestions
+zsh-syntax-highlighting
+zsh-completions
+starship
+
+# Navigation and viewing
+zoxide
+eza
+bat
+
 neovim
 ripgrep
 fd

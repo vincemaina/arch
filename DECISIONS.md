@@ -1116,6 +1116,71 @@ The font choice is primarily visual and can be changed later without affecting t
 
 # Development Environment
 
+## zsh, without a framework
+
+**Decision:** Use zsh as the login shell, with `zsh-autosuggestions`,
+`zsh-syntax-highlighting` and `zsh-completions` sourced directly. No Oh My Zsh.
+`starship` for the prompt.
+
+### Why
+
+bash with no configuration was the least considered part of a system otherwise
+built around living in a terminal: a default prompt, no completion beyond the
+built-ins, a small unshared history, and `fzf`, `ripgrep` and `fd` installed but
+wired to nothing.
+
+zsh over fish because commands are copied from the ArchWiki constantly while
+learning Arch, and fish is not POSIX — `export FOO=bar` and most snippets fail
+as written. fish is the nicer shell to use and the worse one to paste into.
+
+**Oh My Zsh was rejected deliberately.** It is the usual answer and it does work,
+but it is a self-updating git clone rather than a package, which cuts against a
+repository whose premise is that the machine is reproducible from manifests. It
+commonly costs a few hundred milliseconds of startup. And it would be a framework
+managing what is genuinely three `source` lines, since the two plugins that
+matter are packaged.
+
+**Powerlevel10k was rejected** for being AUR-only here and now in maintenance
+mode by its author's own description. starship does the same job as an official
+package configured by one file — which means the prompt is templated from the
+palette and matches the desktop — and works on any shell, so a later change of
+shell does not mean a new prompt to learn.
+
+### Startup time is a constraint, not an aspiration
+
+A shell that takes noticeably long to appear is worse than a plain one, and the
+cost creeps up one addition at a time. `checks/session.sh` measures interactive
+startup and fails past 400ms, so the budget is enforced rather than hoped for.
+
+### The login shell is changed last, and only if the config parses
+
+`sync.sh` sets the login shell after applying dotfiles, and only when
+`zsh -n ~/.zshrc` succeeds. Switching first would hand over a shell whose
+configuration does not exist yet, and a syntax error would otherwise become the
+thing greeting every login. The installer does the same check.
+
+---
+
+## Tools take their colours from the terminal
+
+**Decision:** `eza` and `bat` are configured to use ANSI colours rather than
+carrying their own themes.
+
+### Why
+
+Both can be themed independently, which would mean two more places holding a
+copy of the palette and two more things to forget when it changes. Setting
+`BAT_THEME=ansi` makes them use the sixteen colours foot already gets from
+`.chezmoidata/palette.toml`, so they follow the desktop for free.
+
+### Trade-off
+
+Aliasing `ls` and `cat` means the muscle memory does not transfer to a machine
+without these tools. Both are aliases rather than replacements, so the real
+commands remain a `command ls` away.
+
+
+
 ## Neovim
 
 **Decision:** Install Neovim as the primary development editor.

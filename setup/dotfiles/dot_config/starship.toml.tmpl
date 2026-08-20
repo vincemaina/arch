@@ -1,0 +1,49 @@
+# Prompt. Colours from .chezmoidata/palette.toml, so it matches the desktop.
+#
+# starship rather than powerlevel10k: it is an official package rather than a
+# git clone, it is configured by this one file, and it works on any shell, so a
+# future change of shell does not mean a new prompt to learn.
+
+"$schema" = 'https://starship.rs/config-schema.json'
+
+# Two lines: context above, cursor below. The command always starts in the same
+# column no matter how long the path or branch name is, which matters more when
+# scanning back through a screen of output than saving a line does.
+format = """
+$directory$git_branch$git_status$cmd_duration$status
+$character"""
+
+add_newline = true
+
+[directory]
+style = "bold {{ .palette.accent }}"
+truncation_length = 3
+truncate_to_repo = true
+truncation_symbol = "…/"
+
+[git_branch]
+symbol = " "
+style = "{{ .palette.secondary }}"
+format = "on [$symbol$branch]($style) "
+
+[git_status]
+style = "{{ .palette.warning }}"
+format = "([$all_status$ahead_behind]($style) )"
+
+# Only reports when something took long enough that you may have looked away.
+[cmd_duration]
+min_time = 2000
+style = "{{ .palette.muted }}"
+format = "took [$duration]($style) "
+
+# Silent on success, explicit on failure - the exit code itself, not just a
+# colour, because "which failure" is usually the question.
+[status]
+disabled = false
+style = "{{ .palette.urgent }}"
+format = "[$status]($style) "
+
+[character]
+success_symbol = "[❯]({{ .palette.accent }})"
+error_symbol = "[❯]({{ .palette.urgent }})"
+vimcmd_symbol = "[❮]({{ .palette.ok }})"
