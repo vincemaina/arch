@@ -171,6 +171,11 @@ Three scripts, run from the repo on the target machine:
 | `checks/sway-bindings.sh` | Is any key bound twice? Prints the full binding table. |
 | `checks/session.sh` | Does the running machine match what the repo intends? |
 
+`tools/` holds reports rather than checks. `tools/shortcuts.sh` lists every
+shortcut by context and flags keys that mean different things in different
+tools. Keep the distinction: `checks/` exits non-zero on a problem, `tools/`
+produces output to read.
+
 `checks/session.sh` is the one to run after any change. It covers swap, the OOM
 handler, session units, the boot path, the greeter's session list, the shell,
 the wallpaper and dotfile references.

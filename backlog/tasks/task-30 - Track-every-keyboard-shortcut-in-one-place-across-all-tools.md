@@ -1,9 +1,11 @@
 ---
 id: TASK-30
 title: 'Track every keyboard shortcut in one place, across all tools'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-20 11:09'
+updated_date: '2026-08-20 12:56'
 labels:
   - desktop
   - feel
@@ -27,9 +29,27 @@ Conflicts across contexts are not automatically wrong: the same key doing differ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 One command produces a list of every shortcut grouped by the context it applies in
-- [ ] #2 The list is derived from actual configuration rather than maintained by hand
-- [ ] #3 Shortcuts that mean different things in different contexts are surfaced rather than hidden
-- [ ] #4 Adding a binding to any tracked tool appears in the list without editing it
-- [ ] #5 It is obvious which tools are covered and which are not yet
+- [x] #1 One command produces a list of every shortcut grouped by the context it applies in
+- [x] #2 The list is derived from actual configuration rather than maintained by hand
+- [x] #3 Shortcuts that mean different things in different contexts are surfaced rather than hidden
+- [x] #4 Adding a binding to any tracked tool appears in the list without editing it
+- [x] #5 It is obvious which tools are covered and which are not yet
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented as tools/shortcuts.sh. Kept out of checks/ deliberately: checks exit non-zero on a problem, this produces a report to read, and conflating the two makes both less useful.
+
+sway bindings come from calling checks/sway-bindings.sh rather than parsing the config a second time, so the two cannot disagree about what is bound.
+
+zsh bindings are derived by difference: what an interactive shell binds minus what a shell started with no configuration binds. That needs no list of our own bindings and cannot go stale.
+
+Testing that caught a real gap. The first version compared keys alone, which hid Ctrl+R entirely - zsh binds it to its own history search by default and fzf rebinds it, so the key is present in both sets while the meaning changed. Comparing key-and-widget pairs surfaces rebindings, which is where the interesting cases live.
+
+Cross-context conflicts are found by canonicalising both sides - lower case, sorted modifiers, Mod4 as Super - so a sway binding and a zsh binding are comparable at all. Verified by temporarily binding Ctrl+t in sway alongside fzf file widget, which was correctly reported with both meanings.
+
+Currently zero conflicts, which is itself informative: sway lives on Super, the shell on Ctrl and Alt.
+
+Coverage is stated rather than implied. qutebrowser, neovim, wofi and foot are listed as uncovered with the reason, and each becomes coverable by giving it a config this repository owns.
+<!-- SECTION:NOTES:END -->

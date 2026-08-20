@@ -151,6 +151,17 @@ the keys simply did nothing and nothing reported an error.
 ./checks/session.sh
 ```
 
+```bash
+./checks/sway-bindings.sh
+./tools/shortcuts.sh
+```
+
+The first prints every sway binding and fails if any key is bound twice — sway
+does not warn about that, it just lets the later definition win. The second is a
+report rather than a check: every shortcut this setup defines, grouped by the
+context it applies in, derived from the actual configuration, with any key that
+means different things in different contexts called out.
+
 This one checks the running machine rather than the configuration: that swap is
 active, the OOM handler is running, the session components are supervised and
 would restart if they died, and the boot path is set up as intended. It is
