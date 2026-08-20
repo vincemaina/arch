@@ -1,0 +1,47 @@
+# The desktop palette, defined once.
+#
+# Every themed file is a chezmoi template that reads these values, so changing
+# a colour here changes it everywhere on the next `sync.sh`. Previously the bar
+# was Catppuccin Mocha with two Nord colours mixed in while the terminal
+# referenced a Tokyo Night theme that was not installed, which is what made the
+# desktop look unfinished rather than styled.
+#
+# Gruvbox Dark. Names are by role rather than by colour, so a future palette
+# swap does not leave a variable called "orange" holding something blue.
+
+[palette]
+bg          = "#282828"  # window and bar background
+bg_dim      = "#1d2021"  # lock screen, anything behind everything else
+surface     = "#3c3836"  # inactive borders, hover
+surface_alt = "#504945"  # separators
+muted       = "#928374"  # text that is present but not the point
+text        = "#ebdbb2"  # normal foreground
+text_dim    = "#bdae93"  # unfocused titles
+
+accent      = "#fe8019"  # focus. The one colour that means "here"
+ok          = "#b8bb26"  # healthy, charging
+warning     = "#fabd2f"  # attention, but nothing is wrong yet
+urgent      = "#fb4934"  # something is wrong
+info        = "#83a598"  # neutral emphasis
+
+# The sixteen ANSI colours the terminal needs. Kept here rather than pointing
+# foot at its own bundled gruvbox theme, because a palette split across two
+# files is how the desktop ended up mismatched in the first place: change one,
+# forget the other.
+[term]
+black         = "282828"
+red           = "cc241d"
+green         = "98971a"
+yellow        = "d79921"
+blue          = "458588"
+magenta       = "b16286"
+cyan          = "689d6a"
+white         = "a89984"
+bright_black  = "928374"
+bright_red    = "fb4934"
+bright_green  = "b8bb26"
+bright_yellow = "fabd2f"
+bright_blue   = "83a598"
+bright_magenta= "d3869b"
+bright_cyan   = "8ec07c"
+bright_white  = "ebdbb2"

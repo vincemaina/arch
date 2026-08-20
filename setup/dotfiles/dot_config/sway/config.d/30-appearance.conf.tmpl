@@ -1,0 +1,35 @@
+# Appearance.
+#
+# Colours come from .chezmoidata/palette.toml. Edit them there, not here.
+
+set $bg          {{ .palette.bg }}
+set $surface     {{ .palette.surface }}
+set $text        {{ .palette.text }}
+set $text_dim    {{ .palette.text_dim }}
+set $accent      {{ .palette.accent }}
+set $urgent      {{ .palette.urgent }}
+
+# A flat background rather than an image. The desktop is almost never visible
+# on a tiling system, so a wallpaper is mostly a thing you configure and then
+# never see; a colour that matches everything else is the honest version.
+output * bg $bg solid_color
+
+# Thin borders instead of title bars: the window list belongs in the bar, not
+# repeated above every window. See the Sway section of DECISIONS.md.
+default_border pixel 2
+default_floating_border pixel 2
+
+# Small gaps so adjacent windows read as separate objects rather than one
+# surface split by a line. Enough to see, not enough to waste.
+gaps inner 6
+
+font pango:JetBrainsMono Nerd Font 10
+
+# border | background | text | indicator | child_border
+#
+# Only the focused window gets the accent. Everything else is the same quiet
+# surface colour, so where the focus is can be seen without reading anything.
+client.focused          $accent  $bg  $text      $accent  $accent
+client.focused_inactive $surface $bg  $text_dim  $surface $surface
+client.unfocused        $surface $bg  $text_dim  $surface $surface
+client.urgent           $urgent  $bg  $text      $urgent  $urgent

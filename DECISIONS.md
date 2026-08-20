@@ -501,6 +501,70 @@ precisely why the units must be correct before it arrives.
 
 ---
 
+## One palette, defined once, templated everywhere
+
+**Decision:** Gruvbox Dark, defined in `dotfiles/.chezmoidata/palette.toml`, with
+every themed file a chezmoi template that reads from it.
+
+### Why
+
+The desktop looked unfinished because it was not one design. The bar was
+Catppuccin Mocha with two Nord colours mixed in. The terminal included a Tokyo
+Night theme that foot does not ship, so it silently had no theme at all. Nothing
+else was themed. Three half-applied styles read as "boring" far more than any
+one of them would have.
+
+The obvious fix, picking a palette and editing four files, would have decayed the
+same way: colours copied into sway, Waybar CSS, foot and swaylock drift apart the
+first time one is changed and another forgotten. That is exactly what had already
+happened.
+
+chezmoi is already applying these files, and it templates. So the palette is data
+and the configs are views of it. Changing a colour is one edit followed by
+`sync.sh`.
+
+Names are by role — `accent`, `urgent`, `muted` — rather than by colour, so
+swapping palettes later does not leave a variable called `orange` holding
+something blue.
+
+The sixteen ANSI terminal colours live in the same file rather than pointing foot
+at its own bundled gruvbox theme, for the same reason: a palette split across two
+places is one someone will half-update.
+
+### Trade-off
+
+Four files are now templates, so they cannot be read as literal config without
+rendering them, and a template error breaks them all at once rather than one.
+That is mitigated by the failure being loud — chezmoi refuses to apply — and by
+being able to render into a scratch directory to check. Doing exactly that caught
+a real bug: swaylock wants its colours without a leading `#`, unlike every other
+consumer.
+
+---
+
+## Colour means something
+
+**Decision:** Everything is foreground grey until it needs attention. The focused
+workspace, an active mode, and a failing battery are the only things allowed to
+be bright.
+
+### Why
+
+A bar where every module has its own colour is decoration, and decoration
+competes with the two or three things that are genuinely worth interrupting for.
+The previous stylesheet coloured a dozen modules, most of which were never
+displayed.
+
+The same reasoning removed cpu, memory and temperature readouts: they animate
+constantly, are almost never acted on, and btop reports them better on the rare
+occasions they matter.
+
+Windows follow the same rule. Only the focused one takes the accent border;
+everything else is the same quiet surface colour, so where the focus is can be
+seen without reading anything.
+
+---
+
 ## Thin borders instead of title bars
 
 **Decision:** Remove normal Sway title bars and use thin borders to indicate focus.

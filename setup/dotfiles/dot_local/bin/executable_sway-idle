@@ -15,7 +15,9 @@ set -euo pipefail
 LOCK_AFTER=300          # seconds of inactivity before locking
 DISPLAYS_OFF_AFTER=600  # seconds of inactivity before powering displays down
 
-LOCK='swaylock --daemonize --color 000000'
+# Appearance lives in ~/.config/swaylock/config, which swaylock reads on its
+# own, so this only has to say when to lock rather than what it looks like.
+LOCK='swaylock'
 
 exec swayidle -w \
     timeout "$LOCK_AFTER" "$LOCK" \

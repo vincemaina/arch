@@ -1,0 +1,92 @@
+/* Waybar.
+ *
+ * Colours come from .chezmoidata/palette.toml. Edit them there, not here.
+ *
+ * This replaces a stylesheet that was Catppuccin Mocha with two Nord colours
+ * mixed into it, styling a dozen modules that were never displayed.
+ *
+ * The rule throughout: colour means something. Everything is foreground grey
+ * until it needs attention, and only the focused workspace and a failing
+ * battery are allowed to be bright. */
+
+@define-color bg          {{ .palette.bg }};
+@define-color surface     {{ .palette.surface }};
+@define-color muted       {{ .palette.muted }};
+@define-color text        {{ .palette.text }};
+@define-color accent      {{ .palette.accent }};
+@define-color ok          {{ .palette.ok }};
+@define-color warning     {{ .palette.warning }};
+@define-color urgent      {{ .palette.urgent }};
+
+* {
+    font-family: "JetBrainsMono Nerd Font", monospace;
+    font-size: 13px;
+    min-height: 0;
+}
+
+window#waybar {
+    background: @bg;
+    color: @text;
+    border-bottom: 1px solid @surface;
+}
+
+#workspaces button,
+#mode,
+#window,
+#pulseaudio,
+#battery,
+#clock,
+#tray {
+    padding: 0 10px;
+    margin: 3px 2px;
+    border-radius: 4px;
+    background: transparent;
+    color: @muted;
+}
+
+/* The one piece of colour that is always on screen: where you are. */
+#workspaces button.focused {
+    color: @bg;
+    background: @accent;
+}
+
+#workspaces button.urgent {
+    color: @bg;
+    background: @urgent;
+}
+
+#workspaces button:hover {
+    color: @text;
+    background: @surface;
+}
+
+#window {
+    color: @text;
+}
+
+#clock {
+    color: @text;
+}
+
+/* A mode is temporary and modal, so it says so loudly. */
+#mode {
+    color: @bg;
+    background: @warning;
+}
+
+#pulseaudio.muted {
+    color: @surface;
+}
+
+#battery.charging {
+    color: @ok;
+}
+
+#battery.warning:not(.charging) {
+    color: @warning;
+}
+
+#battery.critical:not(.charging) {
+    color: @bg;
+    background: @urgent;
+}
