@@ -213,6 +213,24 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Audio (TASK-41)"
+
+if ! command -v wpctl &>/dev/null; then
+    skip "wpctl not available"
+elif ! vol="$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null)"; then
+    skip "no default audio sink"
+else
+    # Above 1.0 is software amplification: it clips rather than usefully
+    # increasing loudness, and the volume keys used to have no ceiling at all,
+    # so a machine could be found sitting at 105% or very much worse.
+    level="$(awk '{print $2}' <<<"$vol")"
+    if awk -v v="$level" 'BEGIN { exit !(v <= 1.0) }'; then
+        pass "sink volume is ${level} (at or below 100%)"
+    else
+        fail "sink volume is ${level}, above 100%; that is amplification and it clips. Press volume-down, which now clamps"
+    fi
+fi
+
 section "Key remapping (TASK-40)"
 
 # keyd remaps below xkb and below the console keymap, so this one check covers

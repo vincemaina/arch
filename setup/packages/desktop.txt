@@ -28,10 +28,6 @@ wireplumber
 xdg-desktop-portal
 xdg-desktop-portal-wlr
 
-# pactl, used directly by the volume keys. Pulled in by pipewire-pulse as a
-# dependency, but listed because the config depends on the command itself.
-libpulse
-
 # Screenshots?
 grim
 slurp
