@@ -132,7 +132,7 @@ window {
      * foot has no rounding, so a rounded launcher was the one thing on screen
      * with a different shape language. */
     border-radius:    0;
-    width:            44em;
+    width:            40em;
     padding:          0;
     location:         center;
     anchor:           center;
@@ -149,8 +149,8 @@ mainbox {
 inputbar {
     background-color: {{ .palette.surface }}cc;
     text-color:       @text;
-    padding:          12px 14px;
-    spacing:          10px;
+    padding:          8px 12px;
+    spacing:          8px;
     children:         [ prompt, entry ];
 }
 
@@ -169,8 +169,10 @@ entry {
 
 listview {
     background-color: transparent;
-    lines:            10;
-    padding:          6px;
+    /* More rows, each smaller. The list is for scanning, so fitting more of it
+     * on screen beats making any single row comfortable to read slowly. */
+    lines:            14;
+    padding:          4px;
     scrollbar:        false;
     dynamic:          true;
     fixed-height:     false;
@@ -179,8 +181,11 @@ listview {
 element {
     background-color: transparent;
     text-color:       @text-dim;
-    padding:          7px 10px;
-    spacing:          10px;
+    /* Tight. The default 7px vertical made each row about 40px tall, which
+     * reads as a touch target rather than a list and pushes most of the
+     * results off screen. */
+    padding:          3px 8px;
+    spacing:          8px;
     cursor:           pointer;
 }
 
@@ -218,7 +223,7 @@ element-text {
 
 element-icon {
     background-color: transparent;
-    size:             1.1em;
+    size:             1em;
     vertical-align:   0.5;
 }
 

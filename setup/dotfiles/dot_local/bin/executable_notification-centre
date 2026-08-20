@@ -8,18 +8,31 @@ set -euo pipefail
 # mako has no panel and no tray icon - it draws a notification and then it is
 # gone. It does keep them, though: `makoctl list` is what is on screen now and
 # `makoctl history` is what has already expired. This puts both behind the same
-# launcher used for everything else, so "what did I miss" is a keypress rather
-# than something you either caught or did not.
+# launcher used for everything else, so "what did I miss" is something you can
+# ask rather than something you either caught or did not.
+#
+# Reached by name from the launcher - there is a desktop entry for it - rather
+# than by a binding of its own.
 
-entries="$(
-    python3 - <<'PY'
-import json, subprocess
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+# Python writes both files rather than bash building the menu, and that is not
+# a style choice. rofi takes a per-row icon as `text\0icon\x1f<name>`, with a
+# real NUL byte - and a bash variable cannot hold one. Building the menu in a
+# shell string silently drops the NUL and the row renders as the literal text
+# "icon" followed by the icon name. Files have no such limitation, so the menu
+# goes through one.
+python3 - "$tmp" <<'PYEOF'
+import json, os, subprocess, sys
+
+out_dir = sys.argv[1]
 
 def load(cmd):
     try:
-        out = subprocess.run(["makoctl", cmd, "-j"], capture_output=True,
+        raw = subprocess.run(["makoctl", cmd, "-j"], capture_output=True,
                              text=True, check=True).stdout
-        data = json.loads(out or "[]")
+        data = json.loads(raw or "[]")
     except Exception:
         return []
     # mako has returned both a flat list and a {"data": [[...]]} wrapper across
@@ -30,43 +43,59 @@ def load(cmd):
             data = data[0]
     return data or []
 
-MARK = {"critical": "!", "normal": " ", "low": "·"}
+# freedesktop icon names, resolved from the icon theme, not file paths.
+ICON = {"critical": "dialog-error", "normal": "dialog-information",
+        "low": "dialog-information"}
+SEEN = "document-open-recent"
 
-rows = []
+rows, actions = [], []
+
+def add(label, icon, action):
+    rows.append("{}\0icon\x1f{}".format(label, icon))
+    actions.append(action)
+
 for n in load("list"):
     ident = n.get("id")
     if isinstance(ident, dict):
         ident = ident.get("value")
-    urg = n.get("urgency", "normal")
     app = n.get("app_name") or "?"
     summary = (n.get("summary") or "").strip()
     body = " ".join((n.get("body") or "").split())
-    text = f"{summary} — {body}" if body else summary
-    rows.append(f"dismiss:{ident}\t{MARK.get(urg,' ')} {app}: {text}")
+    label = "{}: {}".format(app, summary + " - " + body if body else summary)
+    # The sending application's own icon where it named one, so a notification
+    # looks like the thing that sent it; the urgency icon otherwise.
+    icon = n.get("app_icon") or ICON.get(n.get("urgency", "normal"), ICON["normal"])
+    add(label, icon, "dismiss:{}".format(ident))
 
 for n in load("history"):
-    summary = (n.get("summary") or "").strip()
     app = n.get("app_name") or "?"
-    rows.append(f"none:0\t· [seen] {app}: {summary}")
+    summary = (n.get("summary") or "").strip()
+    add("{}: {}".format(app, summary), SEEN, "none:0")
 
-print("\n".join(rows))
-PY
-)"
+if not rows:
+    add("Nothing waiting", "notification-symbolic", "none:0")
 
-# Actions always available, listed last so they are out of the way of the
-# notifications themselves but always in the same place.
-actions=$'dismiss-all:0\tDismiss all\nrestore:0\tRestore the last dismissed\ndnd:0\tToggle do not disturb'
+# Always present, always last, so they are out of the way of the notifications
+# but always in the same place.
+add("Dismiss all", "edit-clear-all", "dismiss-all:0")
+add("Restore the last dismissed", "edit-undo", "restore:0")
+add("Toggle do not disturb", "notification-disabled", "dnd:0")
 
-if [[ -n "$entries" ]]; then
-    menu="$entries"$'\n'"$actions"
-else
-    menu=$'none:0\tNothing waiting\n'"$actions"
-fi
+with open(os.path.join(out_dir, "menu"), "w") as f:
+    f.write("\n".join(rows))
+with open(os.path.join(out_dir, "actions"), "w") as f:
+    f.write("\n".join(actions))
+PYEOF
 
-choice="$(cut -f2- <<<"$menu" | rofi -dmenu -i -p notifications -format i || true)"
+# -show-icons because dmenu mode does not inherit it from config.rasi, and
+# -replace because this is normally launched *from* rofi, which may still be
+# exiting when this starts: without it the new instance loses the race for the
+# pidfile and refuses to run, reporting only "Rofi already running?".
+choice="$(rofi -dmenu -i -p notifications -format i -show-icons -replace \
+    < "$tmp/menu" || true)"
 [[ -n "$choice" ]] || exit 0
 
-selected="$(sed -n "$((choice + 1))p" <<<"$menu" | cut -f1)"
+selected="$(sed -n "$((choice + 1))p" "$tmp/actions")"
 verb="${selected%%:*}"
 id="${selected##*:}"
 
