@@ -1,12 +1,11 @@
 // Waybar.
 //
-// Trimmed to what is worth a permanent place on screen. Removed: temperature,
-// which is almost never acted on; the idle inhibitor and scratchpad
-// indicators, which report state that is already obvious; and the backlight,
-// which shows nothing on a machine without one.
+// Each module is a coloured pill. Colour identifies which readout you are
+// looking at, so the bar can be scanned by colour rather than read left to
+// right; state is signalled by a module changing to a warning or urgent colour.
 //
-// cpu and memory are kept at the user's request. They are the two readouts
-// worth a glance on a machine tuned around not running out of memory.
+// Removed: temperature, almost never acted on, and the scratchpad indicator.
+// The backlight stays out until the setup runs on a machine that has one.
 //
 // Also removed a large amount of configuration for modules that were never
 // displayed at all - mpd, a media widget, a power menu, keyboard state, a
@@ -19,7 +18,7 @@
 
     "modules-left": ["sway/workspaces", "sway/mode"],
     "modules-center": ["sway/window"],
-    "modules-right": ["cpu", "memory", "pulseaudio", "battery", "clock", "tray"],
+    "modules-right": ["idle_inhibitor", "cpu", "memory", "pulseaudio", "battery", "clock", "tray"],
 
     "sway/workspaces": {
         "disable-scroll": true,
@@ -33,6 +32,15 @@
     "sway/window": {
         "max-length": 60,
         "tooltip": false
+    },
+
+    // Click to stop the screen locking or sleeping - for watching something,
+    // or during a long build that should not be interrupted.
+    "idle_inhibitor": {
+        "format": "{icon}",
+        "format-icons": { "activated": "", "deactivated": "" },
+        "tooltip-format-activated": "Idle inhibited: the screen will not lock",
+        "tooltip-format-deactivated": "Idle and locking as normal"
     },
 
     "cpu": {

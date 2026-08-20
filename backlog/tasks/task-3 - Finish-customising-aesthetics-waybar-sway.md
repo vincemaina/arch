@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-19 15:28'
-updated_date: '2026-08-20 01:14'
+updated_date: '2026-08-20 11:32'
 labels:
   - desktop
   - feel
@@ -51,4 +51,12 @@ Contrast measured rather than eyeballed, which caught two real problems in the f
 cpu and memory restored to the bar at the user request, styled muted so they can be glanced at without competing with the focus accent. Temperature, idle inhibitor, scratchpad and backlight stay removed.
 
 Rounded window corners investigated and not pursued: sway does not support them and SwayFX, the fork that does, is AUR-only, which would mean teaching the repository to build AUR packages. The user chose to keep everything square rather than take that on.
+
+Bar redesigned after the user said it looked uglier than what it replaced and that they missed the idle inhibitor button.
+
+idle_inhibitor restored - it is the control for stopping the screen locking during something you are watching or a long build, which is exactly the kind of thing a bar is for.
+
+The uniform-grey rule is reversed. Every module is now a coloured pill, with colour identifying the readout and state escalating it to warning or urgent. The reference setups the user collected under docs/themes are unanimous on per-module colour, most as filled pills, which is a strong enough signal to override a principle I had derived from first principles. DECISIONS.md records the reversal and why rather than quietly rewriting it.
+
+Windows keep the stricter rule, since there the question genuinely is binary - which window has focus - rather than which of several readouts am I looking at.
 <!-- SECTION:NOTES:END -->

@@ -572,26 +572,74 @@ pill - rather than for text.
 
 ---
 
-## Colour means something
+## Colour identifies, state escalates
 
-**Decision:** Everything is foreground grey until it needs attention. The focused
-workspace, an active mode, and a failing battery are the only things allowed to
-be bright.
+**Decision:** Every bar module is a coloured pill. Colour tells you which
+readout you are looking at; a module changes to a warning or urgent colour when
+it needs attention.
+
+This revises an earlier decision here, which said everything should be
+foreground grey until it needed attention and that only the focused workspace,
+an active mode and a failing battery were allowed to be bright.
+
+### Why it changed
+
+That rule was defensible in the abstract and wrong in practice. It produced a
+bar that read as austere rather than minimal, and it threw away what colour is
+genuinely useful for on a status bar: telling six readouts apart at a glance, so
+the bar is scanned rather than read left to right. The version it replaced -
+inconsistent as it was - looked better.
+
+The reference setups collected under `docs/themes/` are unanimous on this. Every
+one of them gives each module its own colour, most as a filled pill. That is a
+strong enough signal to override a principle derived from first principles.
+
+The useful half of the original idea survives: because resting colours are
+stable and familiar, a module changing colour is immediately obvious. Escalation
+works precisely because the baseline is not grey but is predictable.
+
+Windows still follow the stricter rule. Only the focused one takes the accent
+border, because there the question really is binary - which window has focus -
+rather than which of several things am I looking at.
+
+---
+
+
+## Applications are made to match, not left to guess
+
+**Decision:** Set a dark GTK theme, an icon set and a UI font centrally, and
+tell toolkits to run natively on Wayland, through `environment.d` and GTK
+settings files.
 
 ### Why
 
-A bar where every module has its own colour is decoration, and decoration
-competes with the two or three things that are genuinely worth interrupting for.
-The previous stylesheet coloured a dozen modules, most of which were never
-displayed.
+Thunar, pavucontrol and qutebrowser each picked their own defaults, so the
+desktop looked assembled from parts rather than designed. The bar had been
+carefully styled, which made the mismatch elsewhere more obvious rather than
+less.
 
-The same reasoning removed cpu, memory and temperature readouts: they animate
-constantly, are almost never acted on, and btop reports them better on the rare
-occasions they matter.
+`GTK_THEME` is set as well as the settings files. The settings files are the
+correct mechanism and cover applications that read them; the environment
+variable also catches ones started outside a normal desktop session, and works
+regardless of which GTK version an application happens to use.
 
-Windows follow the same rule. Only the focused one takes the accent border;
-everything else is the same quiet surface colour, so where the focus is can be
-seen without reading anything.
+The Wayland variables are about correctness as much as appearance. An
+application falling back to XWayland renders blurry on a scaled output and loses
+native input handling, so `QT_QPA_PLATFORM` lists Wayland first with X11 as a
+fallback, and window decorations are disabled because sway draws the border.
+
+`xdg-desktop-portal-gtk` is installed alongside the wlroots portal so that file
+chooser dialogs are the GTK one every other application uses, rather than a bare
+toolkit default.
+
+### What this does not cover
+
+qutebrowser's own interface - its tab bar, status line and completion menu - is
+themed in qutebrowser's configuration, not by any GTK or Qt setting. Making it
+match the palette needs a qutebrowser config, which does not exist yet. The Qt
+platform theme plumbing that would let a Qt application follow a system theme is
+also not set up; it is a larger piece of machinery than the one Qt application
+here justifies.
 
 ---
 

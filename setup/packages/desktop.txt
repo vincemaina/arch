@@ -63,6 +63,13 @@ playerctl
 # Cursor theme, so the pointer looks the same in every application
 adwaita-cursors
 
+# Application appearance: a dark GTK theme, an icon set, and the GTK portal so
+# file chooser dialogs look and behave like the rest of the desktop rather than
+# falling back to a bare Qt or GTK default.
+gnome-themes-extra
+papirus-icon-theme
+xdg-desktop-portal-gtk
+
 # Fonts
 noto-fonts
 noto-fonts-emoji

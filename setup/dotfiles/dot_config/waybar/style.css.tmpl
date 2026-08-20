@@ -1,22 +1,27 @@
-/* Waybar.
+/* Waybar. Colours from .chezmoidata/palette.toml — edit them there, not here.
  *
- * Colours come from .chezmoidata/palette.toml. Edit them there, not here.
+ * Every module is a coloured pill. An earlier version of this file made
+ * everything uniform grey on the principle that colour should be reserved for
+ * things needing attention. That reads as austere rather than minimal, and it
+ * lost the thing colour is actually good for here: telling readouts apart at a
+ * glance, so the bar is scanned rather than read.
  *
- * This replaces a stylesheet that was Catppuccin Mocha with two Nord colours
- * mixed into it, styling a dozen modules that were never displayed.
- *
- * The rule throughout: colour means something. Everything is foreground grey
- * until it needs attention, and only the focused workspace and a failing
- * battery are allowed to be bright. */
+ * So colour identifies the module, and state escalates it — a module turns
+ * warning or urgent when it needs you, which stands out precisely because the
+ * resting colours are stable and familiar. */
 
 @define-color bg          {{ .palette.bg }};
 @define-color surface     {{ .palette.surface }};
+@define-color surface_alt {{ .palette.surface_alt }};
 @define-color muted       {{ .palette.muted }};
 @define-color text        {{ .palette.text }};
 @define-color accent      {{ .palette.accent }};
+@define-color secondary   {{ .palette.secondary }};
 @define-color ok          {{ .palette.ok }};
 @define-color warning     {{ .palette.warning }};
 @define-color urgent      {{ .palette.urgent }};
+@define-color info        {{ .palette.info }};
+@define-color text_dim    {{ .palette.text_dim }};
 
 * {
     font-family: "JetBrainsMono Nerd Font", monospace;
@@ -27,26 +32,50 @@
 window#waybar {
     background: @bg;
     color: @text;
-    border-bottom: 1px solid @surface;
 }
 
-#workspaces button,
-#mode,
-#window,
+/* The shared pill shape. Dark text on a saturated background reads better at
+ * this size than the reverse, and keeps every module the same visual weight. */
+#idle_inhibitor,
 #cpu,
 #memory,
 #pulseaudio,
 #battery,
 #clock,
 #tray {
+    color: @bg;
     padding: 0 10px;
-    margin: 3px 2px;
-    border-radius: 4px;
-    background: transparent;
-    color: @muted;
+    margin: 4px 3px;
+    border-radius: 6px;
 }
 
-/* The one piece of colour that is always on screen: where you are. */
+#idle_inhibitor { background: @surface_alt; color: @muted; }
+#cpu            { background: @info; }
+#memory         { background: @secondary; }
+#pulseaudio     { background: @ok; }
+#battery        { background: @ok; }
+#clock          { background: @accent; font-weight: bold; }
+
+#tray {
+    background: @surface;
+    color: @text;
+}
+
+/* Workspaces are the exception: they are navigation, not a readout, so only
+ * the one you are on is filled in. */
+#workspaces {
+    margin: 4px 3px;
+}
+
+#workspaces button {
+    color: @muted;
+    background: transparent;
+    padding: 0 9px;
+    margin: 0 1px;
+    border: none;
+    border-radius: 6px;
+}
+
 #workspaces button.focused {
     color: @bg;
     background: @accent;
@@ -59,42 +88,40 @@ window#waybar {
 
 #workspaces button:hover {
     color: @text;
-    background: @surface;
+    background: @surface_alt;
+    box-shadow: none;
 }
 
 #window {
-    color: @text;
-}
-
-#clock {
-    color: @text;
+    color: @text_dim;
+    margin: 0 8px;
 }
 
 /* A mode is temporary and modal, so it says so loudly. */
 #mode {
     color: @bg;
     background: @warning;
+    padding: 0 10px;
+    margin: 4px 3px;
+    border-radius: 6px;
 }
 
-/* Readouts stay muted: they are for glancing at, not for noticing. */
-#cpu,
-#memory {
-    color: @muted;
+/* State escalation. These override the resting colour above. */
+
+#idle_inhibitor.activated {
+    background: @warning;
+    color: @bg;
 }
 
 #pulseaudio.muted {
-    color: @surface;
-}
-
-#battery.charging {
-    color: @ok;
+    background: @surface_alt;
+    color: @muted;
 }
 
 #battery.warning:not(.charging) {
-    color: @warning;
+    background: @warning;
 }
 
 #battery.critical:not(.charging) {
-    color: @bg;
     background: @urgent;
 }
