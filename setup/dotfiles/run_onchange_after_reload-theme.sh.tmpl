@@ -77,6 +77,35 @@ if systemctl --user is-active --quiet waybar.service; then
         echo "    waybar did not restart; run 'systemctl --user restart waybar'" >&2
 fi
 
+# Neovim, which CAN be told, and for a while was assumed not to be.
+#
+# Every neovim listens on a socket whether or not it was asked to - v:servername
+# is set even for a headless one - so a running editor is reachable at
+# $XDG_RUNTIME_DIR/nvim.<pid>.0 without any configuration. That is the whole
+# reason this is possible; the assumption that the editor would have to be
+# restarted, the way foot does, was simply wrong.
+#
+# --remote-expr rather than --remote-send, because send types the keys into
+# whatever mode the editor is in: an editor sitting in insert mode would get
+# ':colorscheme arch' inserted into the file. expr evaluates and returns instead,
+# touching no buffer and no mode.
+#
+# Sockets outlive the process that made them, so most of what matches this glob
+# on a long-running machine is dead. Connecting to a dead one fails immediately
+# and is not worth reporting - only a live editor refusing is interesting, and
+# there is no way to tell the two apart from out here, so neither is reported.
+nvim_reloaded=0
+for sock in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/nvim.*.0; do
+    [[ -S "$sock" ]] || continue
+    if nvim --server "$sock" --remote-expr "execute('colorscheme arch')" \
+            >/dev/null 2>&1; then
+        nvim_reloaded=$((nvim_reloaded + 1))
+    fi
+done
+if (( nvim_reloaded > 0 )); then
+    echo "    neovim: $nvim_reloaded running editor(s) picked up the new colours"
+fi
+
 # Deliberately not handled, because they need nothing:
 #
 #   rofi, swaylock  read their configuration every time they are launched.

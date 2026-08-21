@@ -301,14 +301,39 @@ else:
         high, low = sorted((luminance(a), luminance(b)), reverse=True)
         return (high + 0.05) / (low + 0.05)
 
+    # The editor's colours are checked here too, and were not until the editor
+    # started using them. A comment sitting at the conventional near-invisible
+    # grey is the single most common thing wrong with a dark colourscheme, and
+    # arch.lua.tmpl said this file enforced a floor on it while this file had
+    # never heard of it - a comment describing a hypothesis as an outcome, which
+    # is the failure mode CLAUDE.md names.
+    #
+    # Comments come from term.bright_black, hence the dotted lookup. The
+    # diagnostic severities reuse the same role colours as the bar, so an error
+    # in the editor is the red of an urgent notification - which means checking
+    # them here covers both.
     RULES = [
         ("muted", "bg", 4.5, "the cpu and memory readouts against the background"),
         ("text", "tertiary", 3.5, "the workspace number against its own disc"),
+        ("term.bright_black", "bg", 4.5, "comments in the editor"),
+        ("urgent", "bg", 4.5, "error diagnostics in the editor"),
+        ("warning", "bg", 4.5, "warning diagnostics in the editor"),
+        ("info", "bg", 4.5, "hint and info diagnostics in the editor"),
     ]
+
+    def colour(palette, path):
+        # The sixteen ANSI colours are stored without a leading #, unlike the
+        # roles - the terminal wants them bare. Everything doing arithmetic on
+        # them has to put it back.
+        if "." in path:
+            section, key = path.split(".")
+            return "#" + palette[section][key].lstrip("#")
+        return palette[path]
+
     poor = []
     for name, palette in themes.items():
         for fg, bg, floor, what in RULES:
-            ratio = contrast(palette[fg], palette[bg])
+            ratio = contrast(colour(palette, fg), colour(palette, bg))
             if ratio < floor:
                 poor.append(f"{name}: {fg} on {bg} is {ratio:.2f}:1, under {floor}:1 - {what}")
     if poor:
@@ -791,6 +816,56 @@ io.write(table.concat(out, ", "))' -c quit 2>/dev/null)"
         fail "editor keybindings with no description, so nobody chose them: $undescribed"
     else
         pass "every editor keybinding carries a description, so all of them were chosen"
+    fi
+
+    # Every language server the editor declares is actually there.
+    #
+    # lua/lsp.lua only enables a server whose executable it can find, which is
+    # deliberate - a missing one would otherwise throw on every matching file
+    # with an error about a command that could not be spawned, saying nothing
+    # about the cause. The cost of that kindness is silence: the editor works,
+    # with less of it, and nothing says so. This is what says so.
+    #
+    # It asks the module rather than re-listing the servers here, so adding one
+    # to lsp.lua is enough and this check cannot drift from it.
+    lsp_missing="$(nvim --headless -c 'lua
+local ok, m = pcall(require, "lsp")
+if not ok then io.write("MODULE") return end
+local enabled = {}
+for _, n in ipairs(m.enabled or {}) do enabled[n] = true end
+local out = {}
+for _, n in ipairs(m.expected or {}) do
+  if not enabled[n] then out[#out+1] = n end
+end
+table.sort(out)
+io.write(table.concat(out, " "))' -c quit 2>/dev/null)"
+    if [[ "$lsp_missing" == "MODULE" ]]; then
+        fail "the editor's lsp module does not load, so no language server is configured"
+    elif [[ -n "$lsp_missing" ]]; then
+        fail "language servers declared but not installed: $lsp_missing - run ./sync.sh"
+    else
+        pass "every language server the editor declares is installed"
+    fi
+
+    # The npm servers specifically, because they are the ones not installed by
+    # pacman and therefore the ones a rebuilt machine can quietly lack. npm ci
+    # installs from the lockfile, so a mismatch here means the run_onchange
+    # script has not run - which is exactly what happened when it hashed
+    # package.json without the lockfile.
+    npm_servers_dir="$HOME/.local/lib/language-servers"
+    if [[ ! -d "$npm_servers_dir/node_modules" ]]; then
+        fail "the npm language servers are not installed in $npm_servers_dir - run ./sync.sh"
+    else
+        npm_missing=""
+        for bin in vscode-html-language-server vscode-css-language-server \
+                   vscode-json-language-server emmet-language-server; do
+            [[ -x "$npm_servers_dir/node_modules/.bin/$bin" ]] || npm_missing+="$bin "
+        done
+        if [[ -n "$npm_missing" ]]; then
+            fail "npm language servers missing from the lockfile install: ${npm_missing}- run ./sync.sh"
+        else
+            pass "the npm language servers are installed where the editor looks for them"
+        fi
     fi
 
     # Parsers are declared packages rather than runtime downloads, so a missing

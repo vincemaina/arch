@@ -1,11 +1,11 @@
 ---
 id: TASK-84
 title: 'The language servers that are not packaged: html, css, json, emmet, sql'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-21 14:22'
-updated_date: '2026-08-21 15:02'
+updated_date: '2026-08-21 19:54'
 labels:
   - dev
   - dotfiles
@@ -35,11 +35,11 @@ If the answer to TASK-43 is no, the fallback is a tracked list of npm packages i
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 html, css, json and emmet language servers work in the editor, installed through npm from a list tracked in this repository
-- [ ] #2 The list is reconciled the way packages/ is - a machine missing one installs it, rather than the list being documentation
-- [ ] #3 Where the servers land is a known location, not scattered, and checks/session.sh notices when a declared one is missing
-- [ ] #4 Mason is not used, and neither is the AUR - both were decided against, on TASK-73 and TASK-43 respectively
-- [ ] #5 SQL's server is either included, pulling in go, or explicitly deferred - TASK-83 delivers the client half without it
+- [x] #1 html, css, json and emmet language servers work in the editor, installed through npm from a list tracked in this repository
+- [x] #2 The list is reconciled the way packages/ is - a machine missing one installs it, rather than the list being documentation
+- [x] #3 Where the servers land is a known location, not scattered, and checks/session.sh notices when a declared one is missing
+- [x] #4 Mason is not used, and neither is the AUR - both were decided against, on TASK-73 and TASK-43 respectively
+- [x] #5 SQL's server is either included, pulling in go, or explicitly deferred - TASK-83 delivers the client half without it
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -68,4 +68,28 @@ anything.
 
 sqls is Go rather than npm, which is why SQL is the one that may still wait: it
 needs the go toolchain at 215M, for one language server.
+
+VERIFICATION.
+
+AC1 - all four work, tested with the config actually loaded (which took two goes: `nvim -l` does NOT read init.lua, so an LSP test through it reports zero clients and reads as a broken editor):
+  html   attaches, 117 tag completions after '<d'
+  cssls  attaches, 2 diagnostics on a malformed rule
+  jsonls attaches, 1 diagnostic - 'Trailing comma'
+  emmet  attaches, expands 'ul>li.item*3'
+
+CSS WAS ATTACHING AND DOING NOTHING. The vscode css server ships with validation off, per dialect, and announces it nowhere - it answered completions while accepting 'colour: red' in silence. settings.css.validate now turns it on for css, scss and less. Exactly the failure this repository keeps meeting.
+
+AC2 - reconciled, not documentation: run_onchange_after_install-language-servers.sh runs npm ci from a tracked package-lock.json, and re-runs when either package.json or the lockfile changes. Both are hashed - the first version hashed only package.json, so pinning a version would silently not have installed.
+
+AC3 - checks/session.sh now notices. Two new checks: one asks lua/lsp.lua which servers it expected versus which it could actually find, so adding a server to that module is enough and the check cannot drift from it; the other looks for the four npm executables in ~/.local/lib/language-servers/node_modules/.bin. PROVEN BY HIDING ONE: renaming emmet-language-server made both fail by name, and restoring it made both pass. A check that has never failed proves nothing.
+
+AC4 - no Mason and no AUR. The servers come from npm into a prefix under $HOME, named by absolute path in lua/lsp.lua because ~/.local/bin is not on the session PATH.
+
+AC5 - SQL IS DEFERRED, deliberately. sqls is written in Go, is not in the official repositories, and neither route to it is acceptable here: the AUR was ruled out on TASK-43, and 'go install' means adding a whole toolchain outside the manifests to build one binary - the same objection that ruled out Mason. TASK-83 delivers the useful half, running SQL from the editor, and does not need a language server to do it. Revisit if sqls is ever packaged.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+html, css, json and emmet installed from npm into ~/.local/lib/language-servers via npm ci from a tracked lockfile, reconciled by a run_onchange script that hashes both package.json and the lockfile. All four verified working by opening real files and reading back diagnostics and completions - which exposed that the css server ships with validation off and had been attaching silently. checks/session.sh now fails when a declared server is missing, proven by hiding one. SQL deferred: sqls is Go, unpackaged, and reaching it means either the AUR or a toolchain outside the manifests; TASK-83 covers the useful half without it.
+<!-- SECTION:FINAL_SUMMARY:END -->
