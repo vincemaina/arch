@@ -95,7 +95,7 @@ window#waybar > box {
      *
      * Kept tight. A wider blur on a 28px bar reaches the top edge and stops
      * looking like light coming from the strip below. */
-    box-shadow: inset 0 -3px 6px -4px mix(@bar, @secondary, 0.55);
+    box-shadow: inset 0 -3px 5px -4px mix(@bar, @secondary, 0.55);
 
     border-bottom: 1px solid transparent;
     border-image: linear-gradient(90deg,
@@ -122,7 +122,7 @@ window#waybar > box {
 #pulseaudio,
 #battery,
 #clock,
-#tray {
+#network {
     background: transparent;
     /* Wider than the pills needed. Without a block behind them the readings
      * have nothing but space to separate them, so the space has to do more. */
@@ -138,13 +138,13 @@ window#waybar > box {
 /* Each reading glows in its own colour. A text-shadow with no offset is how a
  * glow is spelled, and being static it costs nothing to draw - which is the
  * whole reason this is here and the animated gradient is not. */
-#idle_inhibitor { color: @muted;     text-shadow: 0 0 6px @muted; }
-#cpu            { color: @info;      text-shadow: 0 0 7px @info; }
-#memory         { color: @secondary; text-shadow: 0 0 7px @secondary; }
-#pulseaudio     { color: @ok;        text-shadow: 0 0 7px @ok; }
-#battery        { color: @ok;        text-shadow: 0 0 7px @ok; }
-#clock          { color: @accent;    text-shadow: 0 0 7px @accent; font-weight: bold; }
-#tray           { color: @text; }
+#idle_inhibitor { color: @muted;     text-shadow: 0 0 5px @muted; }
+#cpu            { color: @info;      text-shadow: 0 0 5px @info; }
+#memory         { color: @secondary; text-shadow: 0 0 5px @secondary; }
+#pulseaudio     { color: @ok;        text-shadow: 0 0 5px @ok; }
+#battery        { color: @ok;        text-shadow: 0 0 5px @ok; }
+#clock          { color: @accent;    text-shadow: 0 0 5px @accent; font-weight: bold; }
+#network        { color: @muted;     text-shadow: 0 0 5px @muted; }
 
 /* The pill comes back on hover, so the shape is still there when you reach for
  * something - it just is not there when you are only reading. Dark text on the
@@ -155,7 +155,7 @@ window#waybar > box {
 #pulseaudio:hover,
 #battery:hover,
 #clock:hover,
-#tray:hover {
+#network:hover {
     color: @bg;
     /* The glow goes on hover. Dark text on a bright pill does not want a halo
      * in the pill's own colour behind it. */
@@ -169,7 +169,7 @@ window#waybar > box {
 #pulseaudio:hover     { background: @ok; }
 #battery:hover        { background: @ok; }
 #clock:hover          { background: @accent; }
-#tray:hover           { background: @surface; color: @text; }
+#network:hover        { background: @surface_alt; color: @text; }
 
 /* Workspaces are the exception: they are navigation, not a readout, so only
  * the one you are on is filled in. */
@@ -177,18 +177,29 @@ window#waybar > box {
     margin: 4px 3px;
 }
 
+/* Circles, not pills. A workspace is one character, so a shape that grows with
+ * its label was always the wrong shape - equal min-width and min-height with a
+ * half radius gives a disc that stays a disc.
+ *
+ * And violet rather than the accent. Cyan is the loudest colour in the palette
+ * and it was being spent on the thing that changes least; the bar's own edges
+ * are violet, so the marker now belongs to the bar rather than shouting over
+ * it. */
 #workspaces button {
     color: @muted;
     background: transparent;
-    padding: 0 9px;
-    margin: 0 1px;
+    padding: 0;
+    margin: 0 3px;
+    min-width: 22px;
+    min-height: 22px;
     border: none;
-    border-radius: 6px;
+    border-radius: 50%;
 }
 
 #workspaces button.focused {
     color: @bg;
-    background: @accent;
+    background: @tertiary;
+    box-shadow: 0 0 6px @tertiary;
 }
 
 #workspaces button.urgent {
@@ -202,6 +213,10 @@ window#waybar > box {
     box-shadow: none;
 }
 
+#workspaces {
+    margin: 3px 6px;
+}
+
 /* The window title is the one piece of text on the bar that changes with what
  * you are doing, and it sat in the dim colour reserved for things you are not
  * meant to read. It is now the brightest thing up there.
@@ -212,7 +227,7 @@ window#waybar > box {
 #window {
     color: @secondary;
     font-weight: bold;
-    text-shadow: 0 0 8px @secondary;
+    text-shadow: 0 0 6px @secondary;
     margin: 0 8px;
 }
 
