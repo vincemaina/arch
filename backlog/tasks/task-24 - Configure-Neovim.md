@@ -1,10 +1,11 @@
 ---
 id: TASK-24
 title: Configure Neovim
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-19 18:16'
-updated_date: '2026-08-21 14:21'
+updated_date: '2026-08-21 14:30'
 labels:
   - dotfiles
   - dev

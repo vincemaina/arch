@@ -664,6 +664,53 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Editor (TASK-24)"
+
+if ! command -v nvim &>/dev/null; then
+    skip "neovim is not installed"
+elif [[ ! -f "$HOME/.config/nvim/init.lua" ]]; then
+    fail "neovim has no configuration, so it starts as a bare editor"
+else
+    # Loading it is the check. A Lua file that parses can still throw at
+    # runtime - the treesitter guard here did exactly that, looking correct in
+    # the file and printing a stack trace on every python file opened.
+    nvim_errors="$(nvim --headless -c quit 2>&1 | head -3)"
+    if [[ -n "$nvim_errors" ]]; then
+        fail "neovim prints errors on startup: $nvim_errors"
+    else
+        pass "neovim loads its configuration without errors"
+    fi
+
+    # Opening a file of each kind, because the failure above only appeared on a
+    # FileType event and a bare start does not fire one.
+    editor_probe="$(mktemp -d)"
+    : > "$editor_probe/probe.py"; : > "$editor_probe/probe.md"; : > "$editor_probe/probe.sql"
+    probe_errors=""
+    for f in "$editor_probe"/probe.*; do
+        out="$(nvim --headless "$f" -c quit 2>&1 | head -2)"
+        [[ -n "$out" ]] && probe_errors+="  ${f##*/}: ${out}"$'\n'
+    done
+    rm -rf "$editor_probe"
+    if [[ -n "$probe_errors" ]]; then
+        fail "opening a file errors:"$'\n'"${probe_errors%$'\n'}"
+    else
+        pass "opening python, markdown and sql files produces no errors"
+    fi
+
+    # Parsers are declared packages rather than runtime downloads, so a missing
+    # one is package drift rather than something neovim should fix itself.
+    missing_parsers=""
+    for parser in python javascript bash; do
+        [[ -f "/usr/lib/tree_sitter/$parser.so" ]] || missing_parsers+="$parser "
+    done
+    if [[ -n "$missing_parsers" ]]; then
+        fail "declared treesitter parsers not installed: ${missing_parsers}- run ./sync.sh"
+    else
+        pass "the declared treesitter parsers are installed"
+    fi
+fi
+
+# ----------------------------------------------------------------------
 section "Desktop entries"
 
 # A desktop entry whose Exec cannot be resolved fails silently: Terminal=false

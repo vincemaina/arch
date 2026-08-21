@@ -13,6 +13,21 @@ eza
 bat
 
 neovim
+
+# Treesitter grammars, from pacman rather than from a plugin that downloads and
+# compiles them at runtime. Same argument that ruled out Mason for language
+# servers: anything installed outside these manifests is invisible here and
+# absent from a rebuilt machine.
+#
+# Nvim itself ships c, lua, markdown, query, vim and vimdoc. These are the ones
+# the official repositories add that this machine's languages need.
+#
+# Missing and known: typescript, sql, html, css, json, yaml and toml have no
+# package at all. See TASK-84, which is blocked on the AUR decision in TASK-43.
+# Those filetypes fall back to vim's regex highlighting until then.
+tree-sitter-python
+tree-sitter-javascript
+tree-sitter-bash
 ripgrep
 fd
 fzf
