@@ -1,10 +1,10 @@
 ---
 id: TASK-47
 title: File selection in application launcher
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-20 21:58'
-updated_date: '2026-08-21 11:32'
+updated_date: '2026-08-21 13:50'
 labels: []
 dependencies: []
 priority: medium
@@ -20,11 +20,11 @@ Selecting a file in the application launcher should open that file with the appr
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Choosing a file in the launcher opens it in the chosen editor, in a window, verified from rofi rather than from a terminal that already has a tty
-- [ ] #2 The Terminal=true problem is fixed for the category rather than for one entry - or the decision to ship explicit entries instead is recorded, with the yazi/inode-directory association fixed too since it has the same bug
-- [ ] #3 Code files that are not text/plain - shell scripts, json - open in the editor rather than in nothing or in a browser
-- [ ] #4 EDITOR and VISUAL are set, so the terminal and the launcher agree about what edits a file
-- [ ] #5 checks/session.sh covers the mime associations end to end, since the existing one was declared, believed, and never worked
+- [x] #1 Choosing a file in the launcher opens it in the chosen editor, in a window, verified from rofi rather than from a terminal that already has a tty
+- [x] #2 The Terminal=true problem is fixed for the category rather than for one entry - or the decision to ship explicit entries instead is recorded, with the yazi/inode-directory association fixed too since it has the same bug
+- [x] #3 Code files that are not text/plain - shell scripts, json - open in the editor rather than in nothing or in a browser
+- [x] #4 EDITOR and VISUAL are set, so the terminal and the launcher agree about what edits a file
+- [x] #5 checks/session.sh covers the mime associations end to end, since the existing one was declared, believed, and never worked
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -77,3 +77,30 @@ TWO OTHER THINGS FOUND ON THE WAY:
     honouring them fall back to whatever the system default is rather than to
     the chosen editor. Worth fixing in the same pass whichever editor wins.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Choosing a file in the launcher opens it in neovim, in a window.
+
+The editor was never the problem. nvim was already installed and already the
+handler for text/plain; what failed was the launching. xdg-open takes its
+generic path on sway - a desktop it does not recognise - and that path executes
+a desktop entry's command directly, ignoring Terminal=true, so the editor
+started with no tty and died silently. rofi's finder now uses `gio open`, which
+honours Terminal=true by looking for xdg-terminal-exec, and /usr/local/bin
+supplies one.
+
+Fixed for the category rather than one entry, which also fixed the
+inode/directory association that had been declared, commented as working, and
+had never opened anything. Directories now open a terminal at that location
+rather than a file browser.
+
+Shell scripts had no handler at all and JSON opened in a browser; both go to
+the editor now. HTML deliberately still goes to the browser. EDITOR and VISUAL
+are set, so git and systemctl edit agree with the launcher.
+
+Five checks cover the chain end to end, because it was previously believed
+rather than tested. Verified by opening four file types, a directory and an
+image through exactly the command rofi runs, in the session's own environment.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -95,3 +95,45 @@ if [[ $duplicates -gt 0 ]]; then
 fi
 
 echo "No binding is defined twice."
+
+# ----------------------------------------------------------------------
+# Key repeat
+# ----------------------------------------------------------------------
+#
+# sway repeats a binding for as long as the key is held unless --no-repeat says
+# otherwise, and this machine sets repeat_rate 40. That combination turns a
+# fractionally-long press on $mod+q into every window on the workspace closing.
+#
+# So the policy is: repeat off by default, on by exception, and the exceptions
+# are the bindings where holding the key IS the gesture. A binding added without
+# --no-repeat and not on this list is a mistake that is invisible until someone
+# holds the key a beat too long, which is exactly the kind of thing this
+# repository checks rather than remembers.
+REPEATABLE=(
+    '$mod+Shift+$left' '$mod+Shift+$down' '$mod+Shift+$up' '$mod+Shift+$right'
+    '$left' '$down' '$up' '$right'
+    'XF86AudioLowerVolume' 'XF86AudioRaiseVolume'
+    'XF86MonBrightnessDown' 'XF86MonBrightnessUp'
+)
+
+repeating=0
+while IFS= read -r line; do
+    # The key combo is the first field that is not a flag.
+    combo="$(sed -E 's/^[[:space:]]*bindsym([[:space:]]+--[a-z-]+)*[[:space:]]+//; s/[[:space:]].*//' <<<"$line")"
+    allowed=false
+    for k in "${REPEATABLE[@]}"; do
+        [[ "$combo" == "$k" ]] && allowed=true && break
+    done
+    $allowed && continue
+    printf '  repeats: %-24s %s\n' "$combo" "$(sed -E 's/^[[:space:]]*bindsym([[:space:]]+--[a-z-]+)*[[:space:]]+[^[:space:]]+[[:space:]]+//' <<<"$line" | cut -c1-44)"
+    repeating=$((repeating + 1))
+done < <(grep -hE '^[[:space:]]*bindsym' "$SWAY_DIR/config" "$SWAY_DIR"/config.d/*.conf 2>/dev/null | grep -v -- '--no-repeat')
+
+if [[ $repeating -gt 0 ]]; then
+    echo
+    echo "$repeating binding(s) repeat while held and are not on the whitelist."
+    echo "Add --no-repeat, or add the key to REPEATABLE here if holding it is the point."
+    exit 1
+fi
+
+echo "Every binding either does not repeat, or is one where holding it is the gesture."
