@@ -34,6 +34,44 @@ pkill -x rofi
 `rofi -show combi -filter "text"` prefills the search, which is how to prove a
 particular entry is findable without typing.
 
+## Measure it when looking is not enough
+
+Some changes are real but too small to judge by eye - a 3px shadow, whether a
+gradient is actually rendering. `grim -t ppm` writes raw pixels that about ten
+lines of Python can read with no image library installed:
+
+```bash
+grim -t ppm -g "300,0 40x40" probe.ppm
+```
+
+The header is `P6 <w> <h> <max>` followed by raw RGB, so mean brightness per
+row is a few lines. That settled two questions in one session: whether a
+`box-shadow` on `window#waybar` did anything (it did not - GTK clips it at the
+surface edge) and whether the replacement did (it did: one row of near-black
+between bar and wallpaper).
+
+The same trick detects animation. Capture several frames a fraction of a second
+apart and count bytes that differ; a static bar gives zero.
+
+## Never test CSS on the live bar
+
+GTK's CSS parser is stricter than a browser's. One unknown property does not
+get skipped - waybar exits and the bar disappears. `background-clip: text` is
+enough to do it.
+
+Test in a throwaway instance on a throwaway output instead, which cannot touch
+the real one:
+
+```bash
+swaymsg create_output                       # HEADLESS-n
+# config.jsonc with "output": "HEADLESS-1"
+waybar -c /tmp/test/config.jsonc -s /tmp/test/test.css &
+grim -o HEADLESS-1 shot.png
+```
+
+Test one property per run. A parse error on the first stops everything after it
+being evaluated, so a batch of five tells you nothing about four of them.
+
 ## Test without disturbing the user's screen
 
 `swaymsg create_output` makes a headless output with real workspace semantics.
