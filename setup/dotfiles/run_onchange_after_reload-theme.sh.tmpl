@@ -1,0 +1,73 @@
+{{- $palette := index .themes .theme -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Make a colour change take effect, rather than only be written.
+#
+# Nothing on this desktop reads the palette at runtime. Every consumer holds a
+# rendered copy of it, so changing a colour - or changing which theme is
+# selected - updates files that programs have already read and will not read
+# again. Without this, a theme switch leaves the desktop looking exactly as it
+# did until each piece is restarted by hand, which is the "configured and does
+# nothing" failure this repository keeps meeting.
+#
+# WHY THIS IS A SCRIPT AND NOT PART OF THE THEME SWITCHER
+#
+# Because a theme switch is not the only way the colours change. Editing a
+# value in .chezmoidata/themes.toml and running sync.sh changes them too, and a
+# reload that lived only in ~/.local/bin/theme would not happen then. Here it
+# happens for both, because both go through chezmoi.
+#
+# WHAT MAKES IT RE-RUN
+#
+# run_onchange_ re-runs a script when the *rendered script* changes, so the two
+# lines below are load-bearing rather than informational. The theme name catches
+# a switch; the hash catches an edit to the selected theme's colours without the
+# name changing. Neither is decoration - delete them and this stops running at
+# the moment it is most needed.
+#
+# theme:   {{ .theme }}
+# palette: {{ toJson $palette | sha256sum }}
+
+# chezmoi runs scripts wherever it is pointed, including at a scratch
+# destination - rendering to /tmp to preview a template is NOT a dry run, which
+# CLAUDE.md says in as many words. Reloading a session that is not there is
+# meaningless, so having no sway to talk to is a reason to stop rather than a
+# problem to report.
+if [[ -z "${SWAYSOCK:-}" ]]; then
+    exit 0
+fi
+
+echo "    Colours changed, reloading the session"
+
+# sway rereads its config, which also restarts swaybg, so the wallpaper follows
+# without being handled separately.
+if ! swaymsg reload >/dev/null; then
+    echo "    sway did not reload; run 'swaymsg reload'" >&2
+fi
+
+# mako has a reload command and keeps the notifications it is holding.
+if command -v makoctl >/dev/null && ! makoctl reload 2>/dev/null; then
+    echo "    mako did not reload; run 'makoctl reload'" >&2
+fi
+
+# waybar has no reload. SIGUSR2 re-reads the config in recent versions but not
+# the stylesheet, which is the file that actually carries the colours, so the
+# unit is restarted instead. It comes back in well under a second.
+if systemctl --user is-active --quiet waybar.service; then
+    systemctl --user restart waybar.service ||
+        echo "    waybar did not restart; run 'systemctl --user restart waybar'" >&2
+fi
+
+# Deliberately not handled, because they need nothing:
+#
+#   rofi, swaylock  read their configuration every time they are launched.
+#   starship        reads starship.toml per prompt, so the next prompt has it.
+#
+# And one that cannot be handled: foot rereads nothing. Its SIGUSR1 switches
+# between the [colors-dark] and [colors-light] sections already in the config,
+# which is a different thing from reloading the file, so there is no signal that
+# would help. Terminals already open keep the colours they started with.
+if pgrep -x foot >/dev/null; then
+    echo "    foot: open terminals keep their colours; new ones use the new theme"
+fi

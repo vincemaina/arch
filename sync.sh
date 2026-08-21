@@ -219,6 +219,21 @@ else
     done
 fi
 
+# Tell the theme switcher where this checkout is.
+#
+# ~/.local/bin/theme is launched from a menu, not from inside the repository,
+# and this setup always drives chezmoi with an explicit --source. Without a
+# recorded path it falls back to /opt/arch-setup - the copy install.sh leaves
+# behind - which works but renders from whatever the templates looked like at
+# install time. Recording it here points it at the live clone instead.
+#
+# Deliberately outside the "something changed" branch above: the recorded path
+# is wrong after the repository is moved or re-cloned, and that is exactly when
+# nothing else differs.
+if ! $DRY_RUN && [[ -x "$HOME/.local/bin/theme" ]]; then
+    "$HOME/.local/bin/theme" --record-source "$SETUP_SOURCE"
+fi
+
 # ----------------------------------------------------------------------
 # Login shell
 # ----------------------------------------------------------------------

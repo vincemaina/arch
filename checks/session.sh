@@ -219,6 +219,160 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Themes (TASK-46)"
+
+# The themes live in the repository; which one is selected lives on the machine,
+# in chezmoi's config under [data]. Everything below asks chezmoi rather than
+# reading themes.toml directly, so what is checked is what the templates
+# actually see - reading the TOML here would be a second implementation of the
+# merge, and the two would drift.
+THEME_SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/setup"
+
+if ! command -v chezmoi &>/dev/null; then
+    skip "chezmoi is not installed, so themes cannot be checked"
+elif ! theme_data="$(chezmoi --source "$THEME_SOURCE" data 2>/dev/null)"; then
+    fail "chezmoi could not read $THEME_SOURCE, so no template can render"
+else
+    # One python pass reporting one line per finding, because starting an
+    # interpreter per assertion to re-parse the same JSON is most of the runtime
+    # of this section.
+    # The JSON goes via a file rather than a pipe. `python3 -` reads its
+    # program from stdin, and a heredoc is stdin - so piping the data in as
+    # well silently loses it, and json.load sees an empty string. That is what
+    # the first version of this did.
+    theme_json="$(mktemp)"
+    printf '%s' "$theme_data" > "$theme_json"
+
+    while IFS='|' read -r verdict message; do
+        case "$verdict" in
+            pass) pass "$message" ;;
+            fail) fail "$message" ;;
+            skip) skip "$message" ;;
+        esac
+    done < <(python3 - "$THEME_SOURCE" "$theme_json" <<'PYEOF'
+import json, os, sys
+
+source, theme_json = sys.argv[1], sys.argv[2]
+with open(theme_json) as fh:
+    data = json.load(fh)
+themes = data.get("themes") or {}
+selected = data.get("theme")
+out = []
+
+def say(verdict, message):
+    out.append(f"{verdict}|{message}")
+
+if not themes:
+    say("fail", "themes.toml defines no themes")
+elif selected not in themes:
+    say("fail", f"the selected theme {selected!r} is not one of: {', '.join(themes)}")
+else:
+    say("pass", f"selected theme {selected!r} is one of {len(themes)}: {', '.join(sorted(themes))}")
+
+    # A template reads one theme's keys. A theme missing one of them is not a
+    # problem until it is selected, at which point every apply fails with a
+    # template error - so it is checked for every theme, not just this one.
+    reference = {k for k in themes[selected] if k != "term"}
+    reference_term = set(themes[selected].get("term", {}))
+    incomplete = []
+    for name, palette in themes.items():
+        missing = reference - set(palette)
+        missing |= {f"term.{k}" for k in reference_term - set(palette.get("term", {}))}
+        if missing:
+            incomplete.append(f"{name} is missing {', '.join(sorted(missing))}")
+    if incomplete:
+        for problem in incomplete:
+            say("fail", problem)
+    else:
+        say("pass", f"all {len(themes)} themes define the same keys")
+
+    # Two contrast rules that were learned by breaking them. `muted` carries the
+    # cpu and memory readouts; `text` is the workspace number sitting on a disc
+    # filled with `tertiary`, which a first draft of the ember theme left at
+    # 2.76:1 - legible in the file, barely there on screen.
+    def luminance(value):
+        value = value.lstrip("#")
+        channels = [int(value[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+        channels = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+                    for c in channels]
+        return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+
+    def contrast(a, b):
+        high, low = sorted((luminance(a), luminance(b)), reverse=True)
+        return (high + 0.05) / (low + 0.05)
+
+    RULES = [
+        ("muted", "bg", 4.5, "the cpu and memory readouts against the background"),
+        ("text", "tertiary", 3.5, "the workspace number against its own disc"),
+    ]
+    poor = []
+    for name, palette in themes.items():
+        for fg, bg, floor, what in RULES:
+            ratio = contrast(palette[fg], palette[bg])
+            if ratio < floor:
+                poor.append(f"{name}: {fg} on {bg} is {ratio:.2f}:1, under {floor}:1 - {what}")
+    if poor:
+        for problem in poor:
+            say("fail", problem)
+    else:
+        say("pass", "every theme keeps its readouts above the contrast floor")
+
+    # swaybg fails quietly when its image is missing, so a theme that names one
+    # it does not ship is a blank desktop rather than an error.
+    missing_art = [
+        f"{name} names {palette['wallpaper']}, which is not in setup/dotfiles/"
+        for name, palette in themes.items()
+        if not os.path.isfile(os.path.join(
+            source, "dotfiles", "dot_local", "share", "wallpapers",
+            palette.get("wallpaper", "")))
+    ]
+    if missing_art:
+        for problem in missing_art:
+            say("fail", problem)
+    else:
+        say("pass", "every theme ships the wallpaper it names")
+
+    # The one that catches a switch that only half happened: the theme selected
+    # in the config against the image swaybg is actually displaying. These
+    # disagree when something was applied without the session being reloaded.
+    running = ""
+    try:
+        with os.popen("pgrep -a swaybg 2>/dev/null") as fh:
+            for line in fh:
+                parts = line.split()
+                if "-i" in parts:
+                    running = os.path.basename(parts[parts.index("-i") + 1])
+    except OSError:
+        pass
+    expected = themes[selected].get("wallpaper", "")
+    if not running:
+        say("skip", "swaybg is not running, so the live theme cannot be confirmed")
+    elif running == expected:
+        say("pass", f"the running desktop is showing {selected}'s wallpaper")
+    else:
+        say("fail", f"selected theme is {selected} ({expected}) but swaybg is "
+                    f"showing {running} - the session was not reloaded")
+
+print("\n".join(out))
+PYEOF
+    )
+    rm -f "$theme_json"
+fi
+
+# The reload script is what makes a switch visible rather than merely written,
+# and run_onchange_ decides to re-run it by comparing the rendered script. The
+# two lines carrying the theme name and the palette hash are therefore what
+# triggers it at all - they read like comments and are not.
+reload_template="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/setup/dotfiles/run_onchange_after_reload-theme.sh.tmpl"
+if [[ ! -f "$reload_template" ]]; then
+    fail "nothing reloads the session after a theme change"
+elif [[ "$(grep -c '{{ .theme }}\|sha256sum' "$reload_template")" -lt 2 ]]; then
+    fail "$(basename "$reload_template") no longer embeds the theme name and palette hash, so chezmoi will not re-run it"
+else
+    pass "the reload script re-runs on both a theme switch and a colour edit"
+fi
+
+# ----------------------------------------------------------------------
 section "Desktop entries"
 
 # A desktop entry whose Exec cannot be resolved fails silently: Terminal=false

@@ -1,0 +1,16 @@
+# Exec is an absolute path for the same reason notification-centre's is:
+# ~/.local/bin is not on the PATH that sway and rofi hand to what they spawn,
+# so a bare `Exec=theme` works when tested from a terminal and silently does
+# nothing from the launcher.
+
+[Desktop Entry]
+Type=Application
+Name=Theme
+GenericName=Desktop theme
+Comment=Switch the palette used by the bar, borders, terminal, launcher and wallpaper
+Icon=preferences-desktop-theme
+Exec={{ .chezmoi.homeDir }}/.local/bin/theme
+Terminal=false
+Categories=Settings;DesktopSettings;
+Keywords=theme;colour;color;palette;appearance;dark;wallpaper;
+NoDisplay=false

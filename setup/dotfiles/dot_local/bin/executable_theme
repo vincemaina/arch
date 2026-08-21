@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: chezmoi rofi python3
+
+# Switch the desktop theme.
+#
+#   theme              pick one from the launcher
+#   theme slate        switch to a named theme
+#   theme --list       what is available, and what is current
+#   theme --current    just the current name
+#
+# The whole desktop moves together: sway's borders, the bar, the terminal, the
+# launcher, notifications, the lock screen, the prompt and the wallpaper. What
+# does not move is GTK, which reads GTK_THEME once at session start and stays
+# Adwaita dark - which is why every theme in themes.toml is a dark theme. See
+# DECISIONS.md.
+#
+# HOW IT WORKS
+#
+# The themes live in the repository, in .chezmoidata/themes.toml. Which one is
+# selected lives on the machine, in chezmoi's own configuration file under
+# [data] - deliberately not in the repository, because choosing a theme should
+# not leave a diff to explain, and because two machines syncing the same
+# repository should be able to disagree about it.
+#
+# That works because chezmoi merges its config file's data over .chezmoidata
+# rather than under it. Tested rather than assumed, in both directions and with
+# no config file at all, which is the case the installer runs in.
+#
+# Switching is therefore: write one line, and re-apply. The reloads that make it
+# visible are not here - they are in run_onchange_after_reload-theme.sh, so that
+# editing a colour and running sync.sh reloads too, rather than only a switch.
+
+THEMES_KEY="theme"
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml"
+
+die() { echo "theme: $*" >&2; exit 1; }
+
+# ----------------------------------------------------------------------
+# Finding the repository
+# ----------------------------------------------------------------------
+#
+# This setup always drives chezmoi with an explicit --source, because
+# setup/.chezmoiroot points it at the dotfiles directory. So the switcher has to
+# know where the repository is, and it is launched from a menu rather than from
+# inside the checkout.
+#
+# In order: an override for anyone working on this; whatever sync.sh recorded,
+# which is the live clone; and finally /opt/arch-setup, which install.sh copies
+# and leaves behind, so a machine that has never been synced still works.
+resolve_source() {
+    if [[ -n "${ARCH_SETUP_SOURCE:-}" ]]; then
+        echo "$ARCH_SETUP_SOURCE"; return
+    fi
+    local recorded
+    recorded="$(read_config_value sourceDir || true)"
+    if [[ -n "$recorded" && -d "$recorded" ]]; then
+        echo "$recorded"; return
+    fi
+    if [[ -d /opt/arch-setup ]]; then
+        echo /opt/arch-setup; return
+    fi
+    die "cannot find the setup directory. Run ./sync.sh from the repository once, or set ARCH_SETUP_SOURCE."
+}
+
+# ----------------------------------------------------------------------
+# The config file
+# ----------------------------------------------------------------------
+#
+# Read with tomllib and written by hand, because tomllib parses and does not
+# serialise. The file is small and shallow, and everything in it is written by
+# this script, so hand-writing it is honest rather than clever - but it is
+# preserved key by key rather than regenerated, so that a value put here by
+# something else (a machine profile, for instance) survives a theme switch.
+
+read_config_value() {
+    [[ -f "$CONFIG" ]] || return 1
+    python3 - "$CONFIG" "$1" <<'PY'
+import sys, tomllib
+try:
+    with open(sys.argv[1], 'rb') as fh:
+        config = tomllib.load(fh)
+except (OSError, tomllib.TOMLDecodeError):
+    sys.exit(1)
+value = config.get(sys.argv[2])
+if value is None:
+    sys.exit(1)
+print(value)
+PY
+}
+
+write_config() {
+    local key="$1" value="$2" table="$3"   # table is "" for a top-level key
+    mkdir -p "$(dirname "$CONFIG")"
+    python3 - "$CONFIG" "$key" "$value" "$table" <<'PY'
+import os, sys, tomllib
+
+path, key, value, table = sys.argv[1:5]
+
+config = {}
+if os.path.exists(path):
+    with open(path, 'rb') as fh:
+        config = tomllib.load(fh)
+
+if table:
+    config.setdefault(table, {})[key] = value
+else:
+    config[key] = value
+
+def quote(v):
+    return '"' + str(v).replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+lines = [
+    "# chezmoi's machine-local configuration. Written by ~/.local/bin/theme.",
+    "#",
+    "# Deliberately NOT part of the Arch repository. It holds the decisions that",
+    "# belong to this machine rather than to the setup - which theme is selected,",
+    "# and where the checkout driving it lives - so that switching a theme leaves",
+    "# no diff, and so that two machines syncing the same repository can disagree.",
+    "#",
+    "# chezmoi merges this over .chezmoidata, so anything set here wins.",
+    "",
+]
+lines += [f"{k} = {quote(v)}" for k, v in config.items() if not isinstance(v, dict)]
+for name, contents in config.items():
+    if isinstance(contents, dict):
+        lines += ["", f"[{name}]"]
+        lines += [f"{k} = {quote(v)}" for k, v in contents.items()]
+
+with open(path, 'w') as fh:
+    fh.write("\n".join(lines) + "\n")
+PY
+}
+
+# ----------------------------------------------------------------------
+# Themes
+# ----------------------------------------------------------------------
+#
+# Asked of chezmoi rather than read out of the TOML directly, so that what this
+# reports is what the templates will actually see - config override included.
+# Reading themes.toml here would be a second implementation of the merge, and
+# the two would eventually disagree.
+
+theme_data() {
+    chezmoi --source "$SOURCE" data 2>/dev/null ||
+        die "chezmoi could not read $SOURCE"
+}
+
+list_themes() {
+    theme_data | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin)["themes"]))'
+}
+
+current_theme() {
+    theme_data | python3 -c 'import json,sys; print(json.load(sys.stdin)["'"$THEMES_KEY"'"])'
+}
+
+# ----------------------------------------------------------------------
+
+SOURCE="$(resolve_source)"
+
+case "${1:-}" in
+    --current)
+        current_theme
+        exit 0
+        ;;
+    --list)
+        current="$(current_theme)"
+        while read -r name; do
+            if [[ "$name" == "$current" ]]; then
+                echo "* $name"
+            else
+                echo "  $name"
+            fi
+        done < <(list_themes)
+        exit 0
+        ;;
+    --record-source)
+        # Used by sync.sh, so that a machine with a checkout uses the checkout
+        # rather than the copy install.sh left in /opt.
+        [[ -n "${2:-}" ]] || die "--record-source needs a directory"
+        write_config sourceDir "$2" ""
+        exit 0
+        ;;
+    -h|--help)
+        sed -n '6,12p' "$0" | sed 's/^# \?//'
+        exit 0
+        ;;
+esac
+
+wanted="${1:-}"
+
+if [[ -z "$wanted" ]]; then
+    # rofi's own theme is one of the things being switched, so the menu appears
+    # in the theme being left rather than the one being chosen. That is the
+    # right way round: it is the last thing the old theme does.
+    wanted="$(list_themes | rofi -dmenu -i -p "Theme" -no-custom \
+        -select "$(current_theme)" || true)"
+    [[ -n "$wanted" ]] || exit 0
+fi
+
+# Validate before writing. An unknown name would otherwise be written to the
+# config and then fail at render time, inside chezmoi, with a template error
+# about a missing key - leaving the machine configured for a theme that does not
+# exist and every subsequent sync broken until someone worked out why.
+if ! list_themes | grep -qx "$wanted"; then
+    die "no theme called '$wanted'. Available: $(list_themes | tr '\n' ' ')"
+fi
+
+if [[ "$wanted" == "$(current_theme)" ]]; then
+    echo "Already using $wanted."
+    exit 0
+fi
+
+echo "Switching to $wanted"
+write_config "$THEMES_KEY" "$wanted" data
+
+# --force because the target files were written by chezmoi and are being
+# rewritten by chezmoi; there is no user edit to preserve, and a prompt here
+# would block a command launched from a menu, where nothing can answer it.
+#
+# The reloads happen from run_onchange_after_reload-theme.sh, which this apply
+# triggers because the rendered script embeds the theme name.
+chezmoi --source "$SOURCE" apply --force
