@@ -236,14 +236,20 @@ window#waybar > box {
     margin: 3px 6px;
 }
 
-/* Circles, not pills. A workspace is one character, so a shape that grows with
- * its label was always the wrong shape - equal min-width and min-height with a
- * half radius gives a disc that stays a disc.
+/* Workspaces are marked by COLOUR, not by a filled shape.
  *
- * And violet rather than the accent. Cyan is the loudest colour in the palette
- * and it was being spent on the thing that changes least; the bar's own edges
- * are violet, so the marker now belongs to the bar rather than shouting over
- * it. */
+ * The focused one used to be a filled disc, and it was the loudest thing on a
+ * bar whose whole design is that colour identifies and shape does not. It also
+ * fought the caffeine indicator, which was a filled disc for the same bad
+ * reason - two solid blobs competing on a strip 34 pixels tall.
+ *
+ * So: the active workspace is bright and glowing, the others are muted, and
+ * nothing is filled unless you are pointing at it. The pill on hover is there
+ * to show where the click lands, which is the one thing a shape is genuinely
+ * better at than a colour.
+ *
+ * min-width and min-height stay equal so the hover target is a circle rather
+ * than a lozenge that changes size with the label. */
 #workspaces button {
     color: @muted;
     background: transparent;
@@ -256,15 +262,14 @@ window#waybar > box {
     border-radius: 50%;
 }
 
-/* Light on violet, not dark. The dark foreground is right on the bright
- * accents - cyan, green, amber - but violet is itself a dark colour, and
- * near-black on it left the number barely there. */
 #workspaces button.focused {
-    color: @text;
-    background: @tertiary;
-    box-shadow: 0 0 6px @tertiary;
+    color: @accent;
+    text-shadow: 0 0 6px @accent;
+    background: transparent;
 }
 
+/* Urgent still fills, and that is the point: it is the one state that should
+ * interrupt rather than inform, so it gets the shape nothing else uses. */
 #workspaces button.urgent {
     color: @bg;
     background: @urgent;
@@ -273,7 +278,7 @@ window#waybar > box {
 #workspaces button:hover {
     color: @text;
     background: @surface_alt;
-    box-shadow: none;
+    text-shadow: none;
 }
 
 /* A mode is temporary and modal, so it says so loudly. */
@@ -287,9 +292,19 @@ window#waybar > box {
 
 /* State escalation. These override the resting colour above. */
 
+/* Caffeine lights up rather than filling.
+ *
+ * It was a warning-coloured disc, and on a 34px bar a filled circle behind a
+ * cup glyph clipped the saucer and read as a blob. The bar already says
+ * everything else with colour; there is no reason this one thing should shout
+ * with a shape.
+ *
+ * Bright and glowing against muted-and-flat is a large enough difference to
+ * read at a glance, and it is the same language the workspaces now use. */
 #idle_inhibitor.activated {
-    background: @warning;
-    color: @bg;
+    background: transparent;
+    color: @warning;
+    text-shadow: 0 0 7px @warning;
 }
 
 #pulseaudio.muted {
