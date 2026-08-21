@@ -29,15 +29,36 @@ edit = [
     { run = 'nvim "$@"', desc = "nvim", block = true, for = "unix" },
 ]
 
-# NOT CONFIGURED HERE: opening a directory in a terminal.
+# Opening a directory gives a shell in it.
 #
-# That was tried as an [open] rule matching "*/" and taken back out before it
-# shipped. In yazi, Enter on a directory *navigates into it* - that is the core
-# gesture of the program, not an "open" action - and an open rule matching
-# directories risks replacing it. There is no way to verify that without driving
-# yazi interactively, and breaking navigation in the file manager to add a
-# shortcut to it is a bad trade.
+# yazi's own default rule for directories is
 #
-# The same want is served where it can be checked: opening a folder from the
-# launcher gives a terminal in it, through terminal-here.desktop. Inside yazi,
-# its own shell binding already opens a shell in the current directory.
+#     { url = "*/", use = [ "edit", "open", "reveal" ] }
+#
+# with `edit` first. That was harmless while `edit` was ${EDITOR:-vi} and EDITOR
+# was unset, because it failed; the moment `edit` was pointed at a working nvim,
+# opening a directory started opening the directory *in the editor*. Fixing one
+# thing revealed the other, which is why this rule exists rather than leaving
+# yazi's default alone.
+#
+# -D "$1" and not a bare `foot`. A bare foot inherits yazi's working directory,
+# which is the folder you are *in* - not the folder you are hovering over. So
+# opening a subdirectory would have given a terminal one level above it, which
+# is subtly wrong in the way that wastes a minute every time.
+#
+# "$1" is the first path yazi passes, the same substitution the edit rule above
+# uses. Quoted, because directories have spaces in them.
+#
+# orphan so the terminal outlives yazi. Without it, closing the file manager
+# takes the shell with it - the opposite of the point, since the reason to want
+# a terminal here is to do something that lasts longer than the look around that
+# prompted it. Confirmed as a real opener field: yazi's own built-in defaults
+# use `orphan = true` on the rule that opens a video player.
+open-terminal = [
+    { run = 'foot -D "$1"', desc = "terminal here", orphan = true, for = "unix" },
+]
+
+[open]
+prepend_rules = [
+    { url = "*/", use = [ "open-terminal", "reveal" ] },
+]
