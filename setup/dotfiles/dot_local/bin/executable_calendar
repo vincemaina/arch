@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: foot cal readlink dirname
+
+# A calendar, from clicking the clock in the bar.
+#
+# Three months - last, this, next - because the question that sends you to a
+# calendar is almost always "what date is that Thursday" or "how far away is
+# that", and both need the months either side.
+#
+# WHY NOT A CALENDAR APPLICATION
+#
+# Because there is nothing to integrate with. No mail, no events, no accounts:
+# this machine has no calendar data, so a calendar application would be a large
+# GTK dependency rendering exactly what `cal` already prints. The repository's
+# rule is that new tooling earns its place, and this does not.
+#
+# The clock's tooltip also shows a calendar on hover, which is waybar's own and
+# costs nothing. This is the click version, for when you want it to stay put.
+#
+# OPAQUE, UNLIKE EVERY OTHER TERMINAL HERE
+#
+# foot is configured at alpha 0.90, which is right for a window you work in and
+# wrong for this one: a calendar is dense small text read for two seconds, and
+# whatever is behind it shows straight through the gaps between the numbers.
+# Rendered over btop it was genuinely hard to read. The override applies to this
+# window only, so the setting itself is untouched.
+#
+# colors-dark rather than colors: the bare [colors] section is deprecated, and
+# naming it made foot print a deprecation warning into the calendar - one line
+# of the eleven this window has, spent telling the user off.
+
+# Toggling rather than opening: clicking the clock twice should put the calendar
+# away, not open a second one. The app_id here is what both the toggle and the
+# floating window rule match on, so all three have to agree.
+#
+# Its sibling is called by path, not by name. This script is launched by waybar,
+# which runs as a systemd user service whose PATH is /usr/bin and friends -
+# ~/.local/bin is put there by .zshrc, which applies to interactive shells and
+# nothing else. A bare `sway-toggle-window` here resolves when this is run from
+# a terminal and fails from the bar, which is exactly how it was found.
+exec "$(dirname "$(readlink -f "$0")")/sway-toggle-window" calendar \
+    foot \
+        --app-id=calendar \
+        --title=Calendar \
+        --window-size-chars=64x11 \
+        --override=colors-dark.alpha=1.0 \
+        -e sh -c 'cal -3 --color=always; read -rsn1'

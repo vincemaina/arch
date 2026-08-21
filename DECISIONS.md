@@ -1744,6 +1744,36 @@ Generating rather than committing also means the images are not reproducible fro
 
 ---
 
+## The bar reports and responds
+
+**Decision:** Every module in the bar does something relevant when clicked. The centre carries the date, the time, and whatever is playing — not the focused window's title.
+
+### Why
+
+A readout you can only look at teaches you to stop looking. The bar already knew the answers to "why is this slow" and "what am I connected to", and clicking either one did nothing, so the next step was always a terminal. Clicking a reading now opens the thing that explains it: cpu and memory open btop, the network module opens nmtui, the clock opens a calendar.
+
+The window title went because it was the least useful thing on the bar. Sway already says which window is focused, by drawing the accent border around it, and the title was usually a truncated path repeated from the window itself. The date and time earn that space — they are the thing most often wanted at a glance, and they were squeezed into the right-hand run of readouts. What is playing earns the rest of it, and had nowhere to appear at all.
+
+Windows opened from the bar **toggle**. Clicking the clock twice should put the calendar away, not open a second one, and without that a stray double-click leaves clutter to tidy up. `~/.local/bin/sway-toggle-window` addresses one window by `app_id`, which is deliberately not sway's scratchpad: the scratchpad is a single global stack shared by everything, so showing the calendar would hide whatever else was in it.
+
+### Trade-off
+
+The `app_id` now ties three files together — the command that sets it, the toggle that matches on it, and the `for_window` rule that floats it. Nothing about that coupling is visible when reading any one of them, and when they disagree the window simply tiles rather than erroring. `checks/session.sh` checks it for that reason.
+
+Losing the window title also loses the one case it was good for: a tabbed container, where several windows share a space and only the focused one's title distinguishes them. Sway draws tab labels itself, so the information is still on screen, just not in the bar.
+
+### Alternatives considered
+
+**A calendar application.** Rejected. There is nothing to integrate with — no mail, no events, no accounts — so it would be a large GTK dependency rendering what `cal` already prints. The rule that new tooling must earn its place decides it.
+
+**A custom script polling `playerctl` for the media display.** Unnecessary: waybar here links `libplayerctl`, so the built-in `mpris` module does it, follows whichever player is active through `playerctld`, and hides itself entirely when nothing is playing.
+
+**Binding the media controls explicitly.** Rejected once the manual was read. `waybar-mpris(5)` already binds left to play-pause, middle to previous and right to next, and its bindings act on the player the module is following. Overriding them with `playerctl` would have sent the same commands by a longer route, and a config line that changes nothing is how a file stops being readable.
+
+**Scroll bindings on the media module.** Dropped: the manual documents no scroll handling for it, and configuring something undocumented is indistinguishable from configuring nothing.
+
+---
+
 # Testing Strategy
 
 ## VM-first development

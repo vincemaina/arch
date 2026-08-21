@@ -180,6 +180,86 @@ an effect is not evidence the effect does not exist** until you have shown the
 test could have observed it at all. Prove the mechanism in the positive direction
 before trusting a negative result from it.
 
+## A replace whose match string contains a glyph matches nothing
+
+**Symptom.** A scripted edit reports success, the file looks untouched, and the
+program behaves exactly as before. Five of seven edits to the waybar config
+vanished this way and the fault only surfaced two steps later, in a screenshot,
+because the bar still showed the old layout.
+
+**Cause.** `str.replace` returns the string unchanged when the pattern is absent.
+That is not an error — there is nothing to catch and nothing to log. So any
+match string that is subtly wrong silently does nothing.
+
+The subtly-wrong part here is the one this repository already warns about:
+**Nerd Font glyphs do not survive being typed into a match string.** The config
+holds `"format": " {usage}%"` with a real glyph; the match string ends up
+holding a space where the glyph was; the two never match.
+
+```python
+s = s.replace('"format": " {usage}%",', ...)   # the glyph is not really there
+```
+
+**Fix.** Two rules, both cheap:
+
+1. **Assert every replacement.** `assert old in s, old[:40]` turns a silent
+   no-op into a loud failure at the point of the mistake.
+2. **Never put a glyph in a match string.** Match on the *key*, not the value,
+   and edit by line:
+
+```python
+prefix = '        "format":'
+for i, line in enumerate(lines):
+    if line.startswith(prefix):
+        lines[i] = f'{prefix} "{{:%a %d %b}}",'
+        break
+else:
+    sys.exit("no format line found")
+```
+
+Afterwards, count the glyphs before and after and diff the sets — a deliberate
+removal is then distinguishable from an accidental one:
+
+```python
+glyphs = lambda s: sorted(f"U+{ord(c):04X}" for c in s if 0xe000 <= ord(c) <= 0xf8ff)
+```
+
+## waybar's PATH is not your PATH
+
+**Symptom.** A bar module's `on-click` does nothing. Running the identical
+command in a terminal works perfectly. waybar logs nothing at all.
+
+**Cause.** waybar runs as a systemd user service, so its PATH is
+`/usr/local/sbin:/usr/local/bin:/usr/bin:...` — and `~/.local/bin` is put on
+PATH by `.zshrc`, which applies to interactive shells and to nothing else. A
+bare `"on-click": "calendar"` therefore resolves when tested and is inert from
+the bar, and waybar reports nothing when a click command cannot be found.
+
+This is the same trap the desktop entries hit, in a second place.
+
+**Fix.** Absolute paths, rendered by chezmoi:
+
+```jsonc
+"on-click": "{{ .chezmoi.homeDir }}/.local/bin/calendar"
+```
+
+And it applies transitively: a helper that calls a *sibling* helper by bare
+name fails the same way. Resolve it relative to the script instead:
+
+```bash
+exec "$(dirname "$(readlink -f "$0")")/sway-toggle-window" ...
+```
+
+To test a click the way waybar runs it, take waybar's real environment from
+`/proc` rather than constructing one — `env -i` with a hand-picked subset is not
+faithful and produced two false failures here:
+
+```python
+env = dict(p.split("=", 1) for p in
+           open(f"/proc/{pid}/environ").read().split("\0") if "=" in p)
+subprocess.run(["sh", "-c", command], env=env)
+```
+
 ## Desktop entries need an absolute `Exec`
 
 **Symptom.** A launcher entry does nothing at all. No error anywhere, because

@@ -132,6 +132,7 @@ window#waybar > box {
 #pulseaudio,
 #battery,
 #clock,
+#mpris,
 #network {
     background: transparent;
     /* Enough to keep the hover pill off its own text, and no more. The gap
@@ -155,8 +156,34 @@ window#waybar > box {
 #memory         { color: @secondary; text-shadow: 0 0 5px @secondary; }
 #pulseaudio     { color: @ok;        text-shadow: 0 0 5px @ok; }
 #battery        { color: @ok;        text-shadow: 0 0 5px @ok; }
-#clock          { color: @accent;    text-shadow: 0 0 5px @accent; font-weight: bold; }
 #network        { color: @muted;     text-shadow: 0 0 5px @muted; }
+
+/* The centre. The clock took the space the focused window's title used to
+ * have, and with it the job of being the one bright thing in the middle of the
+ * bar - so it keeps the emphasis treatment rather than the quieter one it had
+ * while it sat among the readouts on the right.
+ *
+ * What is playing sits beside it in the secondary colour, and only when
+ * something is playing: the mpris module draws nothing at all when no player is
+ * running, so the centre is the clock alone the rest of the time. */
+#clock {
+    color: @accent;
+    font-weight: bold;
+    text-shadow: 0 0 6px @accent;
+}
+
+#mpris {
+    color: @secondary;
+    text-shadow: 0 0 6px @secondary;
+}
+
+/* Paused is still worth showing - it is the difference between "nothing is
+ * playing" and "something is waiting for you" - but it should stop asking for
+ * attention, so it drops to the dim colour and loses its glow. */
+#mpris.paused {
+    color: @text_dim;
+    text-shadow: none;
+}
 
 /* The pill comes back on hover, so the shape is still there when you reach for
  * something - it just is not there when you are only reading. Dark text on the
@@ -167,6 +194,7 @@ window#waybar > box {
 #pulseaudio:hover,
 #battery:hover,
 #clock:hover,
+#mpris:hover,
 #network:hover {
     color: @bg;
     /* The glow goes on hover. Dark text on a bright pill does not want a halo
@@ -181,6 +209,7 @@ window#waybar > box {
 #pulseaudio:hover     { background: @ok; }
 #battery:hover        { background: @ok; }
 #clock:hover          { background: @accent; }
+#mpris:hover          { background: @secondary; }
 #network:hover        { background: @surface_alt; color: @text; }
 
 /* Workspaces are the exception: they are navigation, not a readout, so only
@@ -227,20 +256,6 @@ window#waybar > box {
     color: @text;
     background: @surface_alt;
     box-shadow: none;
-}
-
-/* The window title is the one piece of text on the bar that changes with what
- * you are doing, and it sat in the dim colour reserved for things you are not
- * meant to read. It is now the brightest thing up there.
- *
- * The text-shadow is the glow: the same colour as the text, no offset, blurred.
- * That is how a glow is spelled in CSS - a shadow that has not moved. It costs
- * nothing per frame, unlike the animation this replaced. */
-#window {
-    color: @secondary;
-    font-weight: bold;
-    text-shadow: 0 0 6px @secondary;
-    margin: 0 8px;
 }
 
 /* A mode is temporary and modal, so it says so loudly. */

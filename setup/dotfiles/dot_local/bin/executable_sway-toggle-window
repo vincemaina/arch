@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: swaymsg python3
+
+# Open a window, or close it if it is already open.
+#
+#   sway-toggle-window <app_id> <command> [args...]
+#
+# The bar uses this for everything that opens a window on click. Clicking a
+# reading to see more of it should be the same gesture as clicking it again to
+# put it away - without that, every click on the clock leaves another calendar
+# behind, and after a while the workspace is full of them.
+#
+# The app_id is both how the window is found and how the window rules float it,
+# so it has to match the one the command sets. That is a real coupling and the
+# only way to make it visible is to pass it here rather than infer it.
+#
+# WHY NOT THE SCRATCHPAD
+#
+# sway's scratchpad is the obvious candidate and is the wrong shape. It is a
+# single global stack shared by everything, so showing the calendar would hide
+# whatever else was in there, and `scratchpad show` cycles through windows
+# rather than addressing one. This addresses exactly one window by app_id.
+
+if [[ $# -lt 2 ]]; then
+    echo "usage: sway-toggle-window <app_id> <command> [args...]" >&2
+    exit 2
+fi
+
+app_id="$1"
+shift
+
+# Ask sway what exists rather than tracking it here. A pid file would go stale
+# the moment a window was closed any other way - with the keybinding, or by the
+# program exiting on its own - and would then refuse to open the thing it is
+# supposed to open.
+#
+# Matched exactly rather than by prefix: `monitor` must not match a window whose
+# app_id happens to start with it.
+existing="$(swaymsg -t get_tree 2>/dev/null | python3 -c '
+import json, sys
+
+wanted = sys.argv[1]
+
+def walk(node):
+    yield node
+    for key in ("nodes", "floating_nodes"):
+        for child in node.get(key, []):
+            yield from walk(child)
+
+try:
+    tree = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+
+for node in walk(tree):
+    if node.get("app_id") == wanted:
+        print(node["id"])
+        break
+' "$app_id")"
+
+if [[ -n "$existing" ]]; then
+    # By con_id, not by app_id. `[app_id="x"] kill` would close every window
+    # matching, which is right here only because there is one - addressing the
+    # id found above says what is meant and stays correct if that changes.
+    swaymsg "[con_id=$existing]" kill >/dev/null
+    exit 0
+fi
+
+# setsid so the window outlives this script. waybar runs on-click commands as
+# children of itself and does not wait for them, but a foot started as a direct
+# child would still be in waybar's process group and would take the same signals
+# when waybar is restarted - which the theme switcher does routinely.
+setsid "$@" >/dev/null 2>&1 &

@@ -1,0 +1,177 @@
+// Waybar.
+//
+// Each module is a coloured pill. Colour identifies which readout you are
+// looking at, so the bar can be scanned by colour rather than read left to
+// right; state is signalled by a module changing to a warning or urgent colour.
+//
+// The paths to the helper scripts are absolute and rendered by chezmoi, and
+// that is load-bearing rather than tidiness. waybar runs as a systemd user
+// service whose PATH is /usr/bin and friends - ~/.local/bin is added by .zshrc,
+// which applies to interactive shells and to nothing else. A bare
+// `"on-click": "calendar"` therefore works when tested in a terminal and does
+// nothing at all from the bar, silently, because waybar reports nothing when a
+// click command cannot be found. The desktop entries learned this first.
+//
+// EVERY MODULE DOES SOMETHING WHEN CLICKED. A readout you can only look at
+// trains you to ignore it; a readout that opens the thing explaining it is
+// worth glancing at. What each one does:
+//
+//   workspaces    switch to it
+//   clock         a calendar, three months, toggled
+//   mpris         play/pause; middle goes back, right skips forward
+//   idle_inhibitor  stop the screen locking, or let it again
+//   network       nmtui, to change connection
+//   cpu, memory   btop
+//   pulseaudio    pavucontrol; right-click mutes; scroll changes the volume
+//   battery       swap between the charge and the time left on it
+//
+// Everything that opens a window goes through sway-toggle-window, so clicking
+// twice closes it rather than leaving a second one behind.
+//
+// Removed: the focused window's title, which used to occupy the centre. Sway
+// already says which window is focused by giving it the accent border, and the
+// title was usually a truncated path. The date and time are worth that space,
+// and what is playing is worth the rest of it.
+//
+// Also removed: temperature, almost never acted on, and the scratchpad indicator.
+// The backlight stays out until the setup runs on a machine that has one.
+//
+// Also removed a large amount of configuration for modules that were never
+// displayed at all - mpd, a media widget, a power menu, keyboard state, a
+// second battery, power profiles - which made the file look far busier than
+// the bar ever was.
+{
+    "layer": "top",
+    "position": "top",
+    "spacing": 4,
+
+    "modules-left": ["sway/workspaces", "sway/mode"],
+    "modules-center": ["clock", "mpris"],
+    "modules-right": ["idle_inhibitor", "network", "cpu", "memory", "pulseaudio", "battery"],
+
+    "sway/workspaces": {
+        "disable-scroll": true,
+        "format": "{name}"
+    },
+
+    "sway/mode": {
+        "format": "{}"
+    },
+
+    // Click to stop the screen locking or sleeping - for watching something,
+    // or during a long build that should not be interrupted.
+    "idle_inhibitor": {
+        "format": "{icon}",
+        "format-icons": { "activated": "", "deactivated": "" },
+        "tooltip-format-activated": "Idle inhibited: the screen will not lock",
+        "tooltip-format-deactivated": "Idle and locking as normal"
+    },
+
+    "cpu": {
+        "format": " {usage}%",
+        "interval": 3,
+        "tooltip": false,
+        "on-click": "{{ .chezmoi.homeDir }}/.local/bin/sway-toggle-window monitor foot --app-id=monitor --title=btop -e btop"
+    },
+
+    // The same window as cpu, and deliberately the same app_id: btop
+    // shows both, so clicking either reading should raise the one
+    // window rather than a second copy of the same program.
+    "memory": {
+        "format": " {percentage}%",
+        "interval": 5,
+        "tooltip-format": "{used:0.1f}G of {total:0.1f}G",
+        "on-click": "{{ .chezmoi.homeDir }}/.local/bin/sway-toggle-window monitor foot --app-id=monitor --title=btop -e btop"
+    },
+
+    // -l 1.0 on the scroll for the same reason as the media keys: wpctl
+    // caps at the limit given, and without one the volume climbs past
+    // 100% into distortion with nothing to say so. See TASK-41.
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": " muted",
+        "format-icons": { "default": ["", "", ""] },
+        "on-click": "pavucontrol",
+        "tooltip": false,
+        "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+        "on-scroll-up": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+",
+        "on-scroll-down": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%-"
+    },
+
+    // The one module whose click opens nothing. There is no battery
+    // application worth installing, and the useful second fact - how
+    // long the charge has left - is a number waybar already holds.
+    // format-alt swaps to it on click and back, which is the whole
+    // interaction.
+    "battery": {
+        "states": { "warning": 30, "critical": 15 },
+        "format": "{icon} {capacity}%",
+        "format-charging": " {capacity}%",
+        "format-icons": ["", "", "", "", ""],
+        "tooltip": false,
+        "format-alt": "{icon} {time}"
+    },
+
+    // The centre of the bar, and the reason the window title is not.
+    //
+    // Date and time together rather than one behind a click: the point
+    // of moving it here was that both are wanted at a glance. Three
+    // spaces between them rather than a separator glyph, so the halves
+    // read as one thing without a divider to look at.
+    //
+    // The format-alt that used to swap in the date is gone with it, and
+    // on-click is spent on the calendar instead - waybar uses the same
+    // click for both, so they cannot coexist.
+    "clock": {
+        "format": "{:%a %d %b   %H:%M}",
+        "tooltip-format": "<tt>{calendar}</tt>",
+        "on-click": "{{ .chezmoi.homeDir }}/.local/bin/calendar"
+    },
+
+    // What is playing, when something is. The module draws nothing at
+    // all while no player is running, so the centre is the clock alone
+    // the rest of the time and the bar does not reserve space for it.
+    //
+    // waybar here links libplayerctl, so this is the built-in module
+    // rather than a custom script polling playerctl on an interval.
+    //
+    // Icons by codepoint, never pasted. Pasting has silently lost them
+    // in this repository before, leaving an empty string that looks
+    // configured in the file and renders as nothing.
+    //
+    // No click bindings here on purpose. waybar-mpris(5) already binds left to
+    // play-pause, middle to previous and right to next, and its own bindings
+    // act on the player the module is following - overriding them with
+    // playerctl would send the same commands by a longer route, and shipping a
+    // line that changes nothing is how a config stops being readable.
+    //
+    // on-scroll is not overridden either: the manual documents no scroll
+    // handling for this module, and configuring something undocumented is
+    // indistinguishable from configuring nothing.
+    //
+    // dynamic-len caps the title: a long track name in the centre
+    // pushes against the readouts, and the bar should not change shape
+    // because a song changed.
+    "mpris": {
+        "format": "{player_icon}  {dynamic}",
+        "format-paused": "{status_icon}  {dynamic}",
+        "dynamic-order": ["title", "artist"],
+        "dynamic-len": 45,
+        "player-icons": { "default": "\uf001", "mpv": "\uf03d" },
+        "status-icons": { "paused": "\uf04c" },
+        "tooltip-format": "{player}\n{title}\n{artist}"
+    },
+
+    // Icons are Font Awesome codepoints, matching the set every other module
+    // here uses - a themed GTK tray icon cannot, which is why the tray was
+    // replaced rather than restyled. Written as \u escapes rather than pasted:
+    // pasting Nerd Font glyphs has silently lost them in this repository before.
+    "network": {
+        "format-ethernet": "\uf0e8",
+        "format-wifi": "\uf1eb {signalStrength}%",
+        "format-disconnected": "\uf127",
+        "tooltip-format": "{ifname} · {ipaddr}",
+        "interval": 5,
+        "on-click": "{{ .chezmoi.homeDir }}/.local/bin/sway-toggle-window network-tui foot --app-id=network-tui --title=nmtui -e nmtui"
+    }
+}

@@ -229,7 +229,26 @@ want to see what a template produces.
 
 Nerd Font glyphs must be written **by codepoint**, not pasted. Pasting has lost
 them silently more than once, leaving `""` where an icon should be — which looks
-configured in the file and renders as nothing.
+configured in the file and renders as nothing. The same applies to *editing*:
+a scripted `replace` whose match string contains a pasted glyph matches nothing
+and reports nothing, so assert every replacement and match on the key rather than
+the value. See the `scripting-traps` skill.
+
+## The bar is clickable
+
+Every module in `waybar/config.jsonc.tmpl` does something when clicked, and the
+table at the top of that file is the record of what. Three of them open a window
+through `~/.local/bin/sway-toggle-window`, so clicking twice closes it.
+
+Two things will silently break it, and `checks/session.sh` covers both:
+
+- **waybar's PATH is not your PATH.** It runs as a systemd user service, so
+  `~/.local/bin` is not on it — `.zshrc` puts it there and applies to interactive
+  shells only. Click commands must be absolute, which is why that file is a
+  `.tmpl`. A helper calling a *sibling* helper by bare name fails the same way.
+- **The `app_id` ties three files together**: the command that sets it, the
+  toggle that finds the window by it, and the `for_window` rule that floats it.
+  Nothing else notices when they disagree; the window just tiles.
 
 ## Checks
 

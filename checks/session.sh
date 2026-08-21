@@ -390,6 +390,173 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Bar interaction (TASK-53)"
+
+# Two invisible failures live here, and both have already happened elsewhere in
+# this repository.
+#
+# A click command that cannot be found does nothing and reports nothing: waybar
+# runs as a systemd user service whose PATH is /usr/bin and friends, and
+# ~/.local/bin is put on PATH by .zshrc, which applies to interactive shells
+# only. So a bare command name works when tested in a terminal and is silently
+# inert from the bar. The desktop entries learned this first; the bar learned it
+# again.
+#
+# And a window opened without a matching floating rule tiles instead, shoving
+# the workspace around for something being looked at for ten seconds. The app_id
+# ties three separate files together and nothing else checks that they agree.
+bar_check="$(mktemp)"
+cat > "$bar_check" <<'BARCHECK_EOF'
+import json
+import os
+import re
+import shutil
+import sys
+
+# Emits "verdict|message" lines for session.sh to turn into PASS/FAIL.
+home = os.path.expanduser("~")
+config_path = os.path.join(home, ".config", "waybar", "config.jsonc")
+sway_dir = os.path.join(home, ".config", "sway", "config.d")
+
+out = []
+
+
+def say(verdict, message):
+    out.append(f"{verdict}|{message}")
+
+
+if not os.path.isfile(config_path):
+    say("skip", "waybar is not configured on this machine")
+    print("\n".join(out))
+    sys.exit(0)
+
+raw = open(config_path).read()
+config = json.loads(re.sub(r"^\s*//.*$", "", raw, flags=re.M))
+
+# waybar's PATH, taken from the running process rather than assumed. This is the
+# whole point of the check: ~/.local/bin is put on PATH by .zshrc, which applies
+# to interactive shells and to nothing else, so a bare command name in an
+# on-click works when tested in a terminal and does nothing at all from the bar.
+# waybar reports nothing when a click command cannot be found.
+waybar_path = None
+for pid in os.listdir("/proc"):
+    if not pid.isdigit():
+        continue
+    try:
+        with open(f"/proc/{pid}/comm") as fh:
+            if fh.read().strip() != "waybar":
+                continue
+        with open(f"/proc/{pid}/environ") as fh:
+            env = dict(p.split("=", 1) for p in fh.read().split("\0") if "=" in p)
+        waybar_path = env.get("PATH")
+        break
+    except OSError:
+        continue
+
+search_path = waybar_path or "/usr/local/sbin:/usr/local/bin:/usr/bin"
+
+actions = []
+for name, body in config.items():
+    if not isinstance(body, dict):
+        continue
+    for key, command in body.items():
+        if key.startswith("on-click") or key.startswith("on-scroll"):
+            actions.append((name, key, command))
+
+unresolved = []
+for name, key, command in actions:
+    binary = command.split()[0]
+    if binary.startswith("/"):
+        if not os.access(binary, os.X_OK):
+            unresolved.append(f"{name}.{key} runs {binary}, which is not executable")
+    elif not shutil.which(binary, path=search_path):
+        unresolved.append(
+            f"{name}.{key} runs bare '{binary}', which is not on waybar's PATH "
+            f"- it will do nothing and say nothing")
+
+if not actions:
+    say("fail", "no module in the bar does anything when clicked")
+elif unresolved:
+    for problem in unresolved:
+        say("fail", problem)
+else:
+    where = "on waybar's own PATH" if waybar_path else "on the default PATH"
+    say("pass", f"all {len(actions)} click actions resolve {where}")
+
+# Every module the bar displays should respond to a click. Two are excluded and
+# both are deliberate: sway/mode only exists while a mode is active, and
+# idle_inhibitor toggles itself without needing a command.
+displayed = (config.get("modules-left", []) + config.get("modules-center", [])
+             + config.get("modules-right", []))
+BUILT_IN = {"sway/workspaces", "sway/mode", "idle_inhibitor", "mpris"}
+inert = []
+for name in displayed:
+    if name in BUILT_IN:
+        continue
+    body = config.get(name, {})
+    if not any(k.startswith("on-") or k == "format-alt" for k in body):
+        inert.append(name)
+if inert:
+    say("fail", f"nothing happens when you click: {', '.join(inert)}")
+else:
+    say("pass", f"every one of the {len(displayed)} modules responds to a click")
+
+# The app_id coupling. sway-toggle-window finds a window by app_id, the command
+# sets that app_id, and a for_window rule floats it. Nothing enforces that the
+# three agree, and when they do not the window tiles instead - shoving the
+# workspace around for something being looked at for ten seconds.
+rules = ""
+if os.path.isdir(sway_dir):
+    for entry in sorted(os.listdir(sway_dir)):
+        rules += open(os.path.join(sway_dir, entry)).read()
+
+# Both the direct calls in the bar's config and the indirect ones: clicking the
+# clock runs ~/.local/bin/calendar, which calls the toggle itself, so the app_id
+# never appears in the waybar config at all.
+searched = raw
+bin_dir = os.path.join(home, ".local", "bin")
+if os.path.isdir(bin_dir):
+    for entry in sorted(os.listdir(bin_dir)):
+        try:
+            searched += open(os.path.join(bin_dir, entry)).read()
+        except (OSError, UnicodeDecodeError):
+            continue
+
+toggled = set(re.findall(r"sway-toggle-window[\"']?\s+(\S+)", searched))
+toggled = {a.strip('"\'\\') for a in toggled if not a.startswith(("-", "$", "<"))}
+unfloated = [
+    app for app in sorted(toggled)
+    if not re.search(rf'for_window\s*\[app_id="{re.escape(app)}"\]\s*floating enable', rules)
+]
+mismatched = [
+    app for app in sorted(toggled)
+    if f"--app-id={app}" not in searched
+]
+
+if not toggled:
+    say("skip", "no module opens a window, so there is no app_id to check")
+elif unfloated:
+    say("fail", f"opened by the bar but no rule floats it: {', '.join(unfloated)} "
+                f"- it will tile and shove the workspace around")
+elif mismatched:
+    say("fail", f"toggled by app_id but the command never sets it: {', '.join(mismatched)}")
+else:
+    say("pass", f"every window the bar opens ({', '.join(sorted(toggled))}) is "
+                f"floated by a matching rule")
+
+print("\n".join(out))
+BARCHECK_EOF
+
+while IFS='|' read -r verdict message; do
+    case "$verdict" in
+        pass) pass "$message" ;;
+        fail) fail "$message" ;;
+        skip) skip "$message" ;;
+    esac
+done < <(python3 "$bar_check")
+rm -f "$bar_check"
+
+# ----------------------------------------------------------------------
 section "Desktop entries"
 
 # A desktop entry whose Exec cannot be resolved fails silently: Terminal=false
