@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: systemctl
+
+# Hides the bar, and gives its strip back to the tiled windows. Same key again
+# brings it back.
+#
+# WHY A SIGNAL AND NOT `systemctl --user stop`
+#
+# Session components here use Restart=always, so anything that hides the bar by
+# killing it gets it restarted a second later - the supervision is doing exactly
+# what it was asked to. An explicit `stop` is honoured, but it throws the process
+# away: coming back means a cold start, every module re-reads its source, and the
+# theme-reload path has one more state to reason about. Signalling leaves the
+# service running and untouched, which is why NRestarts stays where it was.
+#
+# waybar answers SIGUSR1 by toggling the bar's visibility.
+#
+# WHAT ACTUALLY HAS TO HAPPEN, WHICH IS NOT "THE BAR LOOKS GONE"
+#
+# waybar reserves its strip through the layer-shell exclusive zone. A surface
+# that is merely drawn empty still holds that reservation, so the windows keep
+# the gap and the whole point is lost - and it looks identical to a bar that has
+# really gone away. waybar's setVisible releases the zone as well as hiding the
+# surface, which is the reason this mechanism works and is the thing to re-check
+# if it ever stops working. Measure it from `swaymsg -t get_tree`, never from a
+# screenshot: a tiled window on a 1080p output goes from y=41 h=1027 to y=12
+# h=1056 - it gains the 29px the bar held, with the 12px gap left alone.
+#
+# --kill-whom=main is not decoration. The default is every process in the
+# service's cgroup, and waybar's click commands are spawned as its children;
+# SIGUSR1 terminates a process that does not handle it, so the default would
+# take a terminal opened from the bar with it.
+#
+# There is no state kept here, deliberately. A restarted waybar comes back
+# visible, which is the safe direction to fail in: the bar can never be left
+# hidden with nothing able to bring it back.
+
+if ! systemctl --user is-active --quiet waybar.service; then
+    # Not running at all - the bar is as hidden as it gets, so "toggle" means
+    # bring it back.
+    exec systemctl --user start waybar.service
+fi
+
+exec systemctl --user kill --kill-whom=main --signal=SIGUSR1 waybar.service

@@ -89,6 +89,27 @@ swaymsg 'output HEADLESS-1 unplug'
 This is how XWayland scaling was measured and how multi-output workspace
 behaviour was demonstrated, neither of which needed real hardware.
 
+**Unplug it, and put the focus back.** This has gone wrong twice, both times
+leaving the user worse off than before the test:
+
+- An output left plugged in **strands whatever workspace landed on it**. Sway
+  keeps the workspace assigned to an output nobody can see, so a real window -
+  in one case the user's own terminal - simply vanishes. `output HEADLESS-n
+  unplug` migrates the workspace back and recovers it.
+- Focus left on the headless output means **the user's keystrokes go somewhere
+  invisible**. They are typing at a window they cannot see, with no clue why.
+
+So the last two lines are not optional tidying, they are the test:
+
+```bash
+swaymsg 'focus output Virtual-1'; swaymsg workspace 1   # give the screen back
+swaymsg 'output HEADLESS-1 unplug'                      # then remove it
+```
+
+Do both even if the test failed, and especially if something else is running
+concurrently - the other agent's output is not yours to unplug, but focus
+belongs to whoever is sitting at the machine.
+
 ## Trial a keybinding before committing it
 
 `swaymsg bindsym ...` and `swaymsg unbindsym ...` change bindings at runtime
