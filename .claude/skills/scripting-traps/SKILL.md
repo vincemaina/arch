@@ -75,6 +75,45 @@ the marker text behind.
 limitation — and give rofi the file. Write any parallel data, such as the
 action for each row, to a second file so the index still maps back.
 
+## Killing by `app_id` kills the terminal you are running in
+
+**Symptom.** The session's own terminal closes, taking Claude Code and every
+background agent with it. The tool result is exit 137 and nothing else. Repeated
+three times before the cause was looked for, because "the terminal closed" reads
+like a crash rather than like something the command did.
+
+**Cause.** This:
+
+```bash
+swaymsg '[app_id=greeting] kill'      # tidying up a test window
+```
+
+`app_id=greeting` is not the test window. It is EVERY window with that app_id,
+and the login greeting card from `greeting.service` is a full interactive shell
+that this repository's own user works in - so it matched the terminal running
+the command.
+
+**Fix.** Target the specific container, never the class:
+
+```bash
+swaymsg -t get_tree | ...            # find the con_id of the window YOU spawned
+swaymsg "[con_id=$id] kill"
+```
+
+or match on the pid you launched, or exclude the focused window explicitly.
+
+Before killing anything by a selector, ask what the selector matches right now:
+
+```bash
+swaymsg -t get_tree | python3 -c "...print pid, app_id, focused for every node..."
+```
+
+The general form is the same as `pkill -f` two entries below: **a selector that
+describes a category will match members of that category you did not have in
+mind, including the one you are standing in.** The greeting card is the trap
+here specifically because it looks transient - a fastfetch splash - and is
+actually the everyday terminal.
+
 ## `pkill -f` matches your own command line
 
 **Symptom.** The shell dies mid-command, reported as exit code 144. Happened

@@ -29,3 +29,9 @@
 # themes are only read by rofi. Left behind it would be a file nobody could
 # explain.
 .config/rofi/shortcuts.rasi
+
+# sway-place-floating scored positions for a new floating window and moved it to
+# the emptiest one. Removed on TASK-54: placement can only happen after the
+# window exists, so it appeared centred and then jumped, which read as a glitch
+# on every login. The greeting card is centred by a window rule instead.
+.local/bin/sway-place-floating
