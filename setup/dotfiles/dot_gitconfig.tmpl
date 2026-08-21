@@ -1,0 +1,75 @@
+{{/*
+   git's user configuration, built from setup/install.conf (TASK-37).
+
+   Until this file existed, a machine built from this repository could not
+   commit at all: `git commit` ended in "Author identity unknown ... fatal:
+   unable to auto-detect email address". The identity on the reference machine
+   was a 59-byte ~/.gitconfig typed by hand and managed by nothing, so it
+   existed exactly once and had to be remembered again on the next build.
+
+   It is ~/.gitconfig rather than ~/.config/git/config on purpose. git reads
+   both, and ~/.gitconfig is read second and therefore wins - so managing the
+   XDG path would have left the hand-written file quietly in charge and the
+   managed one inert. Exactly one file is in charge this way.
+
+   The identity is NOT duplicated here. setup/install.conf stays the single
+   source of machine identity, and this template parses its KEY="value" lines,
+   which is why chezmoi can read a file outside its source directory: with
+   setup/.chezmoiroot pointing at dotfiles/, "../install.conf" resolves to
+   setup/install.conf in all three contexts - the installer chroot
+   (/opt/arch-setup), sync.sh, and a scratch render.
+
+   Missing keys fail the render loudly rather than producing an empty name.
+   An empty user.name is the invisible-configuration failure this repository
+   keeps hitting: git accepts it and writes unattributable commits.
+*/ -}}
+{{- $conf := dict -}}
+{{- range regexFindAll `(?m)^[A-Z_]+="[^"]*"` (include "../install.conf") -1 -}}
+{{-   $kv := splitn "=" 2 . -}}
+{{-   $_ := set $conf $kv._0 (trimAll `"` $kv._1) -}}
+{{- end -}}
+{{- if not (hasKey $conf "GIT_NAME") }}{{ fail "GIT_NAME is not set in setup/install.conf" }}{{ end -}}
+{{- if not (hasKey $conf "GIT_EMAIL") }}{{ fail "GIT_EMAIL is not set in setup/install.conf" }}{{ end -}}
+{{- if eq $conf.GIT_NAME "" }}{{ fail "GIT_NAME is empty in setup/install.conf" }}{{ end -}}
+{{- if eq $conf.GIT_EMAIL "" }}{{ fail "GIT_EMAIL is empty in setup/install.conf" }}{{ end -}}
+# Managed by chezmoi from setup/dotfiles/dot_gitconfig.tmpl.
+# The identity comes from setup/install.conf - edit it there, not here.
+
+[user]
+	name = {{ $conf.GIT_NAME }}
+	email = {{ $conf.GIT_EMAIL }}
+
+# Four settings, each one because git without it fails or lectures.
+# Nothing here is included because a generic gitconfig usually has it.
+
+[init]
+	# Without this `git init` creates `master` and prints eight lines of hint
+	# about it. Every branch in this repository is `main`, so a repo created
+	# on a machine it built would disagree with the machine's own repo.
+	defaultBranch = main
+
+[pull]
+	# Without this, `git pull` on diverged branches is a hard failure with a
+	# twelve-line lecture: "fatal: Need to specify how to reconcile divergent
+	# branches". `only` is the choice that never does anything surprising - it
+	# refuses rather than silently creating a merge commit (pull.rebase false)
+	# or silently rewriting local commits (pull.rebase true). Divergence is
+	# rare enough here to be worth deciding once, out loud, per occurrence.
+	ff = only
+
+[push]
+	# Without this, the first push of a new branch fails with "fatal: The
+	# current branch X has no upstream branch" and has to be retried with
+	# --set-upstream. There is no case in this setup where the upstream should
+	# be anything other than the same name on origin.
+	autoSetupRemote = true
+
+# Deliberately NOT set, so that the next reader does not add them back:
+#
+#   push.default   - already `simple` since git 2.0. Setting it changes
+#                    nothing and would read as a decision that was made.
+#   core.editor    - EDITOR=nvim is set for the whole user session by
+#                    .config/environment.d/30-editor.conf and git honours it.
+#                    A second copy here is a second thing to keep in step.
+#   commit.gpgsign - there is no signing key on a machine this repository
+#                    builds, and TASK-38 decided not to provision one.

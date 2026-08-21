@@ -6,6 +6,7 @@ networkmanager
 sudo
 vim
 git
+openssh
 intel-ucode
 amd-ucode
 zram-generator

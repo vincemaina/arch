@@ -2156,6 +2156,90 @@ A secure unattended secret-management approach can be added later if needed.
 
 ---
 
+## Git identity lives in `install.conf`, and is committed
+
+**Decision:** Put `GIT_NAME` and `GIT_EMAIL` in `setup/install.conf` alongside
+the other machine identity, and render `~/.gitconfig` from it.
+
+### Why
+
+A machine built from this repository could not commit. With a `HOME` holding no
+gitconfig, git refuses with "Author identity unknown" — and nothing under
+`setup/` mentioned git configuration at all, so the identity on the reference
+machine came from a hand-written file chezmoi did not manage.
+
+Committed rather than prompted, which is the opposite of the entry above, and
+the difference is what kind of thing each is. A password is a secret. A name and
+an email address are not, and this repository's own history publishes both on
+every commit — committing them reveals nothing `git log` does not already. More
+practically, prompting answers the question in the one place it can only be
+answered once, and leaves `sync.sh` with nothing to apply.
+
+`~/.gitconfig` rather than `~/.config/git/config`, measured rather than assumed:
+with both present, `~/.gitconfig` wins. Managing the XDG path would have left a
+hand-written file quietly in charge and the managed one inert — the "configured
+and does nothing" shape again.
+
+The template fails loudly on a missing or empty value, because git *accepts* an
+empty `user.name` and writes unattributable commits rather than complaining.
+
+### Trade-off
+
+Anyone forking this has to edit `install.conf` before their first commit, or the
+render stops them. That is the intended failure: the alternative is committing
+under someone else's name.
+
+### Alternatives considered
+
+**Machine-local chezmoi data, like the theme.** Rejected: the identity is
+per-*person*, not per-machine, and this build has one person — `USERNAME` is
+already equally personal and already committed. It would have split one identity
+across two files for no gain.
+
+---
+
+## No SSH key or agent is provisioned by the build
+
+**Decision:** The build establishes no SSH key and starts no agent. It does
+declare the client.
+
+### Why
+
+Measured first: no agent process, `SSH_AUTH_SOCK` unset, every agent unit
+disabled — and `ssh -T git@github.com` authenticates anyway, because the key has
+no passphrase and ssh simply reads it from disk. An agent exists to cache a
+passphrase, so here it would cache nothing. That is a unit doing nothing, which
+this repository has enough of.
+
+Generating a key at first boot is worse than doing nothing: it produces a key
+that cannot push until somebody registers it, which *looks* provisioned and is
+not — indistinguishable from a working setup until the first push fails.
+
+**What was actually broken was the client.** `openssh` was never declared, and
+was held only by `gcr-4 ← gvfs / libnma-common ← network-manager-applet`. `git`
+does not depend on openssh, so this repository's own `git@github.com` remote
+worked as a side effect of the NetworkManager tray applet's dependency tree —
+and removing that applet, which is under discussion on TASK-58 precisely because
+this desktop has no tray, would have taken ssh with it. Same shape as the
+`polkit` case in TASK-13, and now declared in `base.txt`.
+
+### Trade-off
+
+A new machine still needs `ssh-keygen` and a manual registration step. That step
+is interactive whichever way it is reached.
+
+### Alternatives considered
+
+**`gh ssh-key add` to register automatically.** Rejected: `gh` is neither
+installed nor declared, so it costs a package plus `gh auth login` — the same
+browser step it was meant to remove, one level further away.
+
+**A `gcr-ssh-agent` unit.** Rejected for now rather than on principle. It ships
+with the already-installed `gcr-4` and can be enabled unchanged if a passphrase
+is ever adopted, at which point it starts having something to do.
+
+---
+
 ## Graphical login
 
 Sway is currently started manually after TTY login.
