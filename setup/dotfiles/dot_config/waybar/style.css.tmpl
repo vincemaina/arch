@@ -44,6 +44,11 @@
  * screenshot: about 12 across the bar, dropping to 6 and rising back through
  * the rows beneath it, then 15 for the wallpaper. The band is darker than the
  * bar and the wallpaper both, which is what separates them. */
+@keyframes bar-drift {
+    0%   { background-position:   0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
 window#waybar {
     background: transparent;
     color: @text;
@@ -63,10 +68,34 @@ window#waybar > box {
      * The proportions are what make it a tint rather than a paint job. 10% and
      * 22% of a saturated colour into black is enough to see and not enough to
      * compete with the modules sitting on top of it. */
-    background: linear-gradient(90deg,
+    /* Twice the width of the bar, so there is somewhere to slide to. The
+     * gradient repeats violet-magenta-violet-magenta-violet across it, and
+     * moving one full bar-width lands on an identical point - which is what
+     * makes the loop seamless rather than snapping back. */
+    background-image: linear-gradient(90deg,
         mix(@bar, @tertiary, 0.10) 0%,
-        mix(@bar, @secondary, 0.22) 50%,
+        mix(@bar, @secondary, 0.22) 25%,
+        mix(@bar, @tertiary, 0.10) 50%,
+        mix(@bar, @secondary, 0.22) 75%,
         mix(@bar, @tertiary, 0.10) 100%);
+    background-size: 200% 100%;
+
+    /* Slow on purpose. Fast enough to notice if you look, slow enough that it
+     * never asks to be looked at - the bar should feel alive rather than
+     * animated.
+     *
+     * WHAT THIS COSTS, because it is not free and the number is surprising:
+     * waybar goes from 0.3% CPU to 10.1%, measured over ten seconds each way.
+     * That is continuous, for as long as the session is up.
+     *
+     * The duration does NOT affect it. GTK redraws every frame while an
+     * animation is running, so a forty-second drift costs exactly what a
+     * four-second one would - slowing it down to save power does nothing. The
+     * choice is binary: animate or do not.
+     *
+     * Delete this one line to stop it. Everything else here stays valid; the
+     * gradient just holds still. */
+    animation: bar-drift 40s linear infinite;
 
     /* A gradient hairline instead of a shadow.
      *
