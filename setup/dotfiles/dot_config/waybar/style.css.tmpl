@@ -12,6 +12,7 @@
 
 @define-color bg          {{ .palette.bg }};
 @define-color bar         {{ .palette.bar }};
+@define-color bar_bloom   {{ .palette.bar_bloom }};
 @define-color surface     {{ .palette.surface }};
 @define-color surface_alt {{ .palette.surface_alt }};
 @define-color muted       {{ .palette.muted }};
@@ -41,12 +42,31 @@ window#waybar {
      * Kept high deliberately: at lower opacity the bar stops reading as a
      * separate surface and starts blending into the wallpaper, which is the
      * failure this replaced. */
-    background: alpha(@bar, 0.95);
+    background: linear-gradient(90deg,
+        alpha(@bar, 0.95) 0%,
+        alpha(@bar_bloom, 0.95) 50%,
+        alpha(@bar, 0.95) 100%);
+
+    /* The bloom sits where the bar is emptiest. Modules cluster at both ends
+     * and the middle carries only the window title, so a swell of colour there
+     * fills the gap without competing with anything. It is dark enough to read
+     * as depth rather than as decoration - the gradient is doing the same job
+     * the transparency does, giving the bar somewhere to be other than flat. */
     color: @text;
 }
 
 /* The shared pill shape. Dark text on a saturated background reads better at
- * this size than the reverse, and keeps every module the same visual weight. */
+ * this size than the reverse, and keeps every module the same visual weight.
+ *
+ * The radius is fully rounded rather than softened corners, and each pill
+ * carries a shadow beneath it. Together those lift the modules off the bar
+ * instead of leaving them flush with it - the bar reads as a surface with
+ * things sitting on it rather than as a strip of coloured blocks.
+ *
+ * Worth knowing this is possible at all: waybar is GTK3, so its stylesheet
+ * gets shadows, gradients and rounded corners - none of which sway itself can
+ * draw. A client can decorate its own surface however it likes; the compositor
+ * drawing borders around windows cannot. */
 #idle_inhibitor,
 #cpu,
 #memory,
@@ -57,7 +77,8 @@ window#waybar {
     color: @bg;
     padding: 0 10px;
     margin: 4px 3px;
-    border-radius: 6px;
+    border-radius: 14px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.9);
 }
 
 #idle_inhibitor { background: @surface_alt; color: @muted; }
