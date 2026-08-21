@@ -62,8 +62,11 @@ window#waybar > box {
         @bar_bloom 50%,
         @bar 100%);
 
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.95);
-    margin-bottom: 8px;
+    /* Deliberately tight. This is an edge, not a drop shadow - just enough
+     * dark to stop the bar meeting the wallpaper flush. The margin only needs
+     * to clear the blur, so it tracks it. */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+    margin-bottom: 3px;
 }
 
 /* The shared pill shape. Dark text on a saturated background reads better at
