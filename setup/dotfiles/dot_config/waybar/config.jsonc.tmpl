@@ -180,13 +180,37 @@
     // handling for this module, and configuring something undocumented is
     // indistinguishable from configuring nothing.
     //
-    // dynamic-len caps the title: a long track name in the centre
-    // pushes against the readouts, and the bar should not change shape
-    // because a song changed.
+    // The lengths, and what each one actually does - the difference
+    // matters because getting it wrong makes the module disappear
+    // rather than overflow. dynamic-len is a budget for the whole
+    // {dynamic} string and it does not truncate anything: a tag that
+    // will not fit is dropped whole. dynamic-len 45 on its own was
+    // therefore not a cap on the title at all - a 60-character title
+    // vanished and the bar showed the artist alone, and a long title
+    // with a long artist showed nothing but the icon. Measured, not
+    // assumed; see TASK-79.
+    //
+    // title-len and artist-len are the ones that truncate, with an
+    // ellipsis. The title is capped at 30 so it always fits the budget
+    // and is always the tag that survives; the artist is capped at 20
+    // and is what the budget drops when a long title leaves no room
+    // for it. The centre stops growing at 45 characters, and the thing
+    // it gives up is never the title.
+    //
+    // The untruncated names stay in the tooltip: length limits do not
+    // apply there unless enable-tooltip-len-limits is set, and it is
+    // not, so hovering is where the full track name lives.
+    //
+    // Not scrolled. The module has no marquee, so scrolling the title
+    // would mean replacing it with a custom module polling playerctl
+    // on a timer - a permanently animating readout in the centre of
+    // the bar, redrawing for text the tooltip already holds whole.
     "mpris": {
         "format": "{player_icon}  {dynamic}",
         "format-paused": "{status_icon}  {dynamic}",
         "dynamic-order": ["title", "artist"],
+        "title-len": 30,
+        "artist-len": 20,
         "dynamic-len": 45,
         "player-icons": { "default": "\uf001", "mpv": "\uf03d" },
         "status-icons": { "paused": "\uf04c" },
