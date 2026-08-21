@@ -1,10 +1,10 @@
 ---
 id: TASK-55
 title: 'Resize windows directly, without entering a mode'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-21 10:19'
-updated_date: '2026-08-21 10:42'
+updated_date: '2026-08-21 10:59'
 labels:
   - desktop
   - feel
@@ -65,3 +65,21 @@ If the mode is genuinely worse than direct bindings for the common case - one sm
 
 The 10px step is worth revisiting either way. It is small on a 1920-wide screen, and a proportional step (ppt) would behave the same regardless of how the workspace is split.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed without change: the feature already existed.
+
+The request was direct resize bindings on $mod+minus and $mod+plus, because
+resizing meant entering a mode. Investigating turned up two things. The
+requested keys are the scratchpad's, which is wanted and stays. And the resize
+mode is stock sway, already present in config.d/51-modes.conf on $mod+r, and on
+trying it, it does the job.
+
+So there was nothing to build. What the ticket actually surfaced was that the
+mode was hard to discover - it took writing a ticket about resizing to find out
+the machine already resized. That is worth fixing, but it is a discoverability
+problem rather than a keybinding one, and it belongs with tools/shortcuts.sh and
+the bar's mode indicator rather than here.
+<!-- SECTION:FINAL_SUMMARY:END -->

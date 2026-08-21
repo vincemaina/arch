@@ -133,6 +133,7 @@ window#waybar > box {
 #battery,
 #clock,
 #mpris,
+#scratchpad,
 #network {
     background: transparent;
     /* Enough to keep the hover pill off its own text, and no more. The gap
@@ -157,6 +158,21 @@ window#waybar > box {
 #pulseaudio     { color: @ok;        text-shadow: 0 0 5px @ok; }
 #battery        { color: @ok;        text-shadow: 0 0 5px @ok; }
 #network        { color: @muted;     text-shadow: 0 0 5px @muted; }
+
+/* The scratchpad, in the warning colour rather than a quiet one.
+ *
+ * It is hidden whenever the scratchpad is empty, which is nearly always, so it
+ * is not competing for attention the rest of the time - it can afford to be
+ * seen when it does appear, and being seen is the entire point of a readout
+ * about windows you have hidden.
+ *
+ * `warning` is also the only palette role that means what this means: attention,
+ * nothing wrong yet. And it is the legible choice - measured across all eight
+ * themes it sits between 8.6:1 and 13.4:1 against the background, where
+ * `tertiary`, the obvious pick since the workspace discs use it, falls to
+ * 2.04:1 in mono. Tertiary is a fill colour with light text on top of it, not
+ * a text colour. */
+#scratchpad     { color: @warning;   text-shadow: 0 0 5px @warning; }
 
 /* The centre. The clock took the space the focused window's title used to
  * have, and with it the job of being the one bright thing in the middle of the
@@ -195,6 +211,7 @@ window#waybar > box {
 #battery:hover,
 #clock:hover,
 #mpris:hover,
+#scratchpad:hover,
 #network:hover {
     color: @bg;
     /* The glow goes on hover. Dark text on a bright pill does not want a halo
@@ -209,6 +226,7 @@ window#waybar > box {
 #pulseaudio:hover     { background: @ok; }
 #battery:hover        { background: @ok; }
 #clock:hover          { background: @accent; }
+#scratchpad:hover     { background: @warning; }
 #mpris:hover          { background: @secondary; }
 #network:hover        { background: @surface_alt; color: @text; }
 

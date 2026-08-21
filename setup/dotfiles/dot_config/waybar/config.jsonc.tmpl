@@ -45,7 +45,7 @@
     "position": "top",
     "spacing": 4,
 
-    "modules-left": ["sway/workspaces", "sway/mode"],
+    "modules-left": ["sway/workspaces", "sway/mode", "sway/scratchpad"],
     "modules-center": ["clock", "mpris"],
     "modules-right": ["idle_inhibitor", "network", "cpu", "memory", "pulseaudio", "battery"],
 
@@ -56,6 +56,27 @@
 
     "sway/mode": {
         "format": "{}"
+    },
+    // What is in the scratchpad, which is the one thing about it you cannot
+    // otherwise see. A window put there is hidden by definition, so "how many
+    // have I stashed" has no answer anywhere else on screen.
+    //
+    // It was removed once, in d1c9c08, on the reasoning that it "reports state
+    // that is already obvious". That was right about the idle inhibitor, which
+    // was cut in the same breath and does show its own state, and wrong about
+    // this one for exactly the reason above. Restored rather than re-argued.
+    //
+    // show-empty defaults to false, so this is invisible until something is in
+    // there - which is most of the time, and is why it can afford the warning
+    // colour when it does appear.
+    //
+    // The icon is a \u escape, not a pasted glyph. U+F2D2 is window-restore,
+    // checked against the font's charset rather than assumed present: a missing
+    // glyph renders as an empty box, which looks configured and says nothing.
+    "sway/scratchpad": {
+        "format": "\uf2d2 {count}",
+        "tooltip-format": "{app}: {title}",
+        "on-click": "swaymsg scratchpad show"
     },
 
     // Click to stop the screen locking or sleeping - for watching something,

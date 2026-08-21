@@ -4,7 +4,7 @@ title: sway segfaulted in llvmpipe while creating a client buffer
 status: To Do
 assignee: []
 created_date: '2026-08-20 22:36'
-updated_date: '2026-08-20 22:37'
+updated_date: '2026-08-21 10:59'
 labels:
   - foundation
   - performance
@@ -40,3 +40,21 @@ Worth deciding whether anything is worth doing inside the guest in the meantime.
 - [ ] #3 Whether anything proportionate can be done inside the guest is decided, and concluding that nothing is counts as completing this
 - [ ] #4 The outcome is recorded alongside the existing software-rendering entry in DECISIONS.md, since it is the same root cause rather than a separate finding
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Checked 2026-08-21 11:58. No recurrence.
+
+coredumpctl list /usr/bin/sway still shows exactly one entry, the original at
+2026-08-20 23:30:11. The 17 journal lines matching segfault or core dump since
+then are all systemd socket noise - "Listening on Process Core Dump Socket" and
+its Closed counterpart - and none is a crash.
+
+Two boots have happened since, covering roughly ten hours of session time: boot
+-1 from 01:37 to 10:57, and the current one from 10:57. Both ended by a clean
+shutdown rather than a fault.
+
+Leaving open until the end of the day as agreed, since a crash seen once in
+several days is not disproved by ten hours.
+<!-- SECTION:NOTES:END -->
