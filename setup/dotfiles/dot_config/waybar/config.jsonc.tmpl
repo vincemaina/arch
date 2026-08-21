@@ -79,13 +79,23 @@
         "on-click": "swaymsg scratchpad show"
     },
 
-    // Click to stop the screen locking or sleeping - for watching something,
-    // or during a long build that should not be interrupted.
+    // Caffeine: keep the screen awake. Click to stop it locking or sleeping -
+    // for watching something, or during a long build.
+    //
+    // The module type has to be idle_inhibitor because that is what waybar
+    // calls it, but everything a person sees says caffeinated. The name is the
+    // useful metaphor: this is not "inhibiting an idle timer", it is "do not
+    // let the machine nod off".
+    //
+    // One glyph for both states, by codepoint - U+F0F4, a coffee cup, checked
+    // against the font's charset rather than pasted. Colour carries the state
+    // the way it does everywhere else on this bar: muted when off, warning
+    // when on, since a machine deliberately kept awake is exactly "attention,
+    // nothing wrong yet".
     "idle_inhibitor": {
-        "format": "{icon}",
-        "format-icons": { "activated": "", "deactivated": "" },
-        "tooltip-format-activated": "Idle inhibited: the screen will not lock",
-        "tooltip-format-deactivated": "Idle and locking as normal"
+        "format": "\uf0f4",
+        "tooltip-format-activated": "Caffeinated: the screen will not lock or sleep",
+        "tooltip-format-deactivated": "Not caffeinated: locking and sleeping as normal"
     },
 
     "cpu": {
