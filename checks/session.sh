@@ -807,6 +807,27 @@ io.write(table.concat(out, ", "))' -c quit 2>/dev/null)"
 fi
 
 # ----------------------------------------------------------------------
+section "Shortcut reference (TASK-68)"
+
+# The point of deriving the list rather than writing one is that it cannot go
+# stale. That only holds if each source still yields anything - a parser that
+# silently returns nothing looks exactly like a context with no shortcuts.
+if [[ ! -x "$HOME/.local/bin/shortcuts" ]]; then
+    fail "the shortcuts helper is not installed"
+else
+    empty_contexts=""
+    for context in sway nvim yazi desktop; do
+        count="$(timeout 40 "$HOME/.local/bin/shortcuts" --mode "$context" 2>/dev/null | grep -c . || true)"
+        [[ "${count:-0}" -lt 3 ]] && empty_contexts+="$context "
+    done
+    if [[ -n "$empty_contexts" ]]; then
+        fail "these contexts list nothing, so their parser has stopped working: $empty_contexts"
+    else
+        pass "every shortcut context lists bindings derived from live config"
+    fi
+fi
+
+# ----------------------------------------------------------------------
 section "Desktop entries"
 
 # A desktop entry whose Exec cannot be resolved fails silently: Terminal=false

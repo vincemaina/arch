@@ -1,0 +1,14 @@
+# Absolute Exec for the reason every other entry here has one: ~/.local/bin is
+# not on the PATH sway hands to what it spawns.
+
+[Desktop Entry]
+Type=Application
+Name=Shortcuts
+GenericName=Keyboard reference
+Comment=Every keyboard shortcut, grouped by where it applies
+Icon=preferences-desktop-keyboard-shortcuts
+Exec={{ .chezmoi.homeDir }}/.local/bin/shortcuts
+Terminal=false
+Categories=Utility;Documentation;
+Keywords=shortcut;shortcuts;keys;keyboard;binding;bindings;help;cheatsheet;
+NoDisplay=false

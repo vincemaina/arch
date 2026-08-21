@@ -1,0 +1,109 @@
+{{- $palette := index .themes .theme -}}
+/* The shortcuts viewer.
+ *
+ * A separate theme from the launcher because it is a different job: the
+ * launcher is a prompt you type into and dismiss in under a second, this is a
+ * reference you read. So it is wider, taller, uses a monospaced key column, and
+ * shows the available contexts along the bottom rather than hiding them.
+ *
+ * Colours from the selected theme in .chezmoidata/themes.toml. Edit them there.
+ */
+
+* {
+    background-color: transparent;
+    text-color:       {{ $palette.text }};
+    font:             "JetBrainsMono Nerd Font 11";
+}
+
+window {
+    /* Wide enough for a key column and a sentence, tall enough to read a
+     * context without scrolling. Fixed rather than proportional: a reference
+     * that changes size with its content is harder to scan the second time. */
+    width:            900px;
+    height:           620px;
+    border-radius:    14px;
+    background-color: {{ $palette.bg }};
+    border:           1px;
+    border-color:     {{ $palette.surface_alt }};
+    padding:          0;
+}
+
+mainbox {
+    children: [ inputbar, listview, mode-switcher ];
+    padding:  0;
+    spacing:  0;
+}
+
+/* The search field, sized like something you type into rather than a label. */
+inputbar {
+    padding:          18px 22px;
+    spacing:          12px;
+    background-color: {{ $palette.surface }};
+    children:         [ prompt, entry ];
+}
+
+prompt {
+    text-color: {{ $palette.accent }};
+    font:       "JetBrainsMono Nerd Font Bold 11";
+}
+
+entry {
+    placeholder:       "Filter shortcuts";
+    placeholder-color: {{ $palette.muted }};
+    text-color:        {{ $palette.text }};
+}
+
+listview {
+    padding:      10px 10px;
+    spacing:      2px;
+    scrollbar:    false;
+    dynamic:      true;
+    fixed-height: true;
+}
+
+/* Rows are not selectable - this is a reference, not a menu - so there is no
+ * selection colour to design. Hovering still highlights, which is enough to
+ * keep your place while reading down the list. */
+element {
+    padding:       7px 12px;
+    border-radius: 8px;
+}
+
+element normal.normal,
+element alternate.normal {
+    text-color:       {{ $palette.text }};
+    background-color: transparent;
+}
+
+element selected.normal,
+element normal.active,
+element selected.active {
+    text-color:       {{ $palette.text }};
+    background-color: {{ $palette.surface }};
+}
+
+element-text {
+    text-color: inherit;
+    highlight:  bold {{ $palette.accent }};
+}
+
+/* The contexts, along the bottom. This is the part that makes the thing
+ * discoverable: what else exists is on screen rather than something you have to
+ * already know to press Shift+Right for. */
+mode-switcher {
+    padding:          10px 12px;
+    spacing:          8px;
+    background-color: {{ $palette.surface }};
+}
+
+button {
+    padding:          7px 16px;
+    border-radius:    8px;
+    text-color:       {{ $palette.muted }};
+    background-color: transparent;
+}
+
+button selected {
+    text-color:       {{ $palette.bg }};
+    background-color: {{ $palette.accent }};
+}

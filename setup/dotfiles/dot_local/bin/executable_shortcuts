@@ -1,0 +1,409 @@
+#!/usr/bin/env python3
+# requires: rofi swaymsg nvim yazi
+
+"""Every keyboard shortcut on this desktop, grouped by where it applies.
+
+    shortcuts                 open it, on the tab matching the focused window
+    shortcuts --mode sway     print one context (this is how rofi calls it)
+    shortcuts --list          every context, to a terminal
+
+Bound to $mod+? and available from the launcher.
+
+WHY IT OPENS ON THE RIGHT TAB
+
+Because the question is almost never "what are all the shortcuts" - it is
+"what can I do *here*", asked while looking at the thing. So it reads the
+focused window's app_id from sway and opens on that context. Tab through the
+rest with Shift+Right, which is rofi's own binding rather than one invented
+here.
+
+WHY IT DERIVES EVERYTHING RATHER THAN LISTING IT
+
+A hand-written list is wrong the first time someone changes a binding and
+forgets to update it, and there is no way to notice. tools/shortcuts.sh made
+the same argument and made the same choice; this is its in-session
+counterpart, because tools/ never reaches the built machine.
+
+So sway's bindings are parsed from the config sway actually loads, and
+neovim's are asked of neovim. The descriptions come from the same place: the
+`desc` on a keymap, which checks/session.sh already requires every mapping to
+have. Writing the description is what puts a binding in this list.
+"""
+
+import json
+import os
+import pathlib
+import re
+import subprocess
+import sys
+
+HOME = pathlib.Path.home()
+CACHE = HOME / ".cache" / "shortcuts"
+
+# app_id -> context. The launcher opens on the context matching whatever is
+# focused, so a window not listed here simply opens on the desktop tab.
+APP_CONTEXT = {
+    "foot": "desktop",
+    "explorer": "yazi",
+    "xdg-terminal": "desktop",
+    "org.qutebrowser.qutebrowser": "qutebrowser",
+    "monitor": "desktop",
+    "calendar": "desktop",
+}
+
+
+def sway_msg(kind):
+    try:
+        out = subprocess.run(["swaymsg", "-t", kind, "--raw"],
+                             capture_output=True, text=True, timeout=5).stdout
+        return json.loads(out)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+# ---------------------------------------------------------------------------
+# sway
+# ---------------------------------------------------------------------------
+
+def sway_shortcuts():
+    """Parsed from the config sway loads, with `set $var` expanded.
+
+    DESCRIBED BY THE COMMAND, NOT BY THE COMMENT ABOVE IT.
+
+    Using the preceding comment was the obvious approach and it produced
+    nonsense: this config explains its reasoning in paragraphs, so the line
+    immediately above a binding is the end of an argument rather than a label.
+    `$mod+q` came out as "not frequent and are worth being slightly awkward".
+
+    The command is the one thing that cannot drift from what the key does,
+    because it IS what the key does. A trailing `# comment` on the bindsym line
+    overrides it, for the few whose command says nothing useful.
+    """
+    config_dir = HOME / ".config" / "sway"
+    files = [config_dir / "config"] + sorted((config_dir / "config.d").glob("*.conf"))
+
+    text = ""
+    for f in files:
+        try:
+            text += f.read_text() + "\n"
+        except OSError:
+            continue
+
+    variables = dict(re.findall(r"^\s*set\s+(\$\w+)\s+(.*)$", text, re.M))
+
+    def expand(value):
+        # Repeatedly, because variables refer to variables - $explorer is built
+        # from foot, and $term from the terminal helper.
+        for _ in range(5):
+            for name, replacement in variables.items():
+                value = value.replace(name, replacement)
+        return value
+
+    # Commands whose plain text is not a description. Everything else falls
+    # through to a light tidy-up, which is usually enough: "focus left" and
+    # "fullscreen" already say what they do.
+    PHRASES = [
+        (r"^kill$", "Close the focused window"),
+        (r"^reload$", "Reload the sway config"),
+        (r"^fullscreen$", "Fullscreen the focused window"),
+        (r"^focus mode_toggle$", "Switch between the tiled and floating layers"),
+        (r"^focus parent$", "Select the container holding this window"),
+        (r"^focus (\w+)$", lambda m: f"Focus {m.group(1)}"),
+        (r"^move (\w+)$", lambda m: f"Move the window {m.group(1)}"),
+        (r"^workspace number (\d+)$", lambda m: f"Go to workspace {m.group(1)}"),
+        (r"^move container to workspace number (\d+)$",
+         lambda m: f"Send the window to workspace {m.group(1)}"),
+        (r"^workspace prev_on_output$", "Previous workspace"),
+        (r"^workspace next_on_output$", "Next workspace"),
+        (r"^workspace back_and_forth$", "Back to the last workspace"),
+        (r"^scratchpad show$", "Show the scratchpad"),
+        (r"^move scratchpad$", "Hide the window in the scratchpad"),
+        (r"^layout toggle split tabbed$", "Toggle tabbed layout"),
+        (r'^mode "default"$', "Leave this mode"),
+        (r'^mode "(\w+)"$', lambda m: f"Enter {m.group(1)} mode"),
+        (r"^resize (\w+) (\w+) .*$", lambda m: f"{m.group(1).title()} {m.group(2)}"),
+        (r"^splith?$", "Split horizontally"),
+        (r"^splitv$", "Split vertically"),
+    ]
+
+    def describe(command):
+        for pattern, replacement in PHRASES:
+            m = re.match(pattern, command)
+            if m:
+                return replacement(m) if callable(replacement) else replacement
+        if command.startswith("exec "):
+            rest = command[5:].strip()
+            # A helper of ours describes itself better by name than by path.
+            first = rest.split()[0]
+            if "/" in first:
+                first = os.path.basename(first)
+            args = rest.split(maxsplit=1)
+            if first == "swaynag":
+                return "Exit sway (asks first)"
+            if len(args) > 1 and not args[1].startswith("-"):
+                return f"{first} {args[1]}"[:56]
+            return first
+        return command[:56]
+
+    entries = []
+    for raw in text.split("\n"):
+        line = raw.strip()
+        m = re.match(r"^bindsym(?:\s+--[\w-]+)*\s+(\S+)\s+(.*)$", line)
+        if not m:
+            continue
+        keys, command = m.groups()
+        # A trailing comment wins, for the few commands that say nothing.
+        override = None
+        if " #" in command:
+            command, override = command.split(" #", 1)
+            override = override.strip()
+        command = expand(command.strip())
+        entries.append((expand(keys), override or describe(command)))
+
+    entries.sort(key=lambda e: e[0])
+    return entries
+
+
+# ---------------------------------------------------------------------------
+# neovim
+# ---------------------------------------------------------------------------
+
+def nvim_shortcuts():
+    """Asked of neovim rather than parsed out of its config.
+
+    Cached against init.lua's modification time, because starting neovim costs
+    more than everything else here put together and the answer only changes
+    when the config does.
+    """
+    init = HOME / ".config" / "nvim" / "init.lua"
+    try:
+        stamp = str(int(init.stat().st_mtime))
+    except OSError:
+        return []
+
+    cache_file = CACHE / f"nvim-{stamp}.json"
+    if cache_file.exists():
+        try:
+            return [tuple(x) for x in json.loads(cache_file.read_text())]
+        except ValueError:
+            pass
+
+    lua = '''
+local out = {}
+for _, mode in ipairs({ "n", "i", "v", "x", "o", "t" }) do
+  for _, m in ipairs(vim.api.nvim_get_keymap(mode)) do
+    if not m.lhs:match("^<Plug>") and m.desc and m.desc ~= "" then
+      out[#out+1] = { mode = mode, lhs = m.lhs, desc = m.desc }
+    end
+  end
+end
+io.write(vim.json.encode(out))
+'''
+    try:
+        res = subprocess.run(["nvim", "--headless", "-c", "lua " + lua, "-c", "quit"],
+                             capture_output=True, text=True, timeout=25)
+        data = json.loads(res.stdout or "[]")
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return []
+
+    # One line per key, collapsing the modes a mapping exists in.
+    merged = {}
+    for item in data:
+        key = (item["lhs"], item["desc"])
+        merged.setdefault(key, []).append(item["mode"])
+    entries = []
+    for (lhs, desc), modes in merged.items():
+        suffix = "" if modes == ["n"] else "  [" + "".join(sorted(modes)) + "]"
+        entries.append((lhs + suffix, desc))
+    entries.sort(key=lambda e: e[0].lower())
+
+    CACHE.mkdir(parents=True, exist_ok=True)
+    for old in CACHE.glob("nvim-*.json"):
+        old.unlink(missing_ok=True)
+    cache_file.write_text(json.dumps(entries))
+    return entries
+
+
+# ---------------------------------------------------------------------------
+# yazi
+# ---------------------------------------------------------------------------
+
+def yazi_shortcuts():
+    """Ours from keymap.toml, and yazi's own out of the binary.
+
+    yazi compiles its defaults in rather than shipping a file, so they are
+    extracted from the executable - which is how the T-is-unbound question was
+    answered when that binding was chosen.
+    """
+    entries = []
+    keymap = HOME / ".config" / "yazi" / "keymap.toml"
+    try:
+        import tomllib
+        with open(keymap, "rb") as fh:
+            for item in tomllib.load(fh).get("mgr", {}).get("prepend_keymap", []):
+                entries.append((item.get("on", "?"), item.get("desc", "")))
+    except (OSError, ValueError, ImportError):
+        pass
+
+    try:
+        blob = subprocess.run(["strings", "-n", "8", "/usr/bin/yazi"],
+                              capture_output=True, text=True, timeout=20).stdout
+        seen = set()
+        for on, run in re.findall(r'\{ on = "([^"]+)", run = "([^"]+)"', blob):
+            if on in seen:
+                continue
+            seen.add(on)
+            entries.append((on, run))
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return entries
+
+
+# ---------------------------------------------------------------------------
+# The desktop's own surfaces
+# ---------------------------------------------------------------------------
+
+def desktop_shortcuts():
+    """Things that are not keyboard shortcuts but are the same question.
+
+    Read from the bar's config, so clicking a module is discoverable in the
+    same place as pressing a key - which is where anyone would look for it.
+    """
+    entries = []
+    config = HOME / ".config" / "waybar" / "config.jsonc"
+    try:
+        raw = config.read_text()
+        data = json.loads(re.sub(r"^\s*//.*$", "", raw, flags=re.M))
+    except (OSError, ValueError):
+        return entries
+
+    pretty = {"on-click": "click", "on-click-right": "right click",
+              "on-click-middle": "middle click",
+              "on-scroll-up": "scroll up", "on-scroll-down": "scroll down"}
+    for name, body in data.items():
+        if not isinstance(body, dict):
+            continue
+        for key, command in body.items():
+            if key in pretty:
+                label = name.replace("sway/", "").replace("_", " ")
+                target = os.path.basename(str(command).split()[0])
+                entries.append((f"bar: {label} · {pretty[key]}", target))
+    entries.sort()
+    return entries
+
+
+CONTEXTS = {
+    "sway": ("Desktop keys", sway_shortcuts),
+    "nvim": ("Neovim", nvim_shortcuts),
+    "yazi": ("Files (yazi)", yazi_shortcuts),
+    "desktop": ("The bar", desktop_shortcuts),
+}
+
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+
+def emit(entries):
+    """rofi script mode: one row per line, metadata after a NUL.
+
+    Written from python rather than a shell, because a shell variable cannot
+    hold a NUL byte - which is exactly how the notification centre's icons
+    ended up rendering as literal escape text.
+    """
+    width = max((len(k) for k, _ in entries), default=0)
+    for keys, desc in entries:
+        row = f"{keys.ljust(width)}   {desc}"
+        sys.stdout.write(row + "\0nonselectable\x1ftrue\n")
+
+
+def running_in(pid, wanted, depth=0):
+    """Is one of `wanted` running inside this window?
+
+    Asked of the process tree rather than of the window title. The obvious
+    approach - matching the title - does not work: a foot window running neovim
+    reports its title as "foot", because nothing sets it. The process running
+    inside the terminal is the thing that actually answers "what am I looking
+    at", and it cannot be wrong.
+    """
+    if depth > 4:
+        return None
+    try:
+        comm = pathlib.Path(f"/proc/{pid}/comm").read_text().strip()
+    except OSError:
+        return None
+    if comm in wanted:
+        return wanted[comm]
+    try:
+        children = subprocess.run(["pgrep", "-P", str(pid)],
+                                  capture_output=True, text=True, timeout=3).stdout.split()
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for child in children:
+        found = running_in(child, wanted, depth + 1)
+        if found:
+            return found
+    return None
+
+
+# What is running inside a terminal decides the context, not the terminal.
+BY_PROCESS = {"nvim": "nvim", "yazi": "yazi"}
+
+
+def focused_context():
+    tree = sway_msg("get_tree")
+    if not tree:
+        return "sway"
+
+    def walk(node):
+        yield node
+        for key in ("nodes", "floating_nodes"):
+            for child in node.get(key, []):
+                yield from walk(child)
+
+    for node in walk(tree):
+        if node.get("focused"):
+            by_process = running_in(node.get("pid"), BY_PROCESS) if node.get("pid") else None
+            if by_process:
+                return by_process
+            return APP_CONTEXT.get(node.get("app_id") or "", "sway")
+    return "sway"
+
+
+def main():
+    args = sys.argv[1:]
+
+    if args[:1] == ["--mode"]:
+        name = args[1] if len(args) > 1 else "sway"
+        _, fetch = CONTEXTS.get(name, CONTEXTS["sway"])
+        emit(fetch())
+        return
+
+    if args[:1] == ["--list"]:
+        for name, (title, fetch) in CONTEXTS.items():
+            print(f"\n== {title} ==")
+            for keys, desc in fetch():
+                print(f"  {keys:<24} {desc}")
+        return
+
+    # Absolute path: rofi runs these as child processes and the session PATH
+    # does not include ~/.local/bin, the trap this desktop has met three times.
+    me = str(pathlib.Path(__file__).resolve())
+    modi = ",".join(f"{title}:{me} --mode {name}"
+                    for name, (title, _) in CONTEXTS.items())
+    opening = CONTEXTS[focused_context()][0]
+
+    os.execvp("rofi", [
+        "rofi",
+        "-modi", modi,
+        "-show", opening,
+        # The tabs. sidebar-mode draws every context along the bottom, so what
+        # else is available is visible rather than something to know about.
+        "-sidebar-mode",
+        "-no-custom",
+        "-theme", "shortcuts",
+    ])
+
+
+if __name__ == "__main__":
+    main()

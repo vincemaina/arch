@@ -1,9 +1,11 @@
 ---
 id: TASK-68
 title: add helper + shortcuts tool in rofi
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-21 10:56'
+updated_date: '2026-08-21 16:41'
 labels: []
 dependencies: []
 priority: low
