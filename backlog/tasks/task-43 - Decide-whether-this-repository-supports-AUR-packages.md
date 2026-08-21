@@ -1,16 +1,16 @@
 ---
 id: TASK-43
 title: Decide whether this repository supports AUR packages
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-20 17:39'
-updated_date: '2026-08-21 14:22'
+updated_date: '2026-08-21 14:50'
 labels:
   - repo
   - foundation
 dependencies:
   - TASK-31
-priority: high
+priority: low
 type: spike
 ordinal: 41000
 ---
@@ -61,3 +61,47 @@ Worth noting the fallback if the answer is no: a tracked list of npm packages,
 which keeps them declared at the cost of more machinery. That is not an argument
 for saying yes, but it means a no is not a dead end.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Decided: no AUR support, for now, and "for now" is stated rather than implied.
+
+Nothing currently wanted needs it. The three tools that prompted this ticket
+were sway-systemd, powerlevel10k and swayfx, and swayfx was the live one -
+rejected here on its merits rather than on the cost of the AUR: it buys
+shadows, blur and rounded corners at the cost of GPU work, and vanilla sway
+already looks the way it should after the theming work. That is a judgement
+about the feature, so the AUR machinery has nothing left to justify it.
+
+The neovim gap, which was the other thing gating this, is closed a different
+way. The servers missing from the official repositories - html, css, json,
+emmet - are npm packages, and the AUR PKGBUILDs are wrappers around npm
+install. So npm directly, from a list tracked in this repository, keeps them
+declared and reproducible without a helper to bootstrap, makepkg under runuser
+inside the chroot, or teaching sync.sh which manifest entries pacman -T cannot
+see. See TASK-84.
+
+The data that made that easy: the AUR packages this repository would have
+needed are its weakest. vscode-langservers-extracted has 4 votes, popularity
+0.00 and was last touched in May 2024. sqls is flagged out of date.
+tree-sitter-sql has zero votes. Popularity 0.00 means nobody else installs
+them either, so nobody else notices when they break. By contrast the packages
+that motivated the ticket are healthy - swayfx has 46 votes and was updated
+ten days ago - which is what makes this a judgement about swayfx rather than
+about the AUR.
+
+WHAT WOULD REOPEN THIS
+
+A tool that is genuinely wanted, actively maintained, and AUR-only. niri is
+the likely route instead, and it is in extra at 24.87 MiB rather than in the
+AUR - worth exploring for the workflow rather than for the effects, and not
+now. That exploration belongs on TASK-31.
+
+The costs catalogued in the description above remain accurate and are the
+reason this stays a no rather than a shrug: bootstrapping a helper that is
+itself an AUR package, makepkg refusing to run as root while stages 03-05 do,
+sync.sh's pacman -T reporting AUR entries missing on every run, slow builds
+that can fail an otherwise fine install, and PKGBUILDs being mutable
+user-submitted code executed at build time.
+<!-- SECTION:FINAL_SUMMARY:END -->

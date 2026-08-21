@@ -4,7 +4,7 @@ title: 'Decide whether to move from sway to SwayFX, or elsewhere'
 status: To Do
 assignee: []
 created_date: '2026-08-20 12:52'
-updated_date: '2026-08-20 16:13'
+updated_date: '2026-08-21 14:50'
 labels:
   - desktop
   - foundation
@@ -55,4 +55,20 @@ How the candidates answer them. niri: per-monitor workspaces, so no spanning, bu
 The decision this reduces to: whether spanning workspaces or the quality of tiling and overview matters more. They cannot both be maximised. Note that with one display today, the spanning question is unfalsifiable in daily use, which argues for judging on tiling and overview now and revisiting spanning when a second screen exists.
 
 Sources are recorded in the DECISIONS.md entry "Workspaces stay per-output, as sway does them".
+
+Two inputs from the TASK-43 discussion, both narrowing this considerably.
+
+swayfx is not wanted. It buys shadows, blur and rounded corners - the effects
+sway genuinely cannot do - at the cost of GPU work, and the judgement was that
+vanilla sway already looks right after the theming work. So the
+sway-with-effects option is off the table, and with it the main reason this
+repository would have needed the AUR.
+
+niri is worth exploring, but for the workflow rather than the appearance, and
+not urgently. It is in extra at 24.87 MiB, so unlike swayfx it costs no
+packaging machinery at all - it could be installed alongside and tried from the
+greeter's session list without disturbing the sway setup.
+
+That reframes this ticket: it is no longer "sway, SwayFX or elsewhere" but
+"stay with sway, or try niri's scrollable-tiling workflow at some point".
 <!-- SECTION:NOTES:END -->
