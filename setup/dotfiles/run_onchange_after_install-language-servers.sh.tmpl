@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Install the language servers that exist only as npm packages.
+#
+# html, css, json and emmet have no server in the official Arch repositories.
+# The AUR has them and TASK-43 decided against the AUR, partly on its costs and
+# partly because those particular packages are among the least maintained things
+# in it - vscode-langservers-extracted has four votes and was last updated in May
+# 2024, and its PKGBUILD is a wrapper around `npm install`. Going through npm
+# removes a layer rather than adding one.
+#
+# WHY THIS IS AS REPRODUCIBLE AS packages/
+#
+# package.json says what is wanted and package-lock.json pins exactly what gets
+# installed, down to transitive dependencies and their hashes. Both are tracked.
+# `npm ci` installs strictly from the lockfile and fails rather than resolving
+# something newer, which is the difference between it and `npm install` and the
+# whole reason it is used here.
+#
+# That is a stronger guarantee than the AUR would have given: a PKGBUILD is
+# mutable and fetches whatever the upstream tag points at today.
+#
+# WHERE THINGS LAND
+#
+# ~/.local/lib/language-servers/node_modules, with the executables in that
+# directory's .bin. Deliberately NOT a global `npm install -g`, which needs root
+# and writes into /usr/lib/node_modules where nothing in this repository can see
+# it - the same objection that ruled out Mason.
+#
+# Nothing is added to PATH for this. The editor names the binaries by absolute
+# path, which is the habit the desktop entries and the bar's click commands
+# already had to learn: ~/.local/bin is not on the session PATH and there is no
+# reason to make this depend on that being fixed.
+#
+# WHAT MAKES IT RE-RUN
+#
+# run_onchange_ re-runs a script when the rendered script changes, and a change
+# to package.json does not change this file - so the hash below is what connects
+# them. It reads like a comment and is load-bearing: without it, adding a server
+# to the list would never install it.
+#
+# package.json: {{ include "dot_local/lib/language-servers/package.json" | sha256sum }}
+
+SERVERS="$HOME/.local/lib/language-servers"
+
+if ! command -v npm >/dev/null; then
+    echo "    npm is not installed, so the html, css, json and emmet servers" >&2
+    echo "    cannot be installed. It is declared in packages/dev.txt - run ./sync.sh." >&2
+    exit 0
+fi
+
+if [[ ! -f "$SERVERS/package-lock.json" ]]; then
+    echo "    $SERVERS/package-lock.json is missing, so there is nothing to install" >&2
+    echo "    from. Generate it with 'npm install' there and commit it." >&2
+    exit 0
+fi
+
+echo "    Installing language servers from the lockfile"
+
+# --prefix rather than cd, so a failure cannot leave this script somewhere
+# unexpected. --no-audit and --no-fund because this is not an application and
+# the advisory output is noise on every sync.
+npm ci --prefix "$SERVERS" --no-audit --no-fund >/dev/null
+
+echo "    $(ls "$SERVERS/node_modules/.bin" 2>/dev/null | wc -l) server executables installed"

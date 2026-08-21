@@ -1,10 +1,11 @@
 ---
 id: TASK-84
 title: 'The language servers that are not packaged: html, css, json, emmet, sql'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-21 14:22'
-updated_date: '2026-08-21 14:51'
+updated_date: '2026-08-21 15:02'
 labels:
   - dev
   - dotfiles

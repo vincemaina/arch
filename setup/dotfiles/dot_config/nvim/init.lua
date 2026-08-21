@@ -12,7 +12,7 @@
 --
 -- WHAT IS DELIBERATELY NOT HERE
 --
--- Language servers, formatting and linting are TASK-81. The colourscheme is
+-- Formatting and linting, and the servers that come from pacman, are TASK-81. The colourscheme is
 -- TASK-82, so until then this uses the default and looks like nothing else on
 -- the desktop. Running SQL is TASK-83. Keeping those separate is what stops
 -- this file becoming a distribution nobody understands.
@@ -204,3 +204,13 @@ vim.api.nvim_create_autocmd('FileType', {
   end,
   desc = 'Enable treesitter wherever a parser is actually installed',
 })
+
+-- ---------------------------------------------------------------------------
+-- Language servers
+-- ---------------------------------------------------------------------------
+--
+-- In their own module because there will be more of them: this covers the ones
+-- that come from npm (TASK-84), and the packaged ones are TASK-81. Keeping the
+-- list somewhere other than this file is what stops init.lua turning into the
+-- distribution this was meant not to be.
+require('lsp').setup()

@@ -28,6 +28,21 @@ neovim
 tree-sitter-python
 tree-sitter-javascript
 tree-sitter-bash
+
+# Node, for the language servers that exist only as npm packages.
+#
+# html, css, json and emmet have no server in the official repositories. The AUR
+# has them, and TASK-43 decided against the AUR - partly on its costs, partly
+# because those particular packages are among the least maintained things in it:
+# vscode-langservers-extracted has four votes and was last touched in May 2024,
+# and its PKGBUILD is a wrapper around `npm install`.
+#
+# So npm directly, which removes a layer rather than adding one. What is
+# installed is pinned by a lockfile tracked in this repository - see
+# dot_local/lib/language-servers/ - so it is as reproducible as a package
+# manifest and visible in exactly the same way.
+nodejs
+npm
 ripgrep
 fd
 fzf

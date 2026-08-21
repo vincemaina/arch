@@ -1,0 +1,10 @@
+{
+  "name": "arch-language-servers",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Language servers that exist only as npm packages. Installed by run_onchange_after_install-language-servers.sh; pinned by package-lock.json, which is tracked.",
+  "dependencies": {
+    "vscode-langservers-extracted": "4.10.0",
+    "@olrtg/emmet-language-server": "2.8.0"
+  }
+}
