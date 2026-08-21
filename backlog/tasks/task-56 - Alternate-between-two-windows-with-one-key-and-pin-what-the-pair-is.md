@@ -4,11 +4,13 @@ title: 'Alternate between two windows with one key, and pin what the pair is'
 status: To Do
 assignee: []
 created_date: '2026-08-21 10:20'
+updated_date: '2026-08-21 11:18'
 labels:
   - desktop
   - feel
 dependencies:
-  - TASK-19
+  - TASK-70
+priority: low
 ordinal: 54000
 ---
 
@@ -47,3 +49,36 @@ How pinning is invoked and how you can tell something is pinned both need answer
 - [ ] #6 Whether taking Ctrl+Tab globally is acceptable is decided, given applications bind it themselves
 - [ ] #7 Whether something is pinned is visible without pressing anything
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Parked before implementation. A daemon of its own is not worth it for this at
+this stage, and the general question of whether these behaviours should share
+one is now TASK-70, which this depends on.
+
+Two things were established first, so they are not re-derived:
+
+SWAY CANNOT DO THIS ITSELF. It has focus prev|next, which walks the tree in
+order rather than in focus history; focus mode_toggle, which switches between
+tiling and floating; and workspace back_and_forth, which is exactly this feature
+at the workspace level and has no window equivalent. Confirmed against sway(5).
+So the history has to be kept outside sway by something subscribed to
+window::focus, and that is the only way to build it.
+
+CTRL+TAB IS THE WRONG KEY, AND AC #6 IS ANSWERABLE NOW. qutebrowser binds
+<Ctrl-Tab> by default to `tab-focus last` - literally this same gesture one
+level down, alternating between the last two tabs. A sway binding is global and
+there is no per-application exclusion, so taking Ctrl+Tab would break the
+browser's equivalent feature to provide it for windows. Verified in
+qutebrowser's configdata.yml rather than assumed.
+
+$mod+Tab is free, is the conventional binding for this in sway and i3, and was
+vacated recently: TASK-19 moved workspace back-and-forth from $mod+Tab to
+$mod+Ctrl+j. It also fits the model that modifier carries meaning here - bare
+$mod for windows, $mod+Ctrl for workspaces - so window alternation on $mod+Tab
+sits beside workspace alternation on $mod+Ctrl+j rather than against it.
+
+So when this is picked up, it is $mod+Tab, not Ctrl+Tab, and AC #6 is already
+answered.
+<!-- SECTION:NOTES:END -->
