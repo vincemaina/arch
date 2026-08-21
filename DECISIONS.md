@@ -193,15 +193,17 @@ is markedly worse. Nothing stops one being added later: zram is given
 zram consumes real memory to provide swap, so it is not free capacity — it trades
 CPU for effective memory. It also cannot support hibernation.
 
-### This entry is incomplete, and was measured to be
+### zswap is turned off, so this entry describes what actually happens
 
-Everything above is applied correctly and is almost entirely inert, which
-TASK-66 found by measuring rather than by reading the configuration.
+Everything above was applied correctly and was almost entirely inert until
+TASK-89, and it took measuring to notice.
 
-The Arch kernel ships `CONFIG_ZSWAP_DEFAULT_ON=y`, and nothing in `setup/` turns
-it off. So **zswap** sits in front of the swap device: it compresses pages with
-zstd into its own pool, capped at 20% of RAM, and only writes back to zram what
-that pool cannot hold. On the reference machine after ten and a half hours:
+The Arch kernel ships `CONFIG_ZSWAP_DEFAULT_ON=y`, and nothing here turned it
+off. **zswap** is a compressed cache that sits *in front of* a swap device: it
+compresses pages into its own pool, capped at 20% of RAM, and writes back to the
+device behind it only what that pool cannot hold. So every page went into zswap
+first, and zram — sized at half of RAM — caught the overflow. On the reference
+machine after ten and a half hours:
 
 | counter | pages | meaning |
 | --- | --- | --- |
@@ -210,15 +212,53 @@ that pool cannot hold. On the reference machine after ten and a half hours:
 | `pswpout` | 9,415 | identical, so every page in zram arrived that way |
 
 zram peaked at 7.0 MiB of a 1,951 MiB device. The sizing expression, zstd, the
-priority and both sysctls are all doing what they say and almost none of it is
-being exercised, because a layer this file has never mentioned is doing the
-work.
+priority and both sysctls were all doing exactly what they say, to a device
+handling one percent of the traffic.
 
-That is not necessarily wrong — zswap compressing into RAM is the same idea, and
-the desktop has not frozen. What is wrong is that the comparison this entry
-makes, zram against a disk swapfile, is not the comparison the machine is
-actually running. **TASK-89 decides which layer this repository wants**, and
-TASK-72's question about the right zram size cannot be answered until it does.
+**Decision: zswap off, zram is the compressed swap.**
+
+The two do not stack usefully. zswap's purpose is to avoid touching a disk — it
+absorbs pages in RAM so the slow device behind it is written to less often. That
+is a real gain when the device is an SSD. When the device is *also* RAM, the
+arrangement costs rather than saves: a page is compressed into zswap, and on
+writeback it is decompressed and handed to zram, which compresses it again. Two
+compressions and a decompression, both in RAM, to store one page.
+
+So the layer to keep is the one whose premise still holds. This machine has no
+disk swap, by the decision above, which removes zswap's reason to exist.
+
+### Trade-off
+
+zswap's pool is a fixed fraction of RAM and zram's is not, so zswap gives a
+harder ceiling on how much memory compressed swap can consume. Giving that up
+means the sizing question is now zram's alone — which is TASK-72, and which was
+unanswerable while it was unclear who was holding the pages.
+
+### Alternatives considered
+
+**Keep both, deliberately.** Would need an argument for why a small pool in
+front of a large one in the same memory is worth two compressions per page.
+There is not one here; the numbers above are what that arrangement produced.
+
+**zswap only, dropping zram.** zswap is a cache, not a swap device — it needs a
+real one behind it, which means a disk swapfile. That is rejected above, and
+this would reverse it sideways.
+
+### How it is applied
+
+`/etc/tmpfiles.d/zswap.conf`, written by `setup/system/apply-config.sh`, so it
+reaches a fresh install and a sync from the same file.
+
+`zswap.enabled=0` on the kernel command line is the more usual answer and would
+have been better if it could reach a running machine. It cannot: the boot
+entries under `system/loader/` are rendered with the root UUID at install time
+and are deliberately never applied by sync, so a cmdline change would land on
+fresh installs and no existing machine. zswap is built in rather than a module,
+so modprobe.d has nothing to act on either — but the parameter is writable
+through sysfs, and tmpfiles is what systemd provides for writing sysfs at boot.
+
+`checks/session.sh` fails if zswap is ever enabled again, because the kernel
+default will re-enable it the moment that file stops being applied.
 
 ---
 
@@ -1772,6 +1812,16 @@ The same warning on a physical machine would mean no acceleration there either, 
 ### Alternatives considered
 
 **Declaring Vulkan or Mesa driver packages** to force a different path. Rejected: there is no hardware path to select. `mesa` is now declared explicitly, but for the reason `polkit` is - the desktop relies on it directly and a dependency change should not remove it silently - not because declaring it changes rendering.
+
+### It cost a session once, and nothing was done about it
+
+On 2026-08-20 at 23:30 sway segfaulted and the desktop went with it. The machine did not reboot - greetd restarted and logging back in restored everything - but every open window was lost. The coredump is unambiguous: a segfault in libc, seven frames inside `libgallium`, and `wlr_client_buffer_create` beneath them. sway was allocating a buffer for a client window, that call went into Mesa, and it crashed there. On this machine gallium is llvmpipe, so this is a consequence of the arrangement above rather than a separate fault.
+
+Memory pressure was ruled out - earlyoom reported 58% available a minute earlier, nothing was killed - and so was configuration, the crash being inside a library rather than in config parsing, after ninety minutes of running.
+
+**Nothing was changed in the guest, deliberately, and that is the conclusion rather than an omission.** sway has no crash recovery and cannot be given any from outside; a supervisor that restarted it would produce an empty desktop rather than the one that was lost. The fix is not in the guest at all: enabling 3D acceleration on the hypervisor - virtio video with 3D, SPICE display with OpenGL - takes llvmpipe out of the path entirely. That was already the recommendation here for performance; this raises it from "the desktop is CPU-rendered" to "the compositor can crash".
+
+Not reproduced since: one coredump total, across roughly twenty hours of session time over two subsequent boots, both ending in a clean shutdown. A fault seen once is not disproved by that, which is why this is written down instead of closed silently. TASK-48.
 
 ---
 

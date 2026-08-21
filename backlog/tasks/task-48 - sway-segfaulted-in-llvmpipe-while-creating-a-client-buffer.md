@@ -1,10 +1,11 @@
 ---
 id: TASK-48
 title: sway segfaulted in llvmpipe while creating a client buffer
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-08-20 22:36'
-updated_date: '2026-08-21 10:59'
+updated_date: '2026-08-21 20:55'
 labels:
   - foundation
   - performance
@@ -37,8 +38,8 @@ Worth deciding whether anything is worth doing inside the guest in the meantime.
 <!-- AC:BEGIN -->
 - [ ] #1 Whether enabling 3D acceleration on the hypervisor stops it is established by running with acceleration on, not assumed
 - [ ] #2 If it recurs before then, the coredump is compared with this one to confirm it is the same path rather than a new fault
-- [ ] #3 Whether anything proportionate can be done inside the guest is decided, and concluding that nothing is counts as completing this
-- [ ] #4 The outcome is recorded alongside the existing software-rendering entry in DECISIONS.md, since it is the same root cause rather than a separate finding
+- [x] #3 Whether anything proportionate can be done inside the guest is decided, and concluding that nothing is counts as completing this
+- [x] #4 The outcome is recorded alongside the existing software-rendering entry in DECISIONS.md, since it is the same root cause rather than a separate finding
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -57,4 +58,20 @@ shutdown rather than a fault.
 
 Leaving open until the end of the day as agreed, since a crash seen once in
 several days is not disproved by ten hours.
+
+Checked again 2026-08-21 21:55. Still exactly one coredump for /usr/bin/sway, the original at 2026-08-20 23:30:11. Two boots since, roughly twenty hours of session time, both ended by clean shutdown.
+
+AC1 stays unchecked honestly: whether 3D acceleration stops it cannot be established from inside the guest, and the hypervisor setting has not been changed. It is recorded as the fix rather than as a tested one.
+
+AC2 does not apply - there was no recurrence to compare against.
+
+AC3 is the substance, and the answer is that nothing proportionate can be done in the guest. sway has no crash recovery and cannot be given any from outside: a supervisor restarting it would produce an empty desktop, not the one that was lost, so it would convert a visible failure into a confusing one. The ticket says explicitly that concluding nothing counts as completing this.
+
+AC4 done - recorded under 'The VM renders in software', which is the same root cause rather than a separate finding.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+No recurrence: one coredump total across roughly twenty hours of session time and two clean boots since. Concluded that nothing proportionate can be done inside the guest - sway has no crash recovery, and a supervisor restarting it would produce an empty desktop rather than the lost one - which the ticket states counts as completing it. The real fix is enabling 3D acceleration on the hypervisor, which takes llvmpipe out of the path; that is recorded as the fix rather than as a tested one, since it cannot be verified from inside the guest. Written up under the software-rendering entry in DECISIONS.md, being the same root cause.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -36,6 +36,25 @@ if [[ "$(swapon --show=NAME --noheadings 2>/dev/null | grep -c zram)" -gt 0 ]]; 
     size="$(swapon --show=NAME,SIZE --noheadings | awk '/zram/ {print $2}')"
     pass "zram is active as swap (${size})"
 
+    # zswap must be OFF, or the zram device above is not the compressed swap -
+    # it is a fallback behind a smaller pool that catches almost everything.
+    #
+    # This is not hypothetical tidiness. Measured before it was turned off:
+    # 920,911 pages compressed into zswap and 9,415 - one percent - ever
+    # reached zram, which peaked at 7 MiB of a 1,951 MiB device. Every setting
+    # TASK-9 chose was correctly applied and doing almost nothing, and no check
+    # noticed for as long as this section has existed. The Arch kernel enables
+    # zswap by default, so this reverts the moment /etc/tmpfiles.d/zswap.conf
+    # stops being applied.
+    zswap_state="$(cat /sys/module/zswap/parameters/enabled 2>/dev/null)"
+    if [[ -z "$zswap_state" ]]; then
+        skip "this kernel has no zswap parameter, so nothing sits in front of zram"
+    elif [[ "$zswap_state" == "N" ]]; then
+        pass "zswap is off, so zram is the compressed swap rather than a fallback"
+    else
+        fail "zswap is enabled, so it compresses into its own pool first and zram only sees the writeback - run ./sync.sh, or reboot if it has already run"
+    fi
+
     if command -v zramctl &>/dev/null; then
         algo="$(zramctl --output NAME,ALGORITHM --noheadings 2>/dev/null | awk '/zram/ {print $2}')"
         if [[ "$algo" == zstd* ]]; then

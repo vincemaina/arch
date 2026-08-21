@@ -30,6 +30,10 @@ fi
 CONFIG_FILES=(
     "zram-generator.conf:/etc/systemd/zram-generator.conf"
     "sysctl.d/99-zram.conf:/etc/sysctl.d/99-zram.conf"
+    # Turns zswap off, so the zram device above is the compressed swap rather
+    # than a fallback behind a smaller pool that catches 99% of the traffic.
+    # The file itself explains why it is tmpfiles and not the kernel cmdline.
+    "tmpfiles.d/zswap.conf:/etc/tmpfiles.d/zswap.conf"
     "earlyoom.conf:/etc/default/earlyoom"
     "keyd/default.conf:/etc/keyd/default.conf"
     "greetd/config.toml:/etc/greetd/config.toml"
@@ -256,6 +260,20 @@ fi
 # would kill the desktop of whoever is running this.
 if systemctl is-active --quiet greetd; then
     echo "    greetd is running; login screen changes apply at next boot"
+fi
+
+# zswap, which is on by default in the Arch kernel and would otherwise stay on
+# until the next boot. Writing the sysfs parameter through tmpfiles rather than
+# by hand means the same file is the authority at boot and now.
+#
+# Pages already held in zswap are not lost by this: they stay compressed until
+# something faults them in, and nothing new enters the pool afterwards.
+if ! systemd-tmpfiles --create /etc/tmpfiles.d/zswap.conf; then
+    echo "    WARNING: could not turn zswap off; it applies at next boot" >&2
+elif [[ "$(cat /sys/module/zswap/parameters/enabled 2>/dev/null)" == "N" ]]; then
+    echo "    zswap is off, so zram is the compressed swap"
+else
+    echo "    WARNING: zswap is still enabled after writing the parameter" >&2
 fi
 
 # zram is created by a generator, so the device only appears after the
