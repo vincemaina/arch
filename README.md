@@ -135,38 +135,50 @@ the result — no rebuild required.
 
 ## Checks
 
-Repository checks live in [`checks/`](./checks/) and run on an installed machine:
-
-```bash
-./checks/sway-commands.sh
-```
-
-This verifies that every external command the sway session invokes — keybindings,
-session units, and helper scripts — is provided by a package declared in
-`setup/packages/`. It exists because the config and the manifests could otherwise
-drift apart silently: media keys called `playerctl`, which was never installed, so
-the keys simply did nothing and nothing reported an error.
+Repository checks live in [`checks/`](./checks/) and run on an installed
+machine. They exit non-zero on a problem, so they can gate other work. Nothing
+in `checks/` reaches the built system — it reads `setup/` and inspects the
+machine it is run on.
 
 ```bash
 ./checks/session.sh
 ```
 
+The one to run after any change. It checks the running machine rather than the
+configuration: that swap is active, the OOM handler is running, the session
+components are supervised and would restart if they died, and the boot path is
+set up as intended. It is read-only, and it finishes by listing the few things
+only a human can confirm — whether a keypress really takes a screenshot,
+whether a password prompt appears.
+
+```bash
+./checks/sway-commands.sh
+```
+
+Verifies that every external command the sway session invokes — keybindings,
+session units, and helper scripts — is provided by a package declared in
+`setup/packages/`. It exists because the config and the manifests could
+otherwise drift apart silently: media keys called `playerctl`, which was never
+installed, so the keys simply did nothing and nothing reported an error.
+
 ```bash
 ./checks/sway-bindings.sh
+```
+
+Prints every sway binding and fails if any key is bound twice — sway does not
+warn about that, it just lets the later definition win.
+
+`tools/` is the other half of the distinction: it produces something to read
+rather than a verdict, and never exits non-zero for a number someone else has
+to judge.
+
+```bash
 ./tools/shortcuts.sh
 ```
 
-The first prints every sway binding and fails if any key is bound twice — sway
-does not warn about that, it just lets the later definition win. The second is a
-report rather than a check: every shortcut this setup defines, grouped by the
-context it applies in, derived from the actual configuration, with any key that
-means different things in different contexts called out.
-
-This one checks the running machine rather than the configuration: that swap is
-active, the OOM handler is running, the session components are supervised and
-would restart if they died, and the boot path is set up as intended. It is
-read-only, and it finishes by listing the few things only a human can confirm —
-whether a keypress really takes a screenshot, whether a password prompt appears.
+Every shortcut this setup defines, grouped by the context it applies in,
+derived from the actual configuration, with any key that means different things
+in different contexts called out.
 
 ## Design
 
@@ -178,9 +190,14 @@ The setup is intentionally:
 * **Modular** — packages, system configuration and user configuration are kept separate.
 * **Safe to evolve** — a new VM can be used to test changes before applying them to a real machine.
 
-For the reasoning behind major technical choices, see [`DECISIONS.md`](./DECISIONS.md).
+## Documentation
 
-For an overview of the installation process, see [`FLOW.md`](./FLOW.md).
+| | |
+| --- | --- |
+| [`FLOW.md`](./FLOW.md) | How the repository becomes a running machine: what runs, in what order, in which environment, and where to change each thing. |
+| [`DECISIONS.md`](./DECISIONS.md) | Why each technology and layout was chosen, with the trade-offs and the alternatives rejected. |
+| [`docs/software/`](./docs/software/README.md) | Every declared package accounted for, and what the running system measurably costs. |
+| [`docs/wallpapers/`](./docs/wallpapers/README.md) | Why wallpapers are generated on the machine rather than tracked, and how. |
 
 ## Structure
 

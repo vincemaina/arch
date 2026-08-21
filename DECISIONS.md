@@ -413,7 +413,13 @@ The aim here is not to reproduce a full desktop environment. It is to build a sm
 ## A display manager, reversing an earlier decision
 
 **Decision:** Log in graphically through greetd, with ReGreet as the login screen
-hosted by cage. The session is launched as `uwsm start -- sway.desktop`.
+hosted by cage. The session is launched as `uwsm start -N Sway -D sway -- sway`.
+
+The `.desktop` form this entry used to name - `uwsm start -- sway.desktop` - is
+the one thing that must NOT be used, and `system/wayland-sessions/sway-uwsm.desktop`
+says so at length: it makes uwsm re-read a desktop entry that points back at
+uwsm. The documentation said the opposite of the config for long enough to be
+worth noting here rather than quietly correcting.
 
 This reverses the original decision to have no display manager. That entry is
 reproduced here rather than deleted, because the reasoning was sound at the time
@@ -806,11 +812,17 @@ This is configured explicitly so a new installation behaves correctly immediatel
 **Decision:** Launch the compositor through the Universal Wayland Session Manager:
 
 ```bash
-uwsm start -- sway
+uwsm start -N Sway -D sway -- sway
 ```
 
 Session components — the bar, notifications, idle handling — are systemd user
-units bound to `graphical-session.target`, not sway `exec` lines.
+units bound to `wayland-session@sway.target`, not sway `exec` lines.
+
+Both details were wrong here until TASK-23 checked them against what the machine
+actually runs. `graphical-session.target` in particular is not a harmless
+simplification: it is reached by *every* compositor, so a unit wanted by it
+would also start under a different desktop, which is the specific mistake the
+architecture notes warn against.
 
 ### Why
 
@@ -858,8 +870,14 @@ separately. It is also one more component between login and a working desktop.
 ## Enabling user units by symlink rather than systemctl
 
 **Decision:** Enable session units with symlinks committed under
-`dotfiles/dot_config/systemd/user/graphical-session.target.wants/` rather than by
-running `systemctl --user enable` during installation.
+`dotfiles/dot_config/systemd/user/wayland-session@sway.target.wants/` rather than
+by running `systemctl --user enable` during installation.
+
+(This entry said `graphical-session.target.wants/` until TASK-23. That directory
+does not exist in the repository and has not for some time - the units moved to
+the sway-specific target precisely so they would not start under another
+compositor, and `.chezmoiremove` still deletes the old one from machines that
+have it.)
 
 ### Why
 
@@ -888,23 +906,60 @@ Current configuration includes workspace information and useful system status wh
 
 ---
 
-## Wofi
+## rofi, reversing an earlier decision
 
-**Decision:** Use Wofi as the application launcher.
+**Decision:** Use rofi as the application launcher, and build the desktop's own
+menus on top of it rather than writing a launcher.
+
+This reverses the choice of wofi. That entry is reproduced below rather than
+deleted, in the usual style - the reasoning was fine and it is the requirements
+that moved.
+
+> **Decision:** Use Wofi as the application launcher.
+>
+> Wofi is a small Wayland-native launcher that works well with Sway. The main
+> use is `wofi --show drun`, which provides a simple searchable application
+> launcher. It covers the required use case without needing a heavier desktop
+> menu system.
 
 ### Why
 
-Wofi is a small Wayland-native launcher that works well with Sway.
+"Covers the required use case" stopped being true once the launcher had to do
+more than start applications. This desktop now reaches five things through it -
+applications, open windows, the theme switcher, the wallpaper picker, file
+search and the shortcut reference - and rofi's script mode is what makes each of
+those a few lines of shell rather than a program. wofi has no equivalent.
 
-The main use is:
+The alternative was writing something Raycast-shaped, and TASK-80 settled that
+by asking what would actually have to be built: desktop-entry parsing,
+icon-theme lookup, fuzzy matching, a window switcher, and a plugin protocol -
+all of which rofi already has, to gain a look. The look turned out to be
+expressible in rofi's own theme format, which is where that effort went instead.
 
-```text
-wofi --show drun
-```
+### Trade-off
 
-which provides a simple searchable application launcher.
+rofi began as an X11 program, and for years the Wayland answer was the
+`rofi-wayland` fork - which would have made the launcher the one piece of this
+desktop depending on somebody continuing to rebase. That is no longer the
+position: rofi 2.0 is the first mainline release with the Wayland backend
+merged in, and `rofi` 2.0.0 from `extra` is what is installed. No fork, and no
+AUR support needed to get one.
 
-It covers the required use case without needing a heavier desktop menu system.
+What remains is that rofi is a larger program than the job strictly needs, and
+its theme format is a language of its own to learn before the launcher can be
+made to look like anything in particular.
+
+### Alternatives considered
+
+**wofi** - what this replaces. Wayland-native and simpler, with no script mode,
+so every custom menu would have had to become a separate program.
+
+**fuzzel** - Wayland-native, actively maintained and smaller. It has a dmenu
+mode but nothing equivalent to rofi's script protocol, so the five custom modes
+would each have needed their own front end. Worth revisiting only if that stops
+being true of one of them, not before.
+
+**A custom launcher** - rejected on TASK-80, above.
 
 ---
 
