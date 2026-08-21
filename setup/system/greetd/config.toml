@@ -16,5 +16,20 @@ vt = 1
 #
 # /usr/local/share comes first so our entries are found before the packaged
 # ones, which is what lets a Hidden entry suppress the stock sway session.
-command = "env XDG_DATA_DIRS=/usr/local/share:/usr/share cage -s -- regreet"
+#
+# WLR_NO_HARDWARE_CURSORS matters for the same reason it does in the user
+# session, and it has to be set here as well rather than only there.
+#
+# cage is wlroots, like sway. On a virtio GPU with 3D acceleration enabled the
+# hardware cursor plane renders the cursor upside down, and the greeter runs
+# first - so it sets an inverted cursor on the plane before any user session
+# exists. Nothing clears it afterwards, which is why the inverted pointer
+# survives logging in, switching to a text console with Ctrl+Alt+F2, and
+# logging out again: it is one stale object held by the host, not something
+# being redrawn.
+#
+# Setting it only in the user session gave a correct pointer drawn by sway with
+# the greeter's stale one still visible underneath - two cursors rather than
+# one.
+command = "env XDG_DATA_DIRS=/usr/local/share:/usr/share WLR_NO_HARDWARE_CURSORS=1 cage -s -- regreet"
 user = "greeter"

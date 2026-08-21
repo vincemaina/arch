@@ -1,11 +1,11 @@
 ---
 id: TASK-33
 title: Show something worth looking at when the session starts
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-20 12:53'
-updated_date: '2026-08-20 22:13'
+updated_date: '2026-08-21 00:40'
 labels:
   - desktop
   - feel
@@ -29,7 +29,7 @@ Colours should come from the palette rather than being chosen separately.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A system summary appears when a session starts, without noticeably delaying the shell
+- [x] #1 A system summary appears when a session starts, without noticeably delaying the shell
 - [x] #2 Where it runs is a deliberate decision, not every terminal by default
 - [x] #3 The output is trimmed to what is worth reading rather than left at the default
 - [x] #4 Its colours come from the existing palette
@@ -74,4 +74,12 @@ AC #5 needed no tuning: nothing was added to .zshrc, so shell startup is structu
 AC #1 is left unchecked for now. The unit is enabled and its symlink is in place, so it will start when wayland-session@sway.target is reached, but this session started before it existed and the greeting was started by hand. One login confirms it.
 
 Mistake worth recording: the first attempt came up tiled rather than floating, because the window rules were applied with chezmoi and sway was never reloaded. The rule was correct; nothing had read it.
+
+AC #1 confirmed on 2026-08-21 after a reboot: greeting.service started on its own when the session began, logged as "Started Greet empty workspaces with a system summary". Every previous check had been on a session that predated the unit, with the greeting started by hand.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Every terminal opens with a fastfetch summary, and the automatic ones - at session start and on any empty workspace - float, sized to their contents, placed where there is room. fastfetch lives in the terminal command rather than .zshrc, so nested shells and ssh sessions are unaffected and shell startup is untouched at 128ms. Colours come from the palette by naming ANSI colours, which foot renders from palette.toml, so there is no second copy of the palette to drift. A small daemon on sway IPC handles empty workspaces and the session start, replacing a one-shot unit so nothing races to open the first window. Confirmed starting by itself at login.
+<!-- SECTION:FINAL_SUMMARY:END -->
