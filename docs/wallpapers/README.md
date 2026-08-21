@@ -1,34 +1,44 @@
-# Wallpaper candidates
+# Wallpapers
 
-Generated gradient meshes, built from soft overlapping colour fields with a
-domain warp so the shapes are organic rather than obviously circular. Rendered
-small and upscaled, since there is no detail to lose, with a little noise added
-at full size to stop the smooth gradients banding on a wide screen.
+Wallpapers are **generated from a theme's own colours** by `tools/wallpaper.py`,
+not chosen. Each theme in `.chezmoidata/themes.toml` names its image, the tool
+renders it, and the result is committed into `setup/dotfiles/` so it reaches the
+built machine like any other dotfile.
 
-Candidates are not tracked. Only the chosen one is committed, into
-`setup/dotfiles/`, so it reaches the machine like any other dotfile.
+```bash
+tools/wallpaper.py --all                      # regenerate every theme
+tools/wallpaper.py --theme ember              # just one
+tools/wallpaper.py --theme slate --out /tmp/x.png   # preview without committing
+```
 
-## Purple set
+Standard library only, deliberately: the first version of this generator needed
+numpy and Pillow, was never committed, and was gone by the time a second
+wallpaper was wanted. That is why this file describes a tool rather than a set
+of candidate images.
 
-| File | Character |
-| --- | --- |
-| `04-violet-mesh.png` | Bright and varied: violet through magenta, with blue and a teal corner |
-| `05-aurora.png` | Boldest. A large purple field flowing into deep blue |
-| `06-deep-violet.png` | Moodier. Deep purple with a magenta glow low down and dark corners |
+## Why generated
 
-## First set, kept for comparison
+The bar, the borders and the glow were all tuned to sit against the background.
+A palette swap that left the old picture behind would clash with itself, and a
+hand-picked image per theme is one more thing to keep in step. Deriving the
+image from the colours the rest of the desktop already reads means a new theme
+gets a matching background for free.
 
-Near-black and very subtle. Too subtle, as it turned out.
-
-| File | Character |
-| --- | --- |
-| `01-corner-glow.png` | Cyan glow top left, faint magenta bottom right |
-| `02-diagonal-sweep.png` | A single wide diagonal gradient |
-| `03-low-horizon.png` | Near flat with a faint glow low on the screen |
+The composition is identical across themes - the same soft fields in the same
+places, domain-warped so the shapes are organic rather than circular - and only
+the colours change. Three unrelated pictures would look like three different
+desktops rather than one desktop wearing three palettes.
 
 ## Note
 
-The bar has a solid dark background, so it will read as a dark strip across the
-top of whichever of these is chosen rather than blending into it. That is worth
-seeing before deciding: a brighter wallpaper makes the bar more of a deliberate
-object, a darker one lets it disappear.
+The bar has a solid dark background, so it reads as a dark strip across the top
+of whichever image is showing rather than blending into it. The generator's
+vignette exists partly for that: a bright top edge behind a near-black bar makes
+the bar look stuck on.
+
+## History
+
+An earlier set of hand-generated candidates lived here, untracked. The first
+set was near-black and very subtle - too subtle, as it turned out, and rejected
+as lifeless. The purple set that replaced it produced `06-deep-violet.png`,
+which was the wallpaper until themes arrived and it became `neon.png`.
