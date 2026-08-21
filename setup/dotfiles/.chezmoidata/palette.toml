@@ -29,6 +29,10 @@ text_dim    = "#8fa0bb"  # unfocused titles
 
 accent      = "#00e5ff"  # focus. The one colour that means "here"
 secondary   = "#ff5cf4"  # secondary emphasis
+tertiary    = "#7c4dff"  # a third hue, violet. Picked to sit with the
+                         # wallpaper rather than against it, and used where
+                         # something needs a colour that is neither the accent
+                         # nor the emphasis - the bar's edges, for instance
 ok          = "#3ddc97"  # healthy, charging
 warning     = "#ffc857"  # attention, nothing wrong yet
 urgent      = "#ff4d6d"  # something is wrong

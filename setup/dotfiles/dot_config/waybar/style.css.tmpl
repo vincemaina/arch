@@ -18,6 +18,7 @@
 @define-color text        {{ .palette.text }};
 @define-color accent      {{ .palette.accent }};
 @define-color secondary   {{ .palette.secondary }};
+@define-color tertiary    {{ .palette.tertiary }};
 @define-color ok          {{ .palette.ok }};
 @define-color warning     {{ .palette.warning }};
 @define-color urgent      {{ .palette.urgent }};
@@ -53,9 +54,9 @@ window#waybar > box {
      * rather than partly in it; the colour it needs comes from the gradient
      * rather than from whatever happens to be behind it.
      *
-     * The gradient takes the same path as the border below it - dark cyan at
-     * the edges through dark magenta at the centre - so the two read as one
-     * thing. mix() blends the accents into black rather than naming new
+     * The gradient takes the same path as the border below it - violet at the
+     * edges through magenta at the centre - so the two read as one thing, and
+     * the edges sit with the wallpaper rather than against it. mix() blends the accents into black rather than naming new
      * colours, which keeps them derived from the palette: change accent or
      * secondary and the bar follows, with no third colour to keep in step.
      *
@@ -63,9 +64,9 @@ window#waybar > box {
      * 22% of a saturated colour into black is enough to see and not enough to
      * compete with the modules sitting on top of it. */
     background: linear-gradient(90deg,
-        mix(@bar, @accent, 0.10) 0%,
+        mix(@bar, @tertiary, 0.10) 0%,
         mix(@bar, @secondary, 0.22) 50%,
-        mix(@bar, @accent, 0.10) 100%);
+        mix(@bar, @tertiary, 0.10) 100%);
 
     /* A gradient hairline instead of a shadow.
      *
@@ -79,14 +80,14 @@ window#waybar > box {
      * painted. The width has to be declared separately and only on the bottom,
      * or the gradient wraps all four sides.
      *
-     * The colours run accent to secondary and back, so the line is brightest
+     * The colours run tertiary to secondary and back, so the line is brightest
      * where the bloom behind it is strongest, and the two read as one thing
      * rather than two decorations that happen to share an edge. */
     border-bottom: 1px solid transparent;
     border-image: linear-gradient(90deg,
-        @accent 0%,
+        @tertiary 0%,
         @secondary 50%,
-        @accent 100%) 1;
+        @tertiary 100%) 1;
 }
 
 /* The shared pill shape. Dark text on a saturated background reads better at
