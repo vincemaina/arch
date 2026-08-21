@@ -17,7 +17,31 @@ cage
 # Terminal
 foot
 
-
+# X11 compatibility, for clients with no Wayland backend. Nothing declared here
+# needs it - every application in this file is a native Wayland client - so
+# Xwayland is not normally running at all. It starts on demand and exits with
+# the last X11 client.
+#
+# READ THIS BEFORE ADDING THE FIRST X11 APPLICATION. Electron apps (VS Code,
+# Discord, Slack, Obsidian, Signal), JetBrains IDEs and Java desktop apps
+# generally, Steam and anything under Wine or Proton, Zoom and Teams, and
+# GIMP 2.x all default to XWayland. When one arrives it will look subtly wrong
+# next to everything else: GTK resolves a different icon theme under X11 than
+# under Wayland, so checkmarks and dropdown arrows come out the wrong shape.
+# The theme itself is fine - GTK_THEME is an environment variable and reaches
+# X11 clients - it is only icons.
+#
+# That was investigated as TASK-42 and closed without a fix, because the impact
+# is zero until such an application exists and the usual remedy is running
+# xsettingsd, a daemon whose whole job would be telling X11 clients which icon
+# theme to use. The ticket has the evidence and the hypothesis, which was never
+# confirmed: settings.ini does set gtk-icon-theme-name and GTK reads it on both
+# backends, so the XSETTINGS explanation may be wrong. Confirming it needs
+# python-gobject to ask a running application what it actually resolved.
+#
+# Also relevant when that day comes: environment.d already carries
+# _JAVA_AWT_WM_NONREPARENTING=1, and XWayland has no HiDPI - see the
+# sway-capability-limits skill.
 xorg-xwayland
 polkit
 pipewire

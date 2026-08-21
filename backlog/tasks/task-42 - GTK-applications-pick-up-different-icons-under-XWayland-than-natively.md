@@ -1,10 +1,10 @@
 ---
 id: TASK-42
 title: GTK applications pick up different icons under XWayland than natively
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-20 15:30'
-updated_date: '2026-08-20 15:30'
+updated_date: '2026-08-21 11:13'
 labels:
   - desktop
   - feel
@@ -48,3 +48,40 @@ Worth checking at the same time whether an XSettings daemon is the right answer 
 - [ ] #4 Any daemon added to achieve this is justified against the DECISIONS.md standard that new tooling earns its place, or the decision not to add one is recorded
 - [ ] #5 checks/session.sh or a note records how to reproduce the comparison, so this is not rediscovered from scratch
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed without a fix, deliberately.
+
+The impact is zero rather than small. Nothing in this setup runs under
+XWayland - every declared GUI application is a native Wayland client, and
+Xwayland is not a running process on an idle machine. It starts on demand and
+exits with the last X11 client. The difference was only ever seen by forcing an
+application onto X11 to look for it.
+
+When it does eventually bite it is cosmetic: checkmarks and dropdown arrows in
+the wrong shape inside one application's dialogs. The theme itself reaches X11
+clients correctly, because GTK_THEME is an environment variable.
+
+The usual remedy is running xsettingsd, a daemon whose only job would be to tell
+X11 clients which icon theme to use. Weighed against DECISIONS.md's standard
+that new tooling earns its place, that is a poor trade for icon shapes - which
+is AC #4, answered as "no daemon", with the reason recorded.
+
+AC #1 is explicitly NOT met and should not be presented as though it were. The
+hypothesis in this ticket - that GTK resolves settings through the portal under
+Wayland and XSETTINGS under X11 - was never confirmed, and there is reason to
+doubt it: ~/.config/gtk-3.0/settings.ini does set gtk-icon-theme-name=Papirus-Dark
+and GTK reads that file on both backends, so the absence of an XSettings daemon
+does not obviously explain the difference. Confirming it needs python-gobject,
+which is not installed, to ask a running application what it actually resolved.
+
+The valuable part of this ticket was never the fix, it was knowing which
+applications drag in XWayland. That has been moved to where it will actually be
+read: a comment beside xorg-xwayland in packages/desktop.txt, headed "READ THIS
+BEFORE ADDING THE FIRST X11 APPLICATION", naming Electron, JetBrains, Steam,
+Wine, Zoom and GIMP 2.x, describing the symptom, and pointing back here. Nobody
+reads a closed ticket before installing VS Code; they do read the manifest they
+are adding a line to.
+<!-- SECTION:FINAL_SUMMARY:END -->
