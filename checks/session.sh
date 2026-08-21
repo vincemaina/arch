@@ -1346,9 +1346,28 @@ section "Screenshot helper (TASK-10)"
 if [[ -x "$HOME/.local/bin/sway-screenshot" ]]; then
     if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
         skip "cannot capture outside a Wayland session"
+    elif pgrep -x swaylock >/dev/null 2>&1; then
+        # A LOCKED SCREEN MAKES grim WAIT, NOT FAIL.
+        #
+        # swaylock takes an exclusive lock on every output, and a screencopy
+        # request against a locked output is not refused - it is queued until
+        # the output is readable again. So grim sits there using no CPU, and
+        # this check, and anything running it, hangs indefinitely. It looks like
+        # a broken helper and it is a working one waiting for the screen to come
+        # back. TASK-96.
+        #
+        # Refusing to try is the honest answer: the helper cannot be tested
+        # while the screen is locked, and nothing here can unlock it.
+        skip "the screen is locked, and a capture would block until it is not"
     else
-        shot="$("$HOME/.local/bin/sway-screenshot" screen 2>&1)"
-        if [[ -s "$shot" ]]; then
+        # Bounded even so. The lock is the known cause of a hang, but it is the
+        # known one - a check that can wait forever is worse than one that is
+        # sometimes wrong.
+        shot="$(timeout 15 "$HOME/.local/bin/sway-screenshot" screen 2>&1)"
+        capture_status=$?
+        if [[ $capture_status -eq 124 ]]; then
+            fail "sway-screenshot did not return within 15s - something is holding the output"
+        elif [[ -s "$shot" ]]; then
             pass "captured a screenshot to $shot"
             rm -f "$shot"
         else
