@@ -91,8 +91,11 @@ window#waybar > box {
      * Inset deliberately: an outer glow would need the surface to be taller
      * than the bar to have anywhere to fall - the same constraint that made
      * the drop shadow need a margin - whereas an inset one is painted inside
-     * the bar and needs nothing. It is static, so it costs nothing per frame. */
-    box-shadow: inset 0 -6px 12px -8px mix(@bar, @secondary, 0.55);
+     * the bar and needs nothing. It is static, so it costs nothing per frame.
+     *
+     * Kept tight. A wider blur on a 28px bar reaches the top edge and stops
+     * looking like light coming from the strip below. */
+    box-shadow: inset 0 -3px 6px -4px mix(@bar, @secondary, 0.55);
 
     border-bottom: 1px solid transparent;
     border-image: linear-gradient(90deg,
@@ -120,24 +123,53 @@ window#waybar > box {
 #battery,
 #clock,
 #tray {
-    color: @bg;
-    padding: 0 10px;
-    margin: 4px 3px;
+    background: transparent;
+    /* Wider than the pills needed. Without a block behind them the readings
+     * have nothing but space to separate them, so the space has to do more. */
+    padding: 0 11px;
+    margin: 4px 0;
     border-radius: 14px;
+}
+
+/* The colour moves from the pill to the text. Each module keeps the hue it
+ * always had; it is now the glyph and the number that carry it rather than a
+ * block behind them, which is quieter and lets the bar's own gradient show
+ * through between the readings. */
+/* Each reading glows in its own colour. A text-shadow with no offset is how a
+ * glow is spelled, and being static it costs nothing to draw - which is the
+ * whole reason this is here and the animated gradient is not. */
+#idle_inhibitor { color: @muted;     text-shadow: 0 0 6px @muted; }
+#cpu            { color: @info;      text-shadow: 0 0 7px @info; }
+#memory         { color: @secondary; text-shadow: 0 0 7px @secondary; }
+#pulseaudio     { color: @ok;        text-shadow: 0 0 7px @ok; }
+#battery        { color: @ok;        text-shadow: 0 0 7px @ok; }
+#clock          { color: @accent;    text-shadow: 0 0 7px @accent; font-weight: bold; }
+#tray           { color: @text; }
+
+/* The pill comes back on hover, so the shape is still there when you reach for
+ * something - it just is not there when you are only reading. Dark text on the
+ * module's own colour, which is the inverse of the resting state. */
+#idle_inhibitor:hover,
+#cpu:hover,
+#memory:hover,
+#pulseaudio:hover,
+#battery:hover,
+#clock:hover,
+#tray:hover {
+    color: @bg;
+    /* The glow goes on hover. Dark text on a bright pill does not want a halo
+     * in the pill's own colour behind it. */
+    text-shadow: none;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.9);
 }
 
-#idle_inhibitor { background: @surface_alt; color: @muted; }
-#cpu            { background: @info; }
-#memory         { background: @secondary; }
-#pulseaudio     { background: @ok; }
-#battery        { background: @ok; }
-#clock          { background: @accent; font-weight: bold; }
-
-#tray {
-    background: @surface;
-    color: @text;
-}
+#idle_inhibitor:hover { background: @surface_alt; color: @text; }
+#cpu:hover            { background: @info; }
+#memory:hover         { background: @secondary; }
+#pulseaudio:hover     { background: @ok; }
+#battery:hover        { background: @ok; }
+#clock:hover          { background: @accent; }
+#tray:hover           { background: @surface; color: @text; }
 
 /* Workspaces are the exception: they are navigation, not a readout, so only
  * the one you are on is filled in. */
