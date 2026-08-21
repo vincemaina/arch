@@ -37,16 +37,6 @@ output * bg {{ .chezmoi.homeDir }}/.local/share/wallpapers/deep-violet.png fill
 default_border pixel 4
 default_floating_border pixel 4
 
-# The title bar that floating windows get in 40-window-rules.conf draws its own
-# border, and it defaults to 1px - so a 4px frame met a 1px bar and the join
-# looked wrong. Matching it makes the outline one continuous thickness.
-#
-# Padding must exceed the border thickness, which sway(5) says outright:
-# "Padding includes titlebar borders so their value should be greater than
-# titlebar_border_thickness".
-titlebar_border_thickness 4
-titlebar_padding 10 6
-
 # Small gaps so adjacent windows read as separate objects rather than one
 # surface split by a line. Enough to see, not enough to waste.
 gaps inner 12
@@ -55,20 +45,18 @@ font pango:JetBrainsMono Nerd Font 10
 
 # border | background | text | indicator | child_border
 #
-# Which of these do anything depends on the window, and it is worth knowing.
+# Only the last two do anything, and it is worth knowing which.
 #
 # child_border is the frame drawn round the window, and indicator marks the
-# edge where the next window will open. Those two always apply.
-#
-# border is the frame around a *title bar*, background is that title bar's fill
-# and text is its label. Tiled windows have no title bar - `default_border
-# pixel` above - so for them those three do nothing, which was verified by
-# setting each to a different colour and looking: the frame came out in the
+# edge where the next window will open. border is the frame around a *title
+# bar*, background is that title bar's fill and text is its label - and
+# nothing here has a title bar, so those three are inert. Verified by setting
+# each field to a different colour and looking: the frame came out in the
 # child_border colour and the rest appeared nowhere.
 #
-# Floating windows DO have one, since 40-window-rules.conf gives them
-# `border normal`. So on a floating window all five fields are live, and the
-# title bar is drawn with background behind text, framed by border.
+# They are left in place rather than removed because they wake up the moment
+# any window is given `border normal`, which was tried and reverted - title
+# bars on floating windows looked heavier than the rest of the desktop.
 #
 # Only the focused window gets the accent. Everything else is the same quiet
 # surface colour, so where the focus is can be seen without reading anything.

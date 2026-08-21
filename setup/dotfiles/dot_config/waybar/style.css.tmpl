@@ -11,6 +11,7 @@
  * resting colours are stable and familiar. */
 
 @define-color bg          {{ .palette.bg }};
+@define-color bar         {{ .palette.bar }};
 @define-color surface     {{ .palette.surface }};
 @define-color surface_alt {{ .palette.surface_alt }};
 @define-color muted       {{ .palette.muted }};
@@ -30,7 +31,7 @@
 }
 
 window#waybar {
-    background: @bg;
+    background: @bar;
     color: @text;
 }
 

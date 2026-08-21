@@ -6,17 +6,11 @@ set -euo pipefail
 # Floats or tiles the focused window, and gives it the border that goes with
 # the state it lands in.
 #
-# Floating windows get a title bar: they overlap, they move, and a bar gives
-# them something to grab and a name to tell them apart by. Tiled windows do
-# not: the window list belongs in the bar, not repeated above every window.
-#
-# sway cannot pair these itself. `floating toggle` and `border` are separate
-# commands, and `border toggle` cycles none/normal/pixel blindly rather than
-# choosing by state, so a plain toggle leaves a tiled window wearing a title
-# bar or a floating one without.
-#
-# 40-window-rules.conf covers windows that arrive floating; this covers the
-# ones made floating afterwards, which is the other half of the same rule.
+# Nothing here has a title bar - the window list belongs in the bar, not
+# repeated above every window - so both states use `border pixel`. The border
+# is still set explicitly rather than left alone, because a window that has
+# been given `border normal` by hand should come back to the house style when
+# its placement changes.
 
 is_floating() {
     swaymsg -t get_tree | python3 -c '
@@ -43,5 +37,5 @@ sys.exit(1)
 if is_floating; then
     swaymsg 'floating disable, border pixel 4' >/dev/null
 else
-    swaymsg 'floating enable, border normal 4' >/dev/null
+    swaymsg 'floating enable, border pixel 4' >/dev/null
 fi

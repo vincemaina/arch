@@ -11,7 +11,10 @@
 # leave a variable called "cyan" holding something orange.
 
 [palette]
-bg          = "#0b0e14"  # window and bar background
+bg          = "#0b0e14"  # window background
+bar         = "#0a0715"  # the bar. Darker than bg and pulled toward purple, so
+                         # the chrome sits behind the windows rather than level
+                         # with them, and picks up the wallpaper's hue
 bg_dim      = "#06080d"  # lock screen, behind everything
 surface     = "#151b26"  # inactive borders, hover
 surface_alt = "#1f2937"  # separators
