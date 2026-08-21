@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# requires: foot
+# requires: foot ya
 
 # Open a terminal from yazi, at the place you are looking at.
 #
@@ -24,17 +24,18 @@ target="${1:-$PWD}"
 setsid foot --working-directory="$target" >/dev/null 2>&1 &
 
 
-# NOT DONE: closing yazi behind the terminal. It was asked for and does not
-# work yet, and a comment saying so is better than code that pretends.
+
+# And close the file manager behind us. The reason to want a terminal here is
+# to do something, and yazi has served its purpose by finding the place -
+# leaving it open behind the terminal only means closing it later. Typing
+# `yazi` gets you back to the same spot.
 #
-# Two mechanisms were tried and measured. Chaining `quit` in the keymap - which
-# yazi documents as an array of commands - silently ran NOTHING at all when the
-# array ended in `quit`: not the shell command, not the quit. An array of one
-# element works fine, so the array form itself is sound.
+# `ya emit quit` rather than chaining `quit` in the keymap. The keymap does
+# accept an array of commands, and `quit` in one does quit - but it races: the
+# shell command never runs at all, measured both with and without --orphan.
+# Asking the running instance from here happens after the terminal is already
+# started, which is the order that works.
 #
-# And `ya emit quit` from here, which is the same mechanism yazi-open uses
-# successfully to navigate. YAZI_ID is set in this environment and the command
-# exits 0, and yazi stays open regardless - so `quit` is either not a valid
-# emit action or is ignored for the current instance.
-#
-# Until one of those is understood, closing the file manager is a keypress.
+# foot is setsid'd above, so it is not in yazi's process group and survives
+# yazi exiting a moment later.
+exec ya emit quit

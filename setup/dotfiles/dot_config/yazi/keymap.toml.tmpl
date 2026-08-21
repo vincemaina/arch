@@ -12,14 +12,14 @@ prepend_keymap = [
     # them from the binary rather than by remembering - so neither shadows
     # anything.
     #
-    # These do NOT close yazi, which was asked for and could not be made to
-    # work - see the note in ~/.local/bin/yazi-terminal. Chaining `quit` in an
-    # array here silently runs nothing at all, and `ya emit quit` from the
-    # helper exits 0 and leaves yazi open.
+    # Both close yazi afterwards, and the helper does that itself with
+    # `ya emit quit`. Chaining `quit` into the array here does quit, but it
+    # races the shell command and the shell never runs at all - so the order
+    # has to be enforced from inside the helper, after the terminal is up.
     #
     # $0 is the hovered entry. Absolute path to the helper for the same reason
     # the opener uses one: yazi's PATH comes from sway, which does not have
     # ~/.local/bin on it.
-    { on = "o", run = "shell '{{ .chezmoi.homeDir }}/.local/bin/yazi-terminal \"$0\"'", desc = "Terminal at cursor" },
-    { on = "<C-o>", run = "shell '{{ .chezmoi.homeDir }}/.local/bin/yazi-terminal'", desc = "Terminal here" },
+    { on = "o", run = "shell '{{ .chezmoi.homeDir }}/.local/bin/yazi-terminal \"$0\"' --orphan", desc = "Terminal at cursor" },
+    { on = "<C-o>", run = "shell '{{ .chezmoi.homeDir }}/.local/bin/yazi-terminal' --orphan", desc = "Terminal here" },
 ]
