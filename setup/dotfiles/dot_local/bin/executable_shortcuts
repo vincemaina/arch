@@ -35,6 +35,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
 
 HOME = pathlib.Path.home()
 CACHE = HOME / ".cache" / "shortcuts"
@@ -102,13 +103,28 @@ def sway_shortcuts():
     # through to a light tidy-up, which is usually enough: "focus left" and
     # "fullscreen" already say what they do.
     PHRASES = [
+        # The media keys already say what they are on the keycap, so the
+        # description is what actually happens - the cap, in particular, which
+        # is invisible and the reason wpctl is used instead of pactl.
+        (r"^exec wpctl set-mute .*SINK.* toggle$", "Mute or unmute the speakers"),
+        (r"^exec wpctl set-mute .*SOURCE.* toggle$", "Mute or unmute the microphone"),
+        (r"^exec wpctl set-volume .*5%\+$", "Volume up 5%, capped at 100%"),
+        (r"^exec wpctl set-volume .*5%-$", "Volume down 5%"),
+        (r"^exec playerctl play-pause$", "Play or pause whatever is playing"),
+        (r"^exec playerctl next$", "Skip to the next track"),
+        (r"^exec playerctl previous$", "Back to the previous track"),
+        (r"^exec playerctl stop$", "Stop playback"),
+        (r"^exec brightnessctl set 5%\+$", "Screen brighter"),
+        (r"^exec brightnessctl set 5%-$", "Screen dimmer"),
         (r"^kill$", "Close the focused window"),
         (r"^reload$", "Reload the sway config"),
         (r"^fullscreen$", "Fullscreen the focused window"),
         (r"^focus mode_toggle$", "Switch between the tiled and floating layers"),
         (r"^focus parent$", "Select the container holding this window"),
+        (r"^move scratchpad$", "Hide the window in the scratchpad"),
         (r"^focus (\w+)$", lambda m: f"Focus {m.group(1)}"),
-        (r"^move (\w+)$", lambda m: f"Move the window {m.group(1)}"),
+        (r"^move (left|right|up|down)$",
+         lambda m: f"Move the window {m.group(1)}"),
         (r"^workspace number (\d+)$", lambda m: f"Go to workspace {m.group(1)}"),
         (r"^move container to workspace number (\d+)$",
          lambda m: f"Send the window to workspace {m.group(1)}"),
@@ -116,7 +132,6 @@ def sway_shortcuts():
         (r"^workspace next_on_output$", "Next workspace"),
         (r"^workspace back_and_forth$", "Back to the last workspace"),
         (r"^scratchpad show$", "Show the scratchpad"),
-        (r"^move scratchpad$", "Hide the window in the scratchpad"),
         (r"^layout toggle split tabbed$", "Toggle tabbed layout"),
         (r'^mode "default"$', "Leave this mode"),
         (r'^mode "(\w+)"$', lambda m: f"Enter {m.group(1)} mode"),
@@ -137,8 +152,20 @@ def sway_shortcuts():
             if "/" in first:
                 first = os.path.basename(first)
             args = rest.split(maxsplit=1)
-            if first == "swaynag":
-                return "Exit sway (asks first)"
+            HELPERS = {
+                "terminal": "Open a terminal",
+                "shortcuts": "This panel",
+                "sway-toggle-floating": "Float or tile the focused window",
+                "swaynag": "Exit sway (asks first)",
+                "qutebrowser": "Open the browser",
+            }
+            if first in HELPERS:
+                return HELPERS[first]
+            if first == "sway-screenshot":
+                target = {"screen": "whole screen", "region": "a region",
+                          "clip": "a region, to the clipboard"}
+                which = args[1].strip() if len(args) > 1 else ""
+                return f"Screenshot {target.get(which, which)}"
             if len(args) > 1 and not args[1].startswith("-"):
                 return f"{first} {args[1]}"[:56]
             return first
@@ -333,10 +360,13 @@ def running_in(pid, wanted, depth=0):
         return None
     if comm in wanted:
         return wanted[comm]
+    # /proc rather than pgrep. This runs on a timer now, and spawning a process
+    # per node to ask about processes is the kind of thing that shows up as a
+    # panel quietly costing a percent of a core.
     try:
-        children = subprocess.run(["pgrep", "-P", str(pid)],
-                                  capture_output=True, text=True, timeout=3).stdout.split()
-    except (OSError, subprocess.SubprocessError):
+        children = pathlib.Path(
+            f"/proc/{pid}/task/{pid}/children").read_text().split()
+    except OSError:
         return None
     for child in children:
         found = running_in(child, wanted, depth + 1)
@@ -369,97 +399,233 @@ def focused_context():
     return "sway"
 
 
-ANSI = {
-    "clear": "\033[2J\033[H",
-    "hide_cursor": "\033[?25l",
-    "show_cursor": "\033[?25h",
-    "dim": "\033[2m",
-    "bold": "\033[1m",
-    "reset": "\033[0m",
-    # The terminal's own palette, so this follows the desktop theme through
-    # foot rather than carrying colours of its own that would have to be kept
-    # in step. Cyan is index 6, bright black is 8.
-    "key": "\033[36m",
-    "muted": "\033[90m",
+# ---------------------------------------------------------------------------
+# Making keys readable
+# ---------------------------------------------------------------------------
+#
+# "Mod4+Shift+slash" is what sway calls it and not what anyone presses. Two
+# separate translations are needed, and the second is the interesting one.
+#
+# Names: Mod4 is the Super key, Return is Enter, slash is /.
+#
+# And the keyd swap. /etc/keyd/default.conf makes the physical left Control send
+# Alt and the physical left Alt send Control, so a binding on "Ctrl" is pressed
+# with the key labelled Alt. Showing the logical name would be correct and
+# useless - the point of this panel is to tell you which key to hit. So the
+# physical key is shown, and the header says so once rather than every row.
+KEY_NAMES = {
+    "Mod4": "Super",
+    "Mod1": "Ctrl",      # keyd: the physical left Alt sends Control
+    "Ctrl": "Alt",       # keyd: the physical left Control sends Alt
+    "Control": "Alt",
+    "Alt": "Ctrl",
+    "Return": "Enter",
+    "slash": "/",
+    "minus": "-",
+    "equal": "=",
+    "space": "Space",
+    "Print": "PrtSc",
+    "Escape": "Esc",
+    "XF86AudioRaiseVolume": "Volume up",
+    "XF86AudioLowerVolume": "Volume down",
+    "XF86AudioMute": "Mute",
+    "XF86AudioMicMute": "Mute mic",
+    "XF86AudioPlay": "Play/pause",
+    "XF86AudioPause": "Play/pause",
+    "XF86AudioNext": "Next track",
+    "XF86AudioPrev": "Previous track",
+    "XF86AudioStop": "Stop",
+    "XF86MonBrightnessUp": "Brightness up",
+    "XF86MonBrightnessDown": "Brightness down",
 }
 
 
-def render(context, rows, cols):
-    title, fetch = CONTEXTS[context]
-    entries = fetch()
+def pretty_keys(combo):
+    parts = combo.split("+")
+    return "+".join(KEY_NAMES.get(part, part) for part in parts)
 
-    lines = []
-    others = " · ".join(t for c, (t, _) in CONTEXTS.items() if c != context)
-    lines.append(f'{ANSI["bold"]}{ANSI["key"]}{title}{ANSI["reset"]}')
-    lines.append(f'{ANSI["muted"]}{others[:cols - 2]}{ANSI["reset"]}')
-    lines.append("")
 
-    # Reserve a row for the header block, one for the footer, and ONE MORE for
-    # the line the cursor sits on. Filling the window exactly scrolls it, which
-    # pushed the title off the top - the panel was correct and unreadable.
-    body = max(rows - len(lines) - 2, 1)
+def collapse_runs(entries):
+    """Fold "workspace 1..10" into one row.
 
-    width = min(max((len(k) for k, _ in entries), default=8), max(cols // 3, 10))
-    for keys, desc in entries[:body]:
-        room = max(cols - width - 5, 8)
-        lines.append(f'  {ANSI["key"]}{keys[:width].ljust(width)}{ANSI["reset"]}  '
-                     f'{desc[:room]}')
+    Twenty of the desktop's bindings are the same action with a different
+    number, and listing each one buries everything else in a panel this size.
+    They are folded only when there are at least three, so a genuine pair is
+    left alone.
+    """
+    import collections
+    groups = collections.OrderedDict()
+    for keys, desc in entries:
+        km = re.match(r"^(.*?)(\d)$", keys)
+        dm = re.match(r"^(.*?)(\d+)$", desc)
+        if km and dm:
+            groups.setdefault((km.group(1), dm.group(1)), []).append(
+                (km.group(2), dm.group(2), keys, desc))
+        else:
+            groups.setdefault((keys, desc), None)
 
-    hidden = len(entries) - body
-    if hidden > 0:
-        lines.append(f'{ANSI["muted"]}  {hidden} more — resize to see them{ANSI["reset"]}')
+    out = []
+    for key, members in groups.items():
+        if members is None:
+            out.append(key)
+        elif len(members) < 3:
+            out.extend((k, d) for _, _, k, d in members)
+        else:
+            prefix, desc_prefix = key
+            numbers = [m[1] for m in members]
+            first, last = members[0][0], members[-1][0]
+            out.append((f"{prefix}{first}…{last}",
+                        f"{desc_prefix}{min(numbers, key=int)}–{max(numbers, key=int)}"))
+    return out
 
-    # No trailing newline on the last line, for the same reason.
-    sys.stdout.write(ANSI["clear"] + "\n".join(lines))
-    sys.stdout.flush()
+
+# ---------------------------------------------------------------------------
+# The panel
+# ---------------------------------------------------------------------------
+
+HELP = "Tab switch · / search · ↑↓ scroll · f follow · q quit"
 
 
 def panel():
-    """Redraw whenever focus moves, and otherwise sit still.
+    import curses
+    curses.wrapper(_panel)
 
-    Driven by sway's event stream rather than a timer: a poll would either lag
-    behind a focus change or spend the whole session waking up to discover
-    nothing happened.
-    """
-    own_pid = os.getpid()
-    sys.stdout.write(ANSI["hide_cursor"])
 
-    def size():
+def _panel(stdscr):
+    import curses
+    curses.curs_set(0)
+    curses.use_default_colors()          # keep foot's background, so the panel
+    for i in range(1, 8):                # is as transparent as everything else
+        curses.init_pair(i, i, -1)
+    ACCENT, MUTED, BOLD = curses.color_pair(6), curses.color_pair(8 % 8), curses.A_BOLD
+    MUTED = curses.color_pair(4)
+
+    names = list(CONTEXTS)
+    context = focused_context()
+    following = True                     # until a tab is chosen by hand
+    query, searching, offset = "", False, 0
+    cache = {}
+    last_check = 0.0
+
+    def entries_for(name):
+        if name not in cache:
+            title, fetch = CONTEXTS[name]
+            rows = fetch()
+            if name == "sway":
+                rows = collapse_runs([(pretty_keys(k), d) for k, d in rows])
+            cache[name] = rows
+        return cache[name]
+
+    stdscr.timeout(400)
+    while True:
+        rows, cols = stdscr.getmaxyx()
+        items = [(k, d) for k, d in entries_for(context)
+                 if not query or query.lower() in k.lower() or query.lower() in d.lower()]
+
+        body = max(rows - 4, 1)
+        offset = max(0, min(offset, max(len(items) - body, 0)))
+
+        stdscr.erase()
+
+        # Tabs, with the current one marked. Clickable and Tab-able, because
+        # the automatic guess is sometimes wrong and arguing with it is worse
+        # than steering it.
+        x = 1
+        tab_spans = []
+        for name in names:
+            label = f" {CONTEXTS[name][0]} "
+            if x + len(label) < cols - 1:
+                attr = (curses.A_REVERSE | BOLD) if name == context else MUTED
+                stdscr.addstr(0, x, label, attr)
+                tab_spans.append((x, x + len(label), name))
+                x += len(label) + 1
+
+        marker = "following" if following else "pinned"
+        if cols > 30:
+            stdscr.addstr(0, max(cols - len(marker) - 2, x), marker[:cols - x - 1], MUTED)
+
+        header = f"/{query}" if searching or query else HELP
+        stdscr.addstr(1, 1, header[:cols - 2], MUTED)
+
+        width = min(max((len(k) for k, _ in items), default=8), max(cols // 3, 12))
+        for row, (keys, desc) in enumerate(items[offset:offset + body]):
+            stdscr.addstr(2 + row, 1, keys[:width].ljust(width), ACCENT)
+            room = cols - width - 4
+            if room > 0:
+                stdscr.addstr(2 + row, width + 3, desc[:room])
+
+        if len(items) > body:
+            shown = f"{offset + 1}–{min(offset + body, len(items))} of {len(items)}"
+            stdscr.addstr(rows - 1, 1, shown[:cols - 2], MUTED)
+
+        stdscr.refresh()
+
+        # Poll for a context change as well as listening for one. Opening
+        # neovim inside a terminal that already had focus changes nothing sway
+        # can report - no window appeared, none was focused - so an event-only
+        # panel keeps showing the shell's shortcuts until you switch away and
+        # back. That was the reported bug.
+        now = time.time()
+        if following and now - last_check > 0.8:
+            last_check = now
+            live = focused_context()
+            if live != context:
+                context, offset = live, 0
+
         try:
-            ts = os.get_terminal_size()
-            return ts.lines, ts.columns
-        except OSError:
-            return 24, 80
+            ch = stdscr.getch()
+        except KeyboardInterrupt:
+            return
+        if ch == -1:
+            continue
 
-    current = focused_context()
-    rows, cols = size()
-    render(current, rows, cols)
+        if searching:
+            if ch in (27,):                       # Esc leaves the search
+                searching, query = False, ""
+            elif ch in (curses.KEY_ENTER, 10, 13):
+                searching = False
+            elif ch in (curses.KEY_BACKSPACE, 127, 8):
+                query = query[:-1]
+            elif 32 <= ch < 127:
+                query += chr(ch)
+                offset = 0
+            continue
 
-    proc = subprocess.Popen(["swaymsg", "-t", "subscribe", "-m", '["window"]'],
-                            stdout=subprocess.PIPE, text=True)
-    try:
-        for line in proc.stdout:
+        if ch in (ord("q"), 27):
+            return
+        elif ch == ord("/"):
+            searching, query, offset = True, "", 0
+        elif ch == ord("\t") or ch == 9:
+            context = names[(names.index(context) + 1) % len(names)]
+            following, offset = False, 0
+        elif ch == curses.KEY_BTAB:
+            context = names[(names.index(context) - 1) % len(names)]
+            following, offset = False, 0
+        elif ch == ord("f"):
+            following = True
+            context, offset = focused_context(), 0
+        elif ch in (curses.KEY_DOWN, ord("j")):
+            offset += 1
+        elif ch in (curses.KEY_UP, ord("k")):
+            offset = max(offset - 1, 0)
+        elif ch == curses.KEY_NPAGE:
+            offset += body
+        elif ch == curses.KEY_PPAGE:
+            offset = max(offset - body, 0)
+        elif ch == curses.KEY_HOME:
+            offset = 0
+        elif ch == curses.KEY_END:
+            offset = len(items)
+        elif ch == curses.KEY_MOUSE:
             try:
-                event = json.loads(line)
-            except ValueError:
+                _, mx, my, _, _ = curses.getmouse()
+            except curses.error:
                 continue
-            if event.get("change") != "focus":
-                continue
-            # Focus landing on this panel is not a context change - otherwise
-            # clicking it would replace whatever you opened it to read.
-            container = event.get("container") or {}
-            if container.get("pid") == own_pid or container.get("app_id") == "shortcuts":
-                continue
-            context = focused_context()
-            rows, cols = size()
-            if context != current:
-                current = context
-            render(current, rows, cols)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        proc.terminate()
-        sys.stdout.write(ANSI["show_cursor"])
+            if my == 0:
+                for x0, x1, name in tab_spans:
+                    if x0 <= mx < x1:
+                        context, following, offset = name, False, 0
+                        break
 
 
 def main():
@@ -468,28 +634,32 @@ def main():
     if args[:1] == ["--mode"]:
         name = args[1] if len(args) > 1 else "sway"
         _, fetch = CONTEXTS.get(name, CONTEXTS["sway"])
-        emit(fetch())
+        rows = fetch()
+        if name == "sway":
+            rows = collapse_runs([(pretty_keys(k), d) for k, d in rows])
+        emit(rows)
         return
 
     if args[:1] == ["--list"]:
         for name, (title, fetch) in CONTEXTS.items():
             print(f"\n== {title} ==")
-            for keys, desc in fetch():
-                print(f"  {keys:<24} {desc}")
+            rows = fetch()
+            if name == "sway":
+                rows = collapse_runs([(pretty_keys(k), d) for k, d in rows])
+            for keys, desc in rows:
+                print(f"  {keys:<26} {desc}")
         return
 
     if args[:1] == ["--panel"]:
         panel()
         return
 
-    # Toggle, so $mod+? both opens and closes it - the same gesture the bar's
-    # windows use, through the same helper.
     me = str(pathlib.Path(__file__).resolve())
     toggle = str(pathlib.Path(me).parent / "sway-toggle-window")
     os.execvp(toggle, [
         toggle, "shortcuts",
         "foot", "--app-id=shortcuts", "--title=Shortcuts",
-        "--window-size-chars=64x24",
+        "--window-size-chars=68x26",
         "-e", me, "--panel",
     ])
 
