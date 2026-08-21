@@ -582,6 +582,66 @@ done < <(python3 "$bar_check")
 rm -f "$bar_check"
 
 # ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+section "Terminal windows (TASK-88)"
+
+# The app_id ties two files together, and nothing else notices when they
+# disagree - the window simply tiles.
+#
+# `terminal` sets one of two app_ids for its floating windows and
+# 40-window-rules.conf has to float and centre both. They were a single app_id
+# until TASK-88, which is why this exists: sharing it meant a rule could not
+# name one without the other, and a selector like `swaymsg [app_id=greeting]
+# kill` matched most of the terminals on the machine, including the one being
+# worked in. Splitting them is only useful if they stay split.
+while IFS='|' read -r verdict message; do
+    [[ -z "$verdict" ]] && continue
+    case "$verdict" in
+        pass) pass "$message" ;;
+        fail) fail "$message" ;;
+        skip) skip "$message" ;;
+    esac
+done < <(python3 - "$HOME/.local/bin/terminal" \
+                  "$HOME/.config/sway/config.d/40-window-rules.conf" <<'TERMCHECK_EOF'
+import re, sys, pathlib
+
+term_path, rules_path = (pathlib.Path(p) for p in sys.argv[1:3])
+out = []
+def say(verdict, message): out.append(f"{verdict}|{message}")
+
+if not term_path.exists():
+    say("skip", "the terminal helper is not installed")
+elif not rules_path.exists():
+    say("skip", "the window rules are not installed")
+else:
+    term = term_path.read_text()
+    rules = rules_path.read_text()
+    set_ids = set(re.findall(r"--app-id=([\w-]+)", term))
+    floated = set(re.findall(r'for_window\s*\[app_id="([\w-]+)"\]\s*floating enable', rules))
+    centred = set(re.findall(r'for_window\s*\[app_id="([\w-]+)"\]\s*move position center', rules))
+
+    if not set_ids:
+        say("fail", "the terminal helper sets no app_id, so no rule can match it")
+    else:
+        missing_float = sorted(set_ids - floated)
+        missing_centre = sorted(set_ids - centred)
+        if missing_float:
+            say("fail", f"terminal sets app_id {', '.join(missing_float)} but no rule floats it")
+        elif missing_centre:
+            say("fail", f"terminal sets app_id {', '.join(missing_centre)} but no rule centres it")
+        else:
+            say("pass", f"every app_id the terminal sets ({', '.join(sorted(set_ids))}) is floated and centred by a matching rule")
+
+    if len(set_ids) < 2:
+        say("fail", "the greeting card and the ordinary floating terminal share one app_id again")
+    else:
+        say("pass", "the greeting card and ordinary floating terminals have different app_ids")
+
+print("\n".join(out))
+TERMCHECK_EOF
+)
+
+# ----------------------------------------------------------------------
 section "Opening files (TASK-47)"
 
 # Choosing a file in the launcher has to end with a window. Every link in that

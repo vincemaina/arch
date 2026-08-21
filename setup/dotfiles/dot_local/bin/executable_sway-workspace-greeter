@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# requires: swaymsg python3
+# requires: swaymsg python3 systemd-run
 #
 # `terminal` is deliberately not listed: the requires header is for external
 # commands that must come from a declared package, and that one is our own
@@ -63,10 +63,46 @@ def focused_workspace():
         pass
     return None
 
+# The system summary belongs to landing in a session, not to landing on a
+# workspace. It used to run in every card this opened, which meant seeing the
+# same summary again on every workspace and every new terminal - TASK-88. The
+# first card of the session gets it; the rest are plain terminals.
+#
+# This process is the session: the unit is PartOf wayland-session@sway.target,
+# so it starts when the session does and dies with it. A module-level flag is
+# therefore exactly the right lifetime, and needs no state on disk to reset.
+#
+# Restart=always is the one thing that could undermine that - a crash would
+# restart this and greet again. That is the correct behaviour anyway: coming
+# back from a crash is landing in a session as far as anyone can tell.
+greeted = False
+
 def greet(name):
-    if name and workspace_is_empty(name):
-        subprocess.Popen([TERMINAL, "--floating"],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    global greeted
+    if not (name and workspace_is_empty(name)):
+        return
+    mode = "--greeting" if not greeted else "--floating"
+    greeted = True
+
+    # THE TERMINAL MUST NOT BE A CHILD OF THIS SERVICE.
+    #
+    # Popen alone made every terminal this opened a member of
+    # greeting.service's cgroup, and systemd's default KillMode is
+    # control-group - so `systemctl --user restart greeting.service` closed
+    # every terminal on the machine, including the one the restart was typed
+    # into. It did exactly that. Worse, this unit is Restart=always, so a crash
+    # here would have taken every open terminal with it, at the moment least
+    # convenient for it to happen.
+    #
+    # systemd-run --scope puts each terminal in its own transient scope under
+    # app.slice, which is where a user application belongs anyway - this is a
+    # thing that launches terminals, not a thing that owns them. --collect
+    # cleans the scope up when it exits, and --quiet keeps the unit name off
+    # the journal on every workspace.
+    subprocess.Popen(
+        ["systemd-run", "--user", "--scope", "--quiet", "--collect",
+         TERMINAL, mode],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 # The workspace this session started on, before any events arrive.
 greet(focused_workspace())
