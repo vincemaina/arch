@@ -281,6 +281,13 @@ pointing at a file that does not exist. Empty icon strings. A boot entry naming
 an initramfs that was never built. A greeter offering a session that bypassed
 uwsm.
 
+One variant worth naming separately: a **fix that did not work, kept anyway**.
+The SPICE guest agent was installed to stop a ghost cursor, did not stop it, and
+stayed - with a manifest comment describing the hypothesis it was tried under as
+though it were the outcome. Read that comment a month later and the package is
+load-bearing. It was not. When a fix fails, take it back out, or write down that
+it failed where the next reader will look.
+
 None announced itself; several had been broken since the config was first
 committed. Two consequences for how to work here:
 

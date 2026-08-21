@@ -126,15 +126,3 @@ mesa
 # rather than neofetch: neofetch was archived by its author in 2024 and is
 # unmaintained, while fastfetch is in extra and considerably quicker.
 fastfetch
-
-# SPICE guest agent, for when this is a virtual machine.
-#
-# The host offers an agent channel at /dev/virtio-ports/com.redhat.spice.0 and
-# without something listening on it the SPICE client cannot coordinate the
-# pointer with the guest, so it draws its own - which is a second cursor on
-# screen alongside the one sway draws.
-#
-# Harmless on real hardware: the daemon finds no channel and exits, so this
-# costs a stopped unit and about a megabyte rather than needing to be
-# conditional. Revisit if TASK-14 ever brings per-machine profiles.
-spice-vdagent
