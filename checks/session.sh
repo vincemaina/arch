@@ -628,9 +628,15 @@ for pair in "text/plain:an ordinary text file" \
         missing_handlers+="  nothing opens $what ($mime)"$'\n'
         continue
     fi
-    if ! find /usr/share/applications /usr/local/share/applications \
-              "$HOME/.local/share/applications" \
-              -maxdepth 1 -name "$handler" -print -quit 2>/dev/null | grep -q .; then
+    # No pipe, and `|| true`. `grep -q` closes the pipe at the first match and
+    # find exits 141 under pipefail; and find exits 1 for a missing directory -
+    # /usr/local/share/applications does not exist here - even when it found
+    # what it was asked for. Between them, an entry in the LAST directory
+    # searched was reported as not installed while sitting right there.
+    found_handler="$(find /usr/share/applications /usr/local/share/applications \
+                          "$HOME/.local/share/applications" \
+                          -maxdepth 1 -name "$handler" -print -quit 2>/dev/null || true)"
+    if [[ -z "$found_handler" ]]; then
         missing_handlers+="  $what opens with $handler, which is not installed"$'\n'
     fi
 done

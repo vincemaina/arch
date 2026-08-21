@@ -1,0 +1,43 @@
+# yazi, the file manager on $mod+e.
+#
+# The only thing configured here is which editor opens a file, and it is worth
+# explaining why that needs configuring at all.
+#
+# yazi's default text opener is literally `${EDITOR:-vi} %s`. That is a sensible
+# default and it failed here in the least helpful way: EDITOR was unset, so it
+# fell back to `vi`, which is not installed - nothing owns /usr/bin/vi on this
+# machine - and pressing enter on a file reported "command vi not found".
+#
+# EDITOR is now set, in environment.d. This does not rely on that.
+#
+# WHY NOT JUST RELY ON EDITOR
+#
+# Because the environment is the fragile part. environment.d is read when the
+# systemd user manager starts, and the user manager survives a logout - so a
+# value added there is not in the session until the *next* login, and every
+# process already running keeps the environment it started with. yazi inherits
+# from foot, which inherits from sway, which was started before the variable
+# existed. Naming the editor here means the file manager works from the moment
+# the config is applied, rather than after a login nobody remembers is needed.
+#
+# It also means the two places that decide what edits a file agree: this, and
+# the mimeapps association that sends text/plain to nvim.desktop. If the editor
+# ever changes, both move together - and checks/session.sh checks the second.
+
+[opener]
+edit = [
+    { run = 'nvim "$@"', desc = "nvim", block = true, for = "unix" },
+]
+
+# NOT CONFIGURED HERE: opening a directory in a terminal.
+#
+# That was tried as an [open] rule matching "*/" and taken back out before it
+# shipped. In yazi, Enter on a directory *navigates into it* - that is the core
+# gesture of the program, not an "open" action - and an open rule matching
+# directories risks replacing it. There is no way to verify that without driving
+# yazi interactively, and breaking navigation in the file manager to add a
+# shortcut to it is a bad trade.
+#
+# The same want is served where it can be checked: opening a folder from the
+# launcher gives a terminal in it, through terminal-here.desktop. Inside yazi,
+# its own shell binding already opens a shell in the current directory.

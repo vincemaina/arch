@@ -1,0 +1,27 @@
+# Opening a folder gives you a shell in it.
+#
+# This replaces yazi as the handler for a directory. Both are defensible - yazi
+# is a file manager and browsing is a reasonable thing to want - but a directory
+# you have gone to the trouble of finding is usually one you want to *do*
+# something in, and the file manager is one keypress away on $mod+e either way.
+#
+# NoDisplay because this is a handler, not an application. Without it the
+# launcher would list "Terminal here" as something to launch, which makes no
+# sense with no folder to open it in.
+#
+# Exec uses an absolute path to foot for the same reason every other entry here
+# does: these are launched by things whose PATH is not an interactive shell's.
+# foot is in /usr/bin so it would resolve anyway, but the habit is what stops
+# the next entry from being the one that silently does nothing.
+
+[Desktop Entry]
+Type=Application
+Name=Terminal here
+GenericName=Shell in this folder
+Comment=Open a terminal with this folder as the working directory
+Icon=utilities-terminal
+Exec=/usr/bin/foot --working-directory=%f
+Terminal=false
+Categories=System;TerminalEmulator;
+MimeType=inode/directory;
+NoDisplay=true

@@ -28,6 +28,40 @@ shape and had only ever passed by luck, because `swapon` writes one line.
 if [[ "$(cmd | grep -c pattern)" -gt 0 ]]; then
 ```
 
+## Moving a command out of an `if` condition arms `set -e`
+
+**Symptom.** Rewriting `if ! cmd | grep -q .; then` into an assignment — to fix
+the `grep -q` trap above — makes a script that worked start exiting silently
+part-way through, printing no error at all.
+
+**Cause.** `set -e` does **not** apply to commands in an `if` condition; that is
+the whole point of a condition being allowed to fail. Capturing the same command
+into a variable removes that protection, because the assignment takes the
+command substitution's exit status and `set -e` acts on it.
+
+Here the command was `find` over three directories, one of which
+(`/usr/local/share/applications`) does not exist. find prints exactly what it
+was asked for and **still exits 1**, because a directory was missing. Harmless
+as a condition; fatal as an assignment.
+
+It hid, as well. An entry living in the *first* directory searched matched
+before find reached the missing one, so find quit early and exited 0. Only an
+entry in the **last** directory ever triggered it — and the symptom read as
+"that desktop file is not installed" when it was sitting right there.
+
+**Fix.** Decide what the exit status means, and say so:
+
+```bash
+found="$(find ... -print -quit 2>/dev/null || true)"
+[[ -n "$found" ]] || echo "not found"
+```
+
+**The general form, which is the part worth keeping:** changing *where* a
+command sits changes whether `set -e` is watching it. Moving one out of a
+condition, out of a pipeline, or off the left side of `&&` is not a refactor —
+it changes the error handling, silently, and the same code now behaves
+differently.
+
 ## Bash variables cannot hold NUL
 
 **Symptom.** Every row of a rofi menu renders as the visible text `icon`

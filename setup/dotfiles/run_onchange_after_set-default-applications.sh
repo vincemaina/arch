@@ -25,13 +25,16 @@ set -euo pipefail
 # desktop file : mime types it should handle
 ASSOCIATIONS=(
     "imv.desktop:image/png image/jpeg image/gif image/webp image/bmp image/tiff"
-    # Opening a folder should land in the file manager being used, which is a
-    # terminal one. yazi.desktop declares Terminal=true, which means glib has to
-    # find a terminal to run it in - see ~/.local/bin/xdg-terminal-exec, without
-    # which this association resolved correctly and then opened nothing at all.
-    # It was declared here and believed to work for some time before anyone ran
-    # `xdg-open` on a directory and watched.
-    "yazi.desktop:inode/directory"
+    # Opening a folder gives you a shell in it rather than a file browser. A
+    # directory you have gone to the trouble of finding is usually one you want
+    # to do something in, and yazi is still one keypress away on $mod+e.
+    #
+    # This replaced yazi.desktop, which had a second problem worth remembering:
+    # yazi.desktop declares Terminal=true, so glib has to find a terminal to run
+    # it in, and until /usr/local/bin/xdg-terminal-exec existed there was none.
+    # The association resolved correctly and opened nothing at all, for months,
+    # with a comment here asserting that it worked.
+    "terminal-here.desktop:inode/directory"
 
     # Editing, rather than viewing. text/plain already resolves to nvim through
     # the entry nvim ships, but several things that are plainly code do not:
@@ -53,9 +56,25 @@ for entry in "${ASSOCIATIONS[@]}"; do
     # repository keeps finding: it looks configured and does nothing. Packages
     # are installed before dotfiles are applied, by both install.sh and
     # sync.sh, so a miss here means something is genuinely wrong.
-    if ! find /usr/share/applications /usr/local/share/applications \
-              "$HOME/.local/share/applications" \
-              -maxdepth 1 -name "$desktop" -print -quit 2>/dev/null | grep -q .; then
+    # No pipe here, deliberately. This was `find ... | grep -q .`, and grep -q
+    # exits at the first match and closes the pipe, so find takes SIGPIPE and
+    # exits 141 - which this script's `set -o pipefail` turns into a failure
+    # while the file it was looking for is sitting right there.
+    #
+    # It is a race, so it passed for years: for an entry in /usr/share it is
+    # found immediately and find is done before grep can exit. The first entry
+    # to live in ~/.local/share/applications - the LAST directory searched -
+    # lost that race every time, and reported itself as not installed.
+    # `|| true` because /usr/local/share/applications does not exist on this
+    # machine, and find exits 1 for a missing directory even when it found what
+    # it was asked for. That did not matter while this was the condition of an
+    # `if`, since set -e ignores those - it started mattering the moment the
+    # result was captured into a variable, where the assignment takes the
+    # command substitution's status and set -e acts on it.
+    found="$(find /usr/share/applications /usr/local/share/applications \
+                  "$HOME/.local/share/applications" \
+                  -maxdepth 1 -name "$desktop" -print -quit 2>/dev/null || true)"
+    if [[ -z "$found" ]]; then
         echo "Cannot set defaults: $desktop is not installed." >&2
         echo "Its package should have been installed before dotfiles were applied." >&2
         exit 1
