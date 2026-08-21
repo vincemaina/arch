@@ -23,6 +23,20 @@ local M = {}
 -- what is pinned.
 local npm_bin = vim.fn.expand('~/.local/lib/language-servers/node_modules/.bin')
 
+-- The html and css servers offer no completions at all unless the client says
+-- it supports snippets. That much is a documented quirk. What is not documented
+-- is that handing vim.lsp.config a partial `capabilities` table REPLACES the
+-- defaults rather than merging into them - so declaring only snippetSupport
+-- left the server believing the editor could do nothing else, and it declined
+-- to attach at all. No error: the buffer simply had no client.
+--
+-- So start from the real defaults and add to them.
+local function snippet_capabilities()
+  local caps = vim.lsp.protocol.make_client_capabilities()
+  caps.textDocument.completion.completionItem.snippetSupport = true
+  return caps
+end
+
 -- Common to every server here. root_markers is what decides the project
 -- directory: the first marker found walking upwards wins, and .git last means a
 -- repository is the fallback when a language's own marker is absent.
@@ -47,14 +61,7 @@ local npm_servers = {
     cmd = { npm_bin .. '/vscode-html-language-server', '--stdio' },
     filetypes = { 'html' },
     root_markers = root('package.json'),
-    -- The html server will not offer completions at all unless told the
-    -- provider supports snippets, which is a documented quirk rather than
-    -- something to discover by wondering why nothing happens.
-    capabilities = {
-      textDocument = {
-        completion = { completionItem = { snippetSupport = true } },
-      },
-    },
+    capabilities = snippet_capabilities(),
     init_options = {
       provideFormatter = true,
       embeddedLanguages = { css = true, javascript = true },
@@ -65,11 +72,7 @@ local npm_servers = {
     cmd = { npm_bin .. '/vscode-css-language-server', '--stdio' },
     filetypes = { 'css', 'scss', 'less' },
     root_markers = root('package.json'),
-    capabilities = {
-      textDocument = {
-        completion = { completionItem = { snippetSupport = true } },
-      },
-    },
+    capabilities = snippet_capabilities(),
     init_options = { provideFormatter = true },
   },
 
@@ -113,6 +116,41 @@ function M.setup()
   M.enabled = enabled
   M.expected = vim.tbl_keys(npm_servers)
 end
+
+-- ---------------------------------------------------------------------------
+-- What happens when a server attaches
+-- ---------------------------------------------------------------------------
+--
+-- nvim 0.11 gave LSP its own default keymaps, and they are already there
+-- without configuring anything: K hovers, grn renames, gra is code actions,
+-- grr finds references, gri goes to implementation, gO lists document symbols,
+-- and Ctrl-S in insert mode shows signature help. Repeating them here would be
+-- restating the defaults, which is how a config starts drifting from the manual.
+--
+-- Completion is the one thing that does NOT come on by itself. 0.12 ships
+-- vim.lsp.completion, and it stays off until a buffer asks for it - so a server
+-- can be attached and answering, with nothing ever appearing as you type. That
+-- was the state this was in: four servers connected and no completion anywhere.
+--
+-- autotrigger means it fires on the characters the server nominates - `<` in
+-- html, `.` in most languages - rather than only on Ctrl-X Ctrl-O. That is the
+-- difference between completion existing and completion being usable.
+vim.api.nvim_create_autocmd('LspAttach', {
+  callback = function(args)
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+    if client and client:supports_method('textDocument/completion') then
+      vim.lsp.completion.enable(true, args.data.client_id, args.buf, {
+        autotrigger = true,
+      })
+    end
+  end,
+  desc = 'Turn on LSP completion, which is off by default',
+})
+
+-- popup is what makes the completion menu show documentation beside it rather
+-- than only a list of names, and noselect stops the first entry being inserted
+-- before it has been chosen.
+vim.opt.completeopt = { 'menu', 'menuone', 'noselect', 'popup' }
 
 -- Diagnostics, shown rather than merely collected. The defaults in 0.12 put
 -- them in the sign column and nowhere else, so a message has to be hovered for.

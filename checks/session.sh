@@ -739,6 +739,33 @@ io.write((ts or regex) and "ok" or "none")' -c quit 2>/dev/null)"
         pass "python, javascript, shell and markdown all open highlighted"
     fi
 
+    # The editor follows the theme, and lets the terminal through.
+    #
+    # Checked against the selected theme's actual values rather than "a
+    # colorscheme is loaded", because loading the wrong one would pass that.
+    theme_fg="$(chezmoi --source "$THEME_SOURCE" data 2>/dev/null |
+        python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["themes"][d["theme"]]["text"].lstrip("#").lower())' 2>/dev/null)"
+    editor_colours="$(nvim --headless -c 'lua
+local n = vim.api.nvim_get_hl(0, { name = "Normal" })
+io.write(string.format("%s %s %s", tostring(vim.g.colors_name),
+  n.fg and string.format("%06x", n.fg) or "none",
+  n.bg and "opaque" or "transparent"))' -c quit 2>/dev/null)"
+    read -r cs_name cs_fg cs_bg <<<"$editor_colours"
+
+    if [[ "$cs_name" != "arch" ]]; then
+        fail "the editor is using the '$cs_name' colourscheme, not the generated one"
+    elif [[ -n "$theme_fg" && "$cs_fg" != "$theme_fg" ]]; then
+        fail "the editor's foreground is #$cs_fg but the selected theme's text is #$theme_fg - it is not following the theme"
+    else
+        pass "the editor uses the selected theme's colours"
+    fi
+
+    if [[ "$cs_bg" == "transparent" ]]; then
+        pass "the editor has no background of its own, so the terminal shows through"
+    else
+        fail "the editor paints its own background, so it will not match the other terminal tools"
+    fi
+
     # Parsers are declared packages rather than runtime downloads, so a missing
     # one is package drift rather than something neovim should fix itself.
     missing_parsers=""

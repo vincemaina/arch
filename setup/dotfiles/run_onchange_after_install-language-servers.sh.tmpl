@@ -40,7 +40,13 @@ set -euo pipefail
 # them. It reads like a comment and is load-bearing: without it, adding a server
 # to the list would never install it.
 #
+# Both files, not just package.json. The lockfile is what actually decides
+# which versions arrive, and the first version of this hashed only package.json
+# - so generating the lockfile changed nothing the script could see and the
+# install never ran. Adding a server would have worked; pinning one would not.
+#
 # package.json: {{ include "dot_local/lib/language-servers/package.json" | sha256sum }}
+# lockfile:     {{ include "dot_local/lib/language-servers/package-lock.json" | sha256sum }}
 
 SERVERS="$HOME/.local/lib/language-servers"
 

@@ -243,4 +243,15 @@ vim.api.nvim_create_autocmd('FileType', {
 -- that come from npm (TASK-84), and the packaged ones are TASK-81. Keeping the
 -- list somewhere other than this file is what stops init.lua turning into the
 -- distribution this was meant not to be.
+-- ---------------------------------------------------------------------------
+-- Colours
+-- ---------------------------------------------------------------------------
+--
+-- Generated from the selected theme, like everything else on this desktop.
+-- colors/arch.lua is a chezmoi template; edit .chezmoidata/themes.toml.
+--
+-- Before the language servers, so that if anything below it fails the editor is
+-- at least readable rather than readable-and-grey.
+vim.cmd.colorscheme('arch')
+
 require('lsp').setup()

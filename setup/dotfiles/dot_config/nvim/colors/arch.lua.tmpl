@@ -1,0 +1,262 @@
+{{- $palette := index .themes .theme -}}
+-- The editor's colours, from the selected theme.
+--
+-- Generated from .chezmoidata/themes.toml like sway, the bar, foot, rofi, mako,
+-- swaylock and the prompt. Edit the colours there, not here - this file is
+-- rendered and will be overwritten.
+--
+-- SYNTAX USES THE ANSI COLOURS, CHROME USES THE ROLES
+--
+-- The palette has fifteen role colours chosen for a bar and a lock screen, and
+-- sixteen ANSI colours chosen for a terminal. A syntax theme wants distinct
+-- treatments for keywords, strings, functions, types and constants - which is
+-- exactly what the ANSI sixteen already are, and exactly what the roles are
+-- not. So syntax reads from `term` and the interface furniture reads from the
+-- roles, and no new key has to be added to eight themes to make this work.
+--
+-- The comment colour is the one to be careful with. It is bright_black, which
+-- every theme sets deliberately around 4.8:1 against the background rather than
+-- the near-invisible grey that is conventional - checks/session.sh enforces
+-- that floor, so comments here inherit a contrast that was already argued over.
+--
+-- THE BACKGROUND IS DELIBERATELY ABSENT
+--
+-- Normal has no background at all, so the terminal's own shows through. foot
+-- runs at alpha 0.90, which means the editor gets the same slight transparency
+-- as yazi, btop and every other terminal tool rather than painting an opaque
+-- rectangle over the wallpaper and looking like the one thing that is not part
+-- of the set.
+--
+-- The cost is that anything wanting to stand out has to do it with a colour
+-- rather than by being a different shade of the same background - which is why
+-- the selection and the completion menu below set theirs explicitly.
+
+vim.cmd('highlight clear')
+if vim.fn.exists('syntax_on') == 1 then
+  vim.cmd('syntax reset')
+end
+vim.g.colors_name = 'arch'
+vim.o.background = 'dark'
+
+local p = {
+  bg          = '{{ $palette.bg }}',
+  bg_dim      = '{{ $palette.bg_dim }}',
+  surface     = '{{ $palette.surface }}',
+  surface_alt = '{{ $palette.surface_alt }}',
+  muted       = '{{ $palette.muted }}',
+  text        = '{{ $palette.text }}',
+  text_dim    = '{{ $palette.text_dim }}',
+  accent      = '{{ $palette.accent }}',
+  secondary   = '{{ $palette.secondary }}',
+  tertiary    = '{{ $palette.tertiary }}',
+  ok          = '{{ $palette.ok }}',
+  warning     = '{{ $palette.warning }}',
+  urgent      = '{{ $palette.urgent }}',
+  info        = '{{ $palette.info }}',
+}
+
+local t = {
+  red     = '#{{ $palette.term.red }}',
+  green   = '#{{ $palette.term.green }}',
+  yellow  = '#{{ $palette.term.yellow }}',
+  blue    = '#{{ $palette.term.blue }}',
+  magenta = '#{{ $palette.term.magenta }}',
+  cyan    = '#{{ $palette.term.cyan }}',
+  comment = '#{{ $palette.term.bright_black }}',
+}
+
+local hl = function(group, spec) vim.api.nvim_set_hl(0, group, spec) end
+
+-- ---------------------------------------------------------------------------
+-- The editor itself
+-- ---------------------------------------------------------------------------
+
+-- bg = 'NONE' rather than an omitted key: omitting it inherits, naming NONE is
+-- what actually clears it and lets the terminal through.
+hl('Normal',       { fg = p.text, bg = 'NONE' })
+hl('NormalFloat',  { fg = p.text, bg = p.surface })
+hl('FloatBorder',  { fg = p.surface_alt, bg = p.surface })
+hl('NormalNC',     { fg = p.text, bg = 'NONE' })
+
+hl('LineNr',       { fg = p.muted })
+hl('CursorLineNr', { fg = p.accent, bold = true })
+-- The cursor line is a background, and with a transparent Normal it is the only
+-- thing marking where you are - so it is a real colour rather than a tint of
+-- something that is no longer there.
+hl('CursorLine',   { bg = p.surface })
+hl('SignColumn',   { bg = 'NONE' })
+hl('ColorColumn',  { bg = p.surface })
+hl('Visual',       { bg = p.surface_alt })
+hl('MatchParen',   { fg = p.accent, bold = true })
+
+hl('Search',       { fg = p.bg, bg = p.warning })
+hl('IncSearch',    { fg = p.bg, bg = p.accent })
+hl('CurSearch',    { fg = p.bg, bg = p.accent })
+
+hl('StatusLine',   { fg = p.text, bg = p.surface })
+hl('StatusLineNC', { fg = p.muted, bg = p.bg_dim })
+hl('WinSeparator', { fg = p.surface_alt })
+hl('VertSplit',    { fg = p.surface_alt })
+
+hl('Folded',       { fg = p.muted, bg = p.surface })
+hl('NonText',      { fg = p.surface_alt })
+hl('Whitespace',   { fg = p.surface_alt })
+hl('EndOfBuffer',  { fg = p.surface_alt })
+hl('Directory',    { fg = p.accent })
+hl('Title',        { fg = p.secondary, bold = true })
+hl('Question',     { fg = p.ok })
+hl('ModeMsg',      { fg = p.accent, bold = true })
+hl('MoreMsg',      { fg = p.ok })
+hl('WarningMsg',   { fg = p.warning })
+hl('ErrorMsg',     { fg = p.urgent })
+
+-- The completion menu. It has to be opaque: a translucent popup over
+-- translucent text is unreadable, which is the one place the transparency has
+-- to stop.
+hl('Pmenu',        { fg = p.text, bg = p.surface })
+hl('PmenuSel',     { fg = p.bg, bg = p.accent, bold = true })
+hl('PmenuSbar',    { bg = p.surface })
+hl('PmenuThumb',   { bg = p.surface_alt })
+hl('PmenuKind',    { fg = p.info, bg = p.surface })
+hl('PmenuExtra',   { fg = p.muted, bg = p.surface })
+
+hl('TabLine',      { fg = p.muted, bg = p.bg_dim })
+hl('TabLineSel',   { fg = p.text, bg = p.surface, bold = true })
+hl('TabLineFill',  { bg = 'NONE' })
+
+-- ---------------------------------------------------------------------------
+-- Syntax
+-- ---------------------------------------------------------------------------
+
+hl('Comment',      { fg = t.comment, italic = true })
+hl('Constant',     { fg = t.yellow })
+hl('String',       { fg = t.green })
+hl('Character',    { fg = t.green })
+hl('Number',       { fg = t.yellow })
+hl('Boolean',      { fg = t.yellow })
+hl('Float',        { fg = t.yellow })
+
+hl('Identifier',   { fg = p.text })
+hl('Function',     { fg = t.blue })
+
+hl('Statement',    { fg = t.magenta })
+hl('Conditional',  { fg = t.magenta })
+hl('Repeat',       { fg = t.magenta })
+hl('Label',        { fg = t.magenta })
+hl('Operator',     { fg = p.text_dim })
+hl('Keyword',      { fg = t.magenta })
+hl('Exception',    { fg = t.red })
+
+hl('PreProc',      { fg = t.cyan })
+hl('Include',      { fg = t.magenta })
+hl('Define',       { fg = t.magenta })
+hl('Macro',        { fg = t.cyan })
+
+hl('Type',         { fg = t.cyan })
+hl('StorageClass', { fg = t.cyan })
+hl('Structure',    { fg = t.cyan })
+hl('Typedef',      { fg = t.cyan })
+
+hl('Special',      { fg = t.red })
+hl('SpecialChar',  { fg = t.red })
+hl('Delimiter',    { fg = p.text_dim })
+hl('SpecialComment', { fg = t.comment, bold = true })
+hl('Todo',         { fg = p.bg, bg = p.warning, bold = true })
+hl('Underlined',   { fg = p.info, underline = true })
+hl('Error',        { fg = p.urgent })
+
+-- ---------------------------------------------------------------------------
+-- Treesitter
+-- ---------------------------------------------------------------------------
+--
+-- Linked rather than restated. Treesitter's capture names are far more specific
+-- than vim's groups, and giving each its own colour is how a theme ends up with
+-- forty shades nobody can tell apart. Linking means the mapping above is the
+-- only place colours are decided.
+
+local links = {
+  ['@comment']              = 'Comment',
+  ['@string']               = 'String',
+  ['@string.escape']        = 'SpecialChar',
+  ['@string.special']       = 'SpecialChar',
+  ['@character']            = 'Character',
+  ['@number']               = 'Number',
+  ['@boolean']              = 'Boolean',
+  ['@float']                = 'Float',
+  ['@constant']             = 'Constant',
+  ['@constant.builtin']     = 'Constant',
+  ['@function']             = 'Function',
+  ['@function.call']        = 'Function',
+  ['@function.builtin']     = 'Function',
+  ['@function.method']      = 'Function',
+  ['@constructor']          = 'Type',
+  ['@keyword']              = 'Keyword',
+  ['@keyword.function']     = 'Keyword',
+  ['@keyword.return']       = 'Keyword',
+  ['@keyword.operator']     = 'Operator',
+  ['@conditional']          = 'Conditional',
+  ['@repeat']               = 'Repeat',
+  ['@exception']            = 'Exception',
+  ['@type']                 = 'Type',
+  ['@type.builtin']         = 'Type',
+  ['@type.definition']      = 'Typedef',
+  ['@attribute']            = 'PreProc',
+  ['@property']             = 'Identifier',
+  ['@field']                = 'Identifier',
+  ['@variable']             = 'Identifier',
+  ['@variable.builtin']     = 'Special',
+  ['@variable.parameter']   = 'Identifier',
+  ['@operator']             = 'Operator',
+  ['@punctuation.delimiter'] = 'Delimiter',
+  ['@punctuation.bracket']  = 'Delimiter',
+  ['@punctuation.special']  = 'SpecialChar',
+  ['@tag']                  = 'Statement',
+  ['@tag.attribute']        = 'Identifier',
+  ['@tag.delimiter']        = 'Delimiter',
+  ['@markup.heading']       = 'Title',
+  ['@markup.link']          = 'Underlined',
+  ['@markup.raw']           = 'String',
+  ['@markup.list']          = 'Statement',
+}
+
+for from, to in pairs(links) do
+  hl(from, { link = to })
+end
+
+-- ---------------------------------------------------------------------------
+-- Diagnostics and LSP
+-- ---------------------------------------------------------------------------
+--
+-- The four severities map onto the four the palette already defines for the
+-- rest of the desktop, so an error in the editor is the same red as an urgent
+-- notification and a battery about to die.
+
+hl('DiagnosticError', { fg = p.urgent })
+hl('DiagnosticWarn',  { fg = p.warning })
+hl('DiagnosticInfo',  { fg = p.info })
+hl('DiagnosticHint',  { fg = p.muted })
+hl('DiagnosticOk',    { fg = p.ok })
+
+hl('DiagnosticUnderlineError', { sp = p.urgent, undercurl = true })
+hl('DiagnosticUnderlineWarn',  { sp = p.warning, undercurl = true })
+hl('DiagnosticUnderlineInfo',  { sp = p.info, undercurl = true })
+hl('DiagnosticUnderlineHint',  { sp = p.muted, undercurl = true })
+
+-- Where the same symbol appears elsewhere in the file, which the LSP reports
+-- as you rest the cursor. A background rather than a colour, so it does not
+-- fight whatever the syntax already made it.
+hl('LspReferenceText',  { bg = p.surface })
+hl('LspReferenceRead',  { bg = p.surface })
+hl('LspReferenceWrite', { bg = p.surface_alt })
+
+-- ---------------------------------------------------------------------------
+-- Diff and git
+-- ---------------------------------------------------------------------------
+
+hl('DiffAdd',    { fg = p.ok })
+hl('DiffChange', { fg = p.warning })
+hl('DiffDelete', { fg = p.urgent })
+hl('DiffText',   { fg = p.bg, bg = p.warning })
+hl('Added',      { fg = p.ok })
+hl('Changed',    { fg = p.warning })
+hl('Removed',    { fg = p.urgent })
