@@ -24,3 +24,8 @@
 # - so the copy here was never found, and leaving it would be a second one to
 # wonder about.
 .local/bin/xdg-terminal-exec
+
+# The shortcut viewer was a rofi mode before it became a window, and rofi
+# themes are only read by rofi. Left behind it would be a file nobody could
+# explain.
+.config/rofi/shortcuts.rasi

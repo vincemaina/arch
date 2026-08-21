@@ -1,33 +1,32 @@
 #!/usr/bin/env python3
-# requires: rofi swaymsg nvim yazi
+# requires: rofi swaymsg nvim yazi foot
 
-"""Every keyboard shortcut on this desktop, grouped by where it applies.
+"""A live shortcut panel that follows whatever you are using.
 
-    shortcuts                 open it, on the tab matching the focused window
-    shortcuts --mode sway     print one context (this is how rofi calls it)
-    shortcuts --list          every context, to a terminal
+    shortcuts             open the panel in its own window
+    shortcuts --panel     the panel itself (what the window runs)
+    shortcuts --mode sway print one context
+    shortcuts --list      every context, to a terminal
 
 Bound to $mod+? and available from the launcher.
 
-WHY IT OPENS ON THE RIGHT TAB
+WHY A WINDOW AND NOT A ROFI MODE
 
-Because the question is almost never "what are all the shortcuts" - it is
-"what can I do *here*", asked while looking at the thing. So it reads the
-focused window's app_id from sway and opens on that context. Tab through the
-rest with Shift+Right, which is rofi's own binding rather than one invented
-here.
+It was a rofi mode first, and rofi draws as a layer-shell surface - which means
+the compositor will not tile it, float it, move it or let it sit in a corner
+while you work. That is fine for a launcher you dismiss in a second and wrong
+for a reference you want kept open beside the thing you are learning.
 
-WHY IT DERIVES EVERYTHING RATHER THAN LISTING IT
+So it is a terminal window, which is what yazi, btop, nmtui and the calendar
+already are here: sway can tile or float it, $mod+Shift+space toggles it, and
+foot gives it the theme for free.
 
-A hand-written list is wrong the first time someone changes a binding and
-forgets to update it, and there is no way to notice. tools/shortcuts.sh made
-the same argument and made the same choice; this is its in-session
-counterpart, because tools/ never reaches the built machine.
+WHY IT FOLLOWS FOCUS
 
-So sway's bindings are parsed from the config sway actually loads, and
-neovim's are asked of neovim. The descriptions come from the same place: the
-`desc` on a keymap, which checks/session.sh already requires every mapping to
-have. Writing the description is what puts a binding in this list.
+Because a panel showing the wrong tool's shortcuts is worse than no panel. It
+subscribes to sway's window events and redraws when focus moves, so it is
+showing neovim's keys while you are in neovim and yazi's the moment you switch.
+It ignores focus landing on itself, or it would only ever show its own.
 """
 
 import json
@@ -370,6 +369,99 @@ def focused_context():
     return "sway"
 
 
+ANSI = {
+    "clear": "\033[2J\033[H",
+    "hide_cursor": "\033[?25l",
+    "show_cursor": "\033[?25h",
+    "dim": "\033[2m",
+    "bold": "\033[1m",
+    "reset": "\033[0m",
+    # The terminal's own palette, so this follows the desktop theme through
+    # foot rather than carrying colours of its own that would have to be kept
+    # in step. Cyan is index 6, bright black is 8.
+    "key": "\033[36m",
+    "muted": "\033[90m",
+}
+
+
+def render(context, rows, cols):
+    title, fetch = CONTEXTS[context]
+    entries = fetch()
+
+    lines = []
+    others = " · ".join(t for c, (t, _) in CONTEXTS.items() if c != context)
+    lines.append(f'{ANSI["bold"]}{ANSI["key"]}{title}{ANSI["reset"]}')
+    lines.append(f'{ANSI["muted"]}{others[:cols - 2]}{ANSI["reset"]}')
+    lines.append("")
+
+    # Reserve a row for the header block, one for the footer, and ONE MORE for
+    # the line the cursor sits on. Filling the window exactly scrolls it, which
+    # pushed the title off the top - the panel was correct and unreadable.
+    body = max(rows - len(lines) - 2, 1)
+
+    width = min(max((len(k) for k, _ in entries), default=8), max(cols // 3, 10))
+    for keys, desc in entries[:body]:
+        room = max(cols - width - 5, 8)
+        lines.append(f'  {ANSI["key"]}{keys[:width].ljust(width)}{ANSI["reset"]}  '
+                     f'{desc[:room]}')
+
+    hidden = len(entries) - body
+    if hidden > 0:
+        lines.append(f'{ANSI["muted"]}  {hidden} more — resize to see them{ANSI["reset"]}')
+
+    # No trailing newline on the last line, for the same reason.
+    sys.stdout.write(ANSI["clear"] + "\n".join(lines))
+    sys.stdout.flush()
+
+
+def panel():
+    """Redraw whenever focus moves, and otherwise sit still.
+
+    Driven by sway's event stream rather than a timer: a poll would either lag
+    behind a focus change or spend the whole session waking up to discover
+    nothing happened.
+    """
+    own_pid = os.getpid()
+    sys.stdout.write(ANSI["hide_cursor"])
+
+    def size():
+        try:
+            ts = os.get_terminal_size()
+            return ts.lines, ts.columns
+        except OSError:
+            return 24, 80
+
+    current = focused_context()
+    rows, cols = size()
+    render(current, rows, cols)
+
+    proc = subprocess.Popen(["swaymsg", "-t", "subscribe", "-m", '["window"]'],
+                            stdout=subprocess.PIPE, text=True)
+    try:
+        for line in proc.stdout:
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if event.get("change") != "focus":
+                continue
+            # Focus landing on this panel is not a context change - otherwise
+            # clicking it would replace whatever you opened it to read.
+            container = event.get("container") or {}
+            if container.get("pid") == own_pid or container.get("app_id") == "shortcuts":
+                continue
+            context = focused_context()
+            rows, cols = size()
+            if context != current:
+                current = context
+            render(current, rows, cols)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        proc.terminate()
+        sys.stdout.write(ANSI["show_cursor"])
+
+
 def main():
     args = sys.argv[1:]
 
@@ -386,22 +478,19 @@ def main():
                 print(f"  {keys:<24} {desc}")
         return
 
-    # Absolute path: rofi runs these as child processes and the session PATH
-    # does not include ~/.local/bin, the trap this desktop has met three times.
-    me = str(pathlib.Path(__file__).resolve())
-    modi = ",".join(f"{title}:{me} --mode {name}"
-                    for name, (title, _) in CONTEXTS.items())
-    opening = CONTEXTS[focused_context()][0]
+    if args[:1] == ["--panel"]:
+        panel()
+        return
 
-    os.execvp("rofi", [
-        "rofi",
-        "-modi", modi,
-        "-show", opening,
-        # The tabs. sidebar-mode draws every context along the bottom, so what
-        # else is available is visible rather than something to know about.
-        "-sidebar-mode",
-        "-no-custom",
-        "-theme", "shortcuts",
+    # Toggle, so $mod+? both opens and closes it - the same gesture the bar's
+    # windows use, through the same helper.
+    me = str(pathlib.Path(__file__).resolve())
+    toggle = str(pathlib.Path(me).parent / "sway-toggle-window")
+    os.execvp(toggle, [
+        toggle, "shortcuts",
+        "foot", "--app-id=shortcuts", "--title=Shortcuts",
+        "--window-size-chars=64x24",
+        "-e", me, "--panel",
     ])
 
 
