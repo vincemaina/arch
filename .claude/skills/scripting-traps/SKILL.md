@@ -214,6 +214,65 @@ an effect is not evidence the effect does not exist** until you have shown the
 test could have observed it at all. Prove the mechanism in the positive direction
 before trusting a negative result from it.
 
+
+## chezmoi will not create the destination root
+
+**Symptom.** The render-to-a-scratch-directory check documented in `CLAUDE.md`
+reports a failure for *every* theme:
+
+```
+chezmoi: .config: mkdir /tmp/.../out/.config: no such file or directory
+```
+
+which reads like the template is broken for all eight palettes at once.
+
+**Cause.** `--destination` names where to write, it does not create it. chezmoi
+makes directories *below* the destination root but not the root itself.
+
+**Fix.** `mkdir -p` it first:
+
+```bash
+mkdir -p "$T/out"
+chezmoi --source ./setup --destination "$T/out" apply --force --exclude=scripts
+```
+
+The trap is not the missing directory, it is that a harness fault is
+indistinguishable from the fault it was built to detect. Eight themes failing
+identically is a signal about the harness, not about the eight themes.
+
+## One patch is not a measurement
+
+**Symptom.** Two contradictory conclusions about the same thing, both from
+screenshots. Whether a translucent window actually masks what is behind it was
+measured three times and answered wrongly twice:
+
+- A before/after taken while the window behind was a *scrolling terminal*
+  compared two different scenes, and reported that 75% of the content still
+  showed through. There was no phenomenon to explain — the numbers described
+  different pictures.
+- A single 140x24 patch sampled inside the window came back perfectly uniform,
+  and was read as proof it masked correctly. The patch had landed in a blank gap
+  between two blocks of text.
+
+**Cause.** Both are the same error: sampling something that varies, at one point
+or one moment, and generalising.
+
+**Fix.** Hold the scene still, sample a region rather than a point, and compare a
+statistic rather than pixels:
+
+```bash
+swaymsg workspace 9        # static content, nothing redrawing
+grim -t ppm -g '930,420 400x200' before.ppm
+# ... open the window ...
+grim -t ppm -g '930,420 400x200' after.ppm
+# compare the 1st-to-99th percentile luminance spread of each
+```
+
+Spread through / spread behind came to 3%, against a window set to 97% opacity —
+which is the answer, and is checkable against a number that was known in advance.
+**Predict what the measurement should say before taking it**; that is what turns
+a sample into evidence rather than a Rorschach test.
+
 ## A replace whose match string contains a glyph matches nothing
 
 **Symptom.** A scripted edit reports success, the file looks untouched, and the

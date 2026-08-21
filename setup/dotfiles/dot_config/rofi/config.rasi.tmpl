@@ -139,121 +139,165 @@ configuration {
     text-color:       @text;
     spacing:          0;
 }
+/* ---------------------------------------------------------------------------
+ * The look
+ * ---------------------------------------------------------------------------
+ *
+ * ROUNDED, AND THAT REVERSES AN EARLIER DECISION. This theme used to be square
+ * on the reasoning that sway draws flat borders and foot has no rounding, so a
+ * rounded launcher would be the one thing on screen with a different shape
+ * language. That was true when it was written and is not now: the bar's modules
+ * are 14px pills, its workspace targets are circles, and the launcher is the
+ * one thing still square. The shape language changed underneath the argument.
+ *
+ * The geometry is taken from what actually makes Raycast feel like Raycast,
+ * which turns out to be spacing rather than capability - a fixed width, room
+ * around each row, icons big enough to recognise without reading, and the keys
+ * you can press written at the bottom instead of assumed.
+ */
 
 window {
+    /* Fixed rather than proportional. A launcher that changes width with its
+     * longest result moves the thing you are aiming at between one invocation
+     * and the next. */
+    width:            780px;
+    location:         center;
+    anchor:           center;
+    padding:          0;
+
     /* Slightly transparent, matching the terminals. Alpha is the last two hex
      * digits: e8 is about 91%. rofi has no blur of its own and cannot get one
      * here - the word does not appear in rofi-theme(5), and blur needs the
      * compositor to implement ext-background-effect-v1, which sway does not.
-     * Same answer as foot. */
-    background-color: {{ $palette.bg }}e8;
-    border:           4px;
-    border-color:     @accent;
-    /* Square, like everything else. sway draws flat rectangular borders and
-     * foot has no rounding, so a rounded launcher was the one thing on screen
-     * with a different shape language. */
-    border-radius:    0;
-    width:            40em;
-    padding:          0;
-    location:         center;
-    anchor:           center;
+     * Same answer as foot.
+     *
+     * f7 rather than the e8 the terminals use, and that difference is the
+     * point: a terminal sits over the wallpaper, but the launcher opens over
+     * whatever you were reading. At 91% the text underneath showed through the
+     * result list and made it genuinely harder to scan - transparency that
+     * costs legibility is decoration. 97% keeps the tint without the noise. */
+    background-color: {{ $palette.bg }}f7;
+
+    /* A hairline rather than the 4px accent frame this had. The frame was
+     * doing the job of separating the launcher from the desktop, which the
+     * background and the shadow of the rounding now do more quietly. */
+    border:           1px;
+    border-color:     {{ $palette.surface_alt }};
+    border-radius:    14px;
 }
 
 mainbox {
     background-color: transparent;
-    children:         [ inputbar, listview ];
+    children:         [ inputbar, listview, textbox-footer ];
     padding:          0;
+    spacing:          0;
 }
 
 /* The prompt reads as one bar rather than a box inside a box: the surface
- * colour separates it from the list without drawing a line. */
+ * colour separates it from the list without drawing a line.
+ *
+ * Generously padded, because this is the part you look at first and a cramped
+ * input is the single clearest tell of a launcher that was not designed. */
 inputbar {
-    background-color: {{ $palette.surface }}cc;
+    background-color: {{ $palette.surface }}f2;
     text-color:       @text;
-    padding:          8px 12px;
-    spacing:          8px;
+    padding:          18px 22px;
+    spacing:          14px;
     children:         [ prompt, entry ];
 }
 
 prompt {
     background-color: transparent;
     text-color:       @accent;
+    font:             "JetBrainsMono Nerd Font Bold 12";
 }
 
 entry {
-    background-color: transparent;
-    text-color:       @text;
-    placeholder:      "search";
+    background-color:  transparent;
+    text-color:        @text;
+    placeholder:       "Search applications, windows, files";
     placeholder-color: @muted;
-    cursor:           text;
+    font:              "JetBrainsMono Nerd Font 12";
 }
 
 listview {
     background-color: transparent;
-    /* More rows, each smaller. The list is for scanning, so fitting more of it
-     * on screen beats making any single row comfortable to read slowly. */
-    lines:            14;
-    padding:          4px;
+    /* Nine rows, fixed. Enough to scan without the window becoming a page. */
+    lines:            9;
+    fixed-height:     true;
+    padding:          10px 10px;
+    spacing:          3px;
     scrollbar:        false;
-    dynamic:          true;
-    fixed-height:     false;
+    dynamic:          false;
 }
 
+/* Rows are separated by space rather than by lines, and each is a rounded
+ * target rather than a full-width band - which is what stops a list of results
+ * looking like a table. */
 element {
     background-color: transparent;
     text-color:       @text-dim;
-    /* Tight. The default 7px vertical made each row about 40px tall, which
-     * reads as a touch target rather than a list and pushes most of the
-     * results off screen. */
-    padding:          3px 8px;
-    spacing:          8px;
-    cursor:           pointer;
+    padding:          10px 14px;
+    spacing:          14px;
+    border-radius:    10px;
 }
 
-/* Only the selected row is loud. Everything else is the same quiet surface,
- * the same reasoning as the sway borders: where you are should be visible
- * without reading anything. */
 element selected {
     background-color: @accent;
-    text-color:       @bg;
+    text-color:       {{ $palette.bg }};
 }
 
-/* Something already open, as opposed to something to launch. Given the
- * secondary colour so the two sources are distinguishable at a glance now
- * that the mode prefix is hidden. */
 element urgent {
-    background-color: @bg;
+    background-color: transparent;
     text-color:       @urgent;
 }
 
 element active {
-    background-color: @bg;
+    background-color: transparent;
     text-color:       @secondary;
 }
 
 element selected active {
     background-color: @secondary;
-    text-color:       @bg;
+    text-color:       {{ $palette.bg }};
 }
 
 element-text {
     background-color: transparent;
     text-color:       inherit;
     vertical-align:   0.5;
+    /* What you typed, picked out inside the result. */
+    highlight:        bold {{ $palette.secondary }};
 }
 
+/* Large enough to recognise at a glance without reading the label, which is
+ * the entire reason to show icons at all. */
 element-icon {
     background-color: transparent;
-    size:             1em;
+    size:             26px;
     vertical-align:   0.5;
 }
 
+/* The keys you can press, written down. This is the most Raycast-ish thing in
+ * the whole theme and the cheapest: a launcher that tells you what it can do is
+ * a different object from one you have to already know. */
+textbox-footer {
+    expand:           false;
+    background-color: {{ $palette.surface }}f2;
+    text-color:       @muted;
+    padding:          12px 22px;
+    content:          "↑↓ move · ⏎ open · Shift+↹ next source · Esc close";
+    font:             "JetBrainsMono Nerd Font 10";
+}
+
 message {
-    background-color: @surface;
-    padding:          10px;
+    background-color: {{ $palette.surface }};
+    text-color:       @text;
+    padding:          12px 18px;
+    border-radius:    10px;
 }
 
 textbox {
-    background-color: @surface;
-    text-color:       @text;
+    background-color: transparent;
+    text-color:       inherit;
 }

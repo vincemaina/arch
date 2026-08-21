@@ -212,8 +212,13 @@ all: terminals already open keep their colours.
 To check a template renders before applying it anywhere:
 
 ```bash
+mkdir -p /tmp/render
 chezmoi --source ./setup --destination /tmp/render apply --force
 ```
+
+The `mkdir` is not optional: chezmoi creates directories *below* the destination
+but not the destination itself, and without it every theme fails identically with
+what looks like a template error.
 
 That catches template errors, and lets you read what a consumer will actually
 receive. It has already caught a real bug: swaylock takes colours without a
