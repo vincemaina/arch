@@ -193,6 +193,33 @@ is markedly worse. Nothing stops one being added later: zram is given
 zram consumes real memory to provide swap, so it is not free capacity — it trades
 CPU for effective memory. It also cannot support hibernation.
 
+### This entry is incomplete, and was measured to be
+
+Everything above is applied correctly and is almost entirely inert, which
+TASK-66 found by measuring rather than by reading the configuration.
+
+The Arch kernel ships `CONFIG_ZSWAP_DEFAULT_ON=y`, and nothing in `setup/` turns
+it off. So **zswap** sits in front of the swap device: it compresses pages with
+zstd into its own pool, capped at 20% of RAM, and only writes back to zram what
+that pool cannot hold. On the reference machine after ten and a half hours:
+
+| counter | pages | meaning |
+| --- | --- | --- |
+| `zswpout` | 920,911 | compressed into zswap |
+| `zswpwb` | 9,415 | ever reached zram — **1.0%** |
+| `pswpout` | 9,415 | identical, so every page in zram arrived that way |
+
+zram peaked at 7.0 MiB of a 1,951 MiB device. The sizing expression, zstd, the
+priority and both sysctls are all doing what they say and almost none of it is
+being exercised, because a layer this file has never mentioned is doing the
+work.
+
+That is not necessarily wrong — zswap compressing into RAM is the same idea, and
+the desktop has not frozen. What is wrong is that the comparison this entry
+makes, zram against a disk swapfile, is not the comparison the machine is
+actually running. **TASK-89 decides which layer this repository wants**, and
+TASK-72's question about the right zram size cannot be answered until it does.
+
 ---
 
 ## earlyoom rather than systemd-oomd

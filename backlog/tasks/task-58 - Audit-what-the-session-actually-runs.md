@@ -4,7 +4,7 @@ title: Audit what the session actually runs
 status: To Do
 assignee: []
 created_date: '2026-08-21 10:20'
-updated_date: '2026-08-21 10:43'
+updated_date: '2026-08-21 20:43'
 labels:
   - desktop
   - repo
@@ -71,3 +71,23 @@ The lesson generalises and is now in CLAUDE.md's failure-mode section as its own
 
 nm-applet remains the open item, and is the same shape - something that survived losing its reason to exist because nothing in setup/ mentions it.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @claude
+created: 2026-08-21 20:43
+---
+Measured while doing TASK-66, so these are numbers rather than estimates, all from tools/performance.sh on the reference VM.
+
+nm-applet: 37.5 MiB RSS, 8.5 MiB by cgroup accounting, 0.2 CPU-seconds over the session. The bar genuinely has no tray - the only occurrence of the word in the rendered ~/.config/waybar/config.jsonc is inside a comment explaining that the tray was removed - so it is confirmed drawing into nothing. It is also the only entry in setup/packages/desktop.txt whose preceding comment is literally '# ?'.
+
+The rest of the list, for scale: gvfs-daemon 12.0M, gvfs-metadata 0.9M, gvfs-udisks2-volume-monitor 4.0M, at-spi-dbus-bus 1.3M plus three dbus-activated atspi Registry instances, xdg-desktop-portal 3.4M, xdg-desktop-portal-gtk 6.4M, xdg-desktop-portal-wlr 0.9M, xdg-document-portal 1.4M, xdg-permission-store 0.6M. All the session components together are 88.3 MiB. Note that at-spi-dbus-bus has its own /etc/xdg/autostart entry from at-spi2-core, so it would keep starting even if nm-applet went.
+
+Xwayland is running at 135.8 MiB with no X11 client visible in swaymsg -t get_tree. That is a bigger number than everything on the list above put together and it is not on the list.
+
+AC #3 has moved: spice-vdagent was removed from the machine at 11:49 on 2026-08-21 and no longer appears in setup/packages/. The daemon is still running from a unit file that no longer exists - systemctl reports spice-vdagentd.service as 'not-found (Reason: Unit not found)' and 'active (running)' at the same time - because removing the package did not stop it. It will go at the next reboot. So the question AC #3 asks may now be about a package this repository no longer ships; worth re-reading before starting.
+
+None of this is a memory problem, which matches what the description already says. system.slice is 121.8 MiB in total and the session is 88.3 MiB; on this VM the pressure comes from the tools being run, not from the desktop.
+---
+<!-- COMMENTS:END -->
