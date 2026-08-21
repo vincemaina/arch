@@ -57,12 +57,22 @@ the process doing the searching.
 **Symptom.** A command that only meant to preview templates changed the real
 system: `xdg-mime` ran against the live machine.
 
-**Cause.** `setup/dotfiles/` now contains a `run_onchange_` script, and chezmoi
-runs scripts regardless of `--destination`.
+**Cause.** `setup/dotfiles/` contains `run_onchange_` scripts, and chezmoi runs
+scripts regardless of `--destination`. There are two now, and the second is more
+disruptive than the first: the theme-reload script restarts waybar and reloads
+sway on the machine you are sitting at.
 
-**Fix.** Templates are still safe to render into a scratch directory. Scripts
-are not sandboxed by pointing chezmoi elsewhere, so read what is in
-`setup/dotfiles/` before assuming a render is harmless.
+**Fix.** Pass `--exclude=scripts` whenever the point is to see what a template
+produces:
+
+```bash
+chezmoi --source ./setup --destination /tmp/render apply --force --exclude=scripts
+```
+
+Templates are safe to render; scripts are not sandboxed by pointing chezmoi
+elsewhere. This is also what makes a before/after render diff trustworthy — it
+is the cleanest way to prove a refactor of the templates changed no output, which
+is exactly how the move from one palette to several themes was verified.
 
 ## A replace can match a comment about the section
 
@@ -76,6 +86,99 @@ the real one.
 **Fix.** Anchor on the start of a line — `sed '/^\[colors-dark\]/a ...'` — or
 match enough surrounding context to be unambiguous. More generally: when a
 replace succeeds but the effect does not appear, check what it matched.
+
+## `python3 -` and a heredoc fight over stdin
+
+**Symptom.** A python block inside a shell script gets empty input and dies on
+`JSONDecodeError: Expecting value: line 1 column 1 (char 0)`, even though the
+command feeding it plainly produces output when run alone.
+
+**Cause.** `python3 -` means *read the program from stdin*, and a heredoc **is**
+stdin. Piping data in as well does not add a second channel — the heredoc wins,
+the piped data is discarded, and `sys.stdin` is already at EOF by the time the
+program runs.
+
+```bash
+printf '%s' "$json" | python3 - "$arg" <<'EOF'   # the JSON never arrives
+data = json.load(sys.stdin)                      # reads nothing
+EOF
+```
+
+**Fix.** Pick one channel for the program and another for the data. Passing the
+data by path is the clearest:
+
+```bash
+tmp="$(mktemp)"; printf '%s' "$json" > "$tmp"
+python3 - "$arg" "$tmp" <<'EOF'
+with open(sys.argv[2]) as fh:
+    data = json.load(fh)
+EOF
+rm -f "$tmp"
+```
+
+## A heredoc whose body contains its own delimiter
+
+**Symptom.** `(eval):89: unmatched ` — a shell syntax error pointing at a line
+far past where you thought the command ended.
+
+**Cause.** Writing documentation *about* heredocs, using `<<'PY'` as the outer
+delimiter, where the text being written contains a `PY` line of its own. The
+outer heredoc ends at the first one, and the rest of the prose is parsed as
+shell.
+
+This bites hardest when generating scripts with scripts, which this repository
+does constantly.
+
+**Fix.** Choose an outer delimiter that cannot appear in the body
+(`<<'OUTER_EOF'`), or write the payload to a file with an editor tool and splice
+it in — which is more robust than picking a rarer word and hoping.
+
+## zsh does not word-split unquoted parameters
+
+**Symptom.** A `for f in $FILES` loop over a multi-line list runs exactly once,
+with `$f` set to the entire list, and whatever it calls fails with a path that is
+obviously several paths concatenated.
+
+**Cause.** The interactive shell here is **zsh**, and zsh does not perform word
+splitting on unquoted parameter expansions the way bash does. The habit is a bash
+habit, and it fails quietly — the loop body still runs, so there is output and an
+exit status, just for one bogus item. It looked like the edit had been applied to
+every file when it had been applied to none.
+
+**Fix.** Do not build a list in a shell variable when the loop matters. Use a
+literal list, `${(f)VAR}` in zsh, or move the loop inside the language actually
+doing the work:
+
+```bash
+for f in a.txt b.txt c.txt; do ...; done      # literal list: fine everywhere
+```
+
+Scripts in this repository run under `#!/usr/bin/env bash`, where splitting does
+happen — so this only bites in ad-hoc commands, which is exactly where it is
+least expected.
+
+## `HOME=` is not enough to fake a home directory
+
+**Symptom.** A test of whether a config file takes effect appears to prove it
+does not. Setting `HOME=/tmp/fake` and writing
+`/tmp/fake/.config/chezmoi/chezmoi.toml` produced a run that ignored the file
+entirely — which nearly became a wrong conclusion recorded as a fact.
+
+**Cause.** `XDG_CONFIG_HOME` is already set in this session, to the *real*
+`~/.config`. Anything resolving configuration through XDG ignores `$HOME`
+completely, so the program was reading the real directory and never looked at the
+fake one.
+
+**Fix.** Set both:
+
+```bash
+HOME=$T/home XDG_CONFIG_HOME=$T/home/.config cmd ...
+```
+
+The general form, which is the part worth keeping: **a test that fails to observe
+an effect is not evidence the effect does not exist** until you have shown the
+test could have observed it at all. Prove the mechanism in the positive direction
+before trusting a negative result from it.
 
 ## Desktop entries need an absolute `Exec`
 

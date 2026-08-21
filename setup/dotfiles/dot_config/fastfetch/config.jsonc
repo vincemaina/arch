@@ -3,7 +3,7 @@
 // COLOURS
 //
 // These are ANSI colour names rather than hex, and that is the point: foot's
-// sixteen ANSI colours are generated from .chezmoidata/palette.toml, so
+// sixteen ANSI colours are generated from the selected theme, so
 // "cyan" here renders as the palette's accent and "magenta" as its secondary.
 // Change the palette and this follows, with nothing to keep in step. Writing
 // hex here would create a second place colours live.

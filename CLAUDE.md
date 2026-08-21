@@ -161,15 +161,42 @@ Machine-wide configuration is applied by scripts (`setup/system/` templates + `s
 
 GPT/UEFI, 1 GiB FAT32 ESP + Btrfs root, subvolumes `@`, `@home`, `@snapshots`, mounted with `compress=zstd`. `01-disk.sh` detects nvme-style names (trailing digit → `p1`/`p2` suffix). No separate `/home` partition and no full-disk encryption — both are deliberate, see `DECISIONS.md`.
 
-## Theming: one palette, templated
+## Theming: several palettes, one selected, all templated
 
-`setup/dotfiles/.chezmoidata/palette.toml` holds every colour, including the
-sixteen ANSI terminal colours. Sway appearance, the Waybar stylesheet, foot,
-swaylock and the starship prompt are all `.tmpl` files reading from it, so
-**changing a colour means editing that one file and running `sync.sh`** — never
-edit a rendered colour in place, it will be overwritten and the others will drift.
+`setup/dotfiles/.chezmoidata/themes.toml` holds every colour of every theme,
+including the sixteen ANSI terminal colours and the theme's wallpaper. Sway
+appearance, the Waybar stylesheet, foot, rofi, mako, swaylock and the starship
+prompt are all `.tmpl` files that resolve the selected theme in their first line
+and read from it, so **changing a colour means editing that one file and running
+`sync.sh`** — never edit a rendered colour in place, it will be overwritten and
+the others will drift.
 
 Names are by role (`accent`, `urgent`, `muted`), not by colour.
+
+**Which theme is selected is machine-local**, in `~/.config/chezmoi/chezmoi.toml`
+under `[data]`, deliberately not in the repository — so switching leaves no diff.
+chezmoi merges config data *over* `.chezmoidata`, which is what makes the tracked
+default in `themes.toml` work for the installer, which has no config file at all.
+`~/.local/bin/theme` is the switcher; `theme --current` is how you find out what a
+machine is actually wearing, because git no longer tells you.
+
+Three things worth holding onto before touching a theme:
+
+- **Every theme must be a dark theme.** GTK reads `GTK_THEME` once at session
+  start and stays Adwaita dark, so a light theme would leave every dialog looking
+  like a different computer. See `DECISIONS.md`.
+- **Every theme must define every key every other theme defines**, or selecting it
+  fails at render. `checks/session.sh` checks this, along with two contrast floors
+  that were both learned by breaking them.
+- **Adding a theme means adding its wallpaper**: `tools/wallpaper.py --theme NAME`
+  generates one from that theme's own colours and it is committed.
+
+Nothing here reads colours at runtime — every consumer holds a rendered copy — so
+a change has to be reloaded into each one. That is
+`run_onchange_after_reload-theme.sh.tmpl`, which re-runs whenever the theme name
+or a hash of the selected palette changes. The two lines carrying them read like
+comments and are load-bearing. foot is the one consumer that cannot reload at
+all: terminals already open keep their colours.
 
 To check a template renders before applying it anywhere:
 
@@ -181,11 +208,13 @@ That catches template errors, and lets you read what a consumer will actually
 receive. It has already caught a real bug: swaylock takes colours without a
 leading `#`, unlike every other consumer.
 
-**It is not entirely a dry run.** `setup/dotfiles/` now contains a
-`run_onchange_` script, and chezmoi runs scripts regardless of `--destination`.
-Rendering to a scratch directory still executes them against the real system —
-the mime-defaults script really does call `xdg-mime` on your machine. Templates
-are safe to render; scripts are not sandboxed by pointing chezmoi elsewhere.
+**It is not entirely a dry run.** `setup/dotfiles/` contains `run_onchange_`
+scripts, and chezmoi runs scripts regardless of `--destination`. Rendering to a
+scratch directory still executes them against the real system — the mime-defaults
+script really does call `xdg-mime` on your machine, and the theme-reload script
+really does restart your waybar. Templates are safe to render; scripts are not
+sandboxed by pointing chezmoi elsewhere. **Add `--exclude=scripts`** when you only
+want to see what a template produces.
 
 Nerd Font glyphs must be written **by codepoint**, not pasted. Pasting has lost
 them silently more than once, leaving `""` where an icon should be — which looks
@@ -201,10 +230,12 @@ Three scripts, run from the repo on the target machine:
 | `checks/sway-bindings.sh` | Is any key bound twice? Prints the full binding table. |
 | `checks/session.sh` | Does the running machine match what the repo intends? |
 
-`tools/` holds reports rather than checks. `tools/shortcuts.sh` lists every
-shortcut by context and flags keys that mean different things in different
-tools. Keep the distinction: `checks/` exits non-zero on a problem, `tools/`
-produces output to read.
+`tools/` holds things that produce output rather than verdicts.
+`tools/shortcuts.sh` lists every shortcut by context and flags keys that mean
+different things in different tools; `tools/wallpaper.py` renders a theme's
+wallpaper from that theme's colours. Keep the distinction: `checks/` exits
+non-zero on a problem, `tools/` produces something to read or to commit. Neither
+reaches the built machine.
 
 `checks/session.sh` is the one to run after any change. It covers swap, the OOM
 handler, session units, the boot path, the greeter's session list, the shell,

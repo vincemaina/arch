@@ -87,7 +87,7 @@ alias cat='bat --style=plain --paging=never'
 alias grep='grep --color=auto'
 
 # bat and eza both take their colours from the terminal palette rather than
-# carrying their own, so they follow .chezmoidata/palette.toml for free.
+# carrying their own, so they follow the selected theme for free.
 export BAT_THEME=ansi
 
 ### Syntax highlighting

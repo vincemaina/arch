@@ -504,7 +504,7 @@ precisely why the units must be correct before it arrives.
 ## One palette, defined once, templated everywhere
 
 **Decision:** A neon palette on a near-black background, defined in
-`dotfiles/.chezmoidata/palette.toml`, with every themed file a chezmoi template
+`dotfiles/.chezmoidata/themes.toml`, with every themed file a chezmoi template
 that reads from it.
 
 ### Why
@@ -1219,7 +1219,7 @@ carrying their own themes.
 Both can be themed independently, which would mean two more places holding a
 copy of the palette and two more things to forget when it changes. Setting
 `BAT_THEME=ansi` makes them use the sixteen colours foot already gets from
-`.chezmoidata/palette.toml`, so they follow the desktop for free.
+`.chezmoidata/themes.toml`, so they follow the desktop for free.
 
 ### Trade-off
 
@@ -1684,6 +1684,55 @@ Configuration for this machine is deliberately outside version control, so it is
 **Leave `.zshrc` unmanaged and check only that an import line is present.** Rejected. It gives up the ability to push a shell change to every machine, which is what the repository is for, and enforcing a line inside an unmanaged file needs a `modify_` script - more machinery for less. Inverting it keeps the shared file managed and puts the escape hatch inside it.
 
 **Require every local change to be folded back in.** Rejected as the only option, though `sync.sh` now prints the `chezmoi re-add` command for each differing file so it is one command when it is the right answer. Insisting on it for everything makes the repository the enemy of trying something quickly.
+
+---
+
+## Switchable themes, and what a theme is allowed to cover
+
+**Decision:** `.chezmoidata/themes.toml` holds a table per theme. Which theme is selected is machine-local, in chezmoi's own config file under `[data]`, and `~/.local/bin/theme` writes it. A theme covers the desktop's own chrome and its wallpaper. It does not cover GTK applications, which fixes every theme as a dark theme.
+
+### Why
+
+One palette already drove the whole desktop: sway, waybar, foot, rofi, mako, swaylock and starship are all templates reading the same values, so changing a colour meant editing one file. What did not exist was a second palette, or any way to move between them.
+
+The mechanism is the interesting part, because **nothing here reads colours at runtime.** Every consumer holds a copy rendered at apply time, so there is no variable to set — switching means re-rendering and then persuading each consumer to reload, and they do not reload the same way.
+
+| Consumer | How it picks up a change |
+| --- | --- |
+| sway | `swaymsg reload`, which also restarts swaybg, so the wallpaper follows |
+| mako | `makoctl reload` |
+| waybar | no stylesheet reload exists; the unit is restarted |
+| rofi, swaylock | nothing — read on every launch |
+| starship | nothing — read per prompt |
+| foot | **cannot.** Terminals already open keep their colours |
+
+foot deserves the emphasis because it looks like it should work. `SIGUSR1` switches between the `[colors-dark]` and `[colors-light]` sections already present in the config, which is a different thing from rereading the file, so there is no signal that helps.
+
+Three decisions inside the decision:
+
+**Where the selection lives.** In chezmoi's machine-local config, not the repository. Switching a theme should not produce a commit, and two machines syncing the same repository should be able to disagree. This works because chezmoi merges config data *over* `.chezmoidata` — which was verified in both directions, and with no config file at all, since the installer chroot runs in exactly that case and must still get a theme.
+
+**What triggers the reload.** A `run_onchange_` script, not the switcher. A theme switch is not the only way the colours change: editing a value in `themes.toml` and running `sync.sh` changes them too, and a reload owned by the switcher would not happen then. The rendered script embeds the theme name *and* a hash of the selected palette, so both cases re-run it.
+
+**How far a theme reaches.** GTK applications read `GTK_THEME` once at session start and cannot be recoloured from a palette without shipping real GTK themes. They stay Adwaita dark. The price is a rule: **every theme in `themes.toml` must be a dark theme**, because a light one would leave every dialog looking like it belonged to a different computer. That rule is the whole reason the boundary is written down rather than left to be discovered.
+
+The wallpaper is part of a theme, and generated from it by `tools/wallpaper.py` rather than chosen. The bar, the borders and the glow were tuned to sit against the background; a palette swap that left the old picture behind would clash with itself.
+
+### Trade-off
+
+`palette.toml` used to mean "the colours". `themes.toml` means "the colours available", and what the desktop is actually wearing is now a machine-local fact that git does not record. Reading the repository no longer tells you what a given machine looks like — `theme --current` does.
+
+Switching is also not instant. It is a `chezmoi apply` plus a set of reloads, which measures at well under a second, but it is a rebuild rather than a variable assignment, and any terminal already open keeps its old colours until it is reopened.
+
+### Alternatives considered
+
+**A script that rewrites the palette in place.** Rejected. It makes the repository's state depend on which theme was last chosen, so the machine holds a modified tracked file forever and the next real diff is buried under it.
+
+**Colours read at runtime instead of rendered.** Not available. None of these programs support it; the closest is foot's two-section toggle, which is a light/dark switch and not a palette.
+
+**Let a theme carry GTK too, by declaring light or dark and rewriting `GTK_THEME`.** Rejected for now. `environment.d` is read when the user manager starts, so GTK would only catch up after a re-login — a switch that is half immediate and half not is worse than one with a stated boundary. Generating a GTK theme per palette was rejected as much the largest option for the least-used surface.
+
+**Fixed terminal colours across themes.** Rejected. A theme that changes the bar and leaves the terminal in the old palette looks half-applied. The sixteen ANSI colours travel with the theme, but keep their own identities — a theme that made `blue` gold would break every program that assumes a diff is red and green.
 
 ---
 
