@@ -1,3 +1,4 @@
+{{- $palette := index .themes .theme -}}
 /* rofi.
  *
  * Colours come from .chezmoidata/palette.toml. Edit them there, not here.
@@ -69,15 +70,15 @@ configuration {
 }
 
 * {
-    bg:        {{ .palette.bg }};
-    surface:   {{ .palette.surface }};
-    surface-alt: {{ .palette.surface_alt }};
-    text:      {{ .palette.text }};
-    text-dim:  {{ .palette.text_dim }};
-    muted:     {{ .palette.muted }};
-    accent:    {{ .palette.accent }};
-    secondary: {{ .palette.secondary }};
-    urgent:    {{ .palette.urgent }};
+    bg:        {{ $palette.bg }};
+    surface:   {{ $palette.surface }};
+    surface-alt: {{ $palette.surface_alt }};
+    text:      {{ $palette.text }};
+    text-dim:  {{ $palette.text_dim }};
+    muted:     {{ $palette.muted }};
+    accent:    {{ $palette.accent }};
+    secondary: {{ $palette.secondary }};
+    urgent:    {{ $palette.urgent }};
 
     /* rofi's own colour variables. Setting these is the point: the stock
      * theme's rules are state-specific - `element normal.normal` and friends -
@@ -125,7 +126,7 @@ window {
      * here - the word does not appear in rofi-theme(5), and blur needs the
      * compositor to implement ext-background-effect-v1, which sway does not.
      * Same answer as foot. */
-    background-color: {{ .palette.bg }}e8;
+    background-color: {{ $palette.bg }}e8;
     border:           4px;
     border-color:     @accent;
     /* Square, like everything else. sway draws flat rectangular borders and
@@ -147,7 +148,7 @@ mainbox {
 /* The prompt reads as one bar rather than a box inside a box: the surface
  * colour separates it from the list without drawing a line. */
 inputbar {
-    background-color: {{ .palette.surface }}cc;
+    background-color: {{ $palette.surface }}cc;
     text-color:       @text;
     padding:          8px 12px;
     spacing:          8px;

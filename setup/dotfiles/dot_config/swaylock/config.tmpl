@@ -1,29 +1,30 @@
+{{- $palette := index .themes .theme -}}
 # Lock screen. Colours from .chezmoidata/palette.toml.
 #
 # Read automatically by swaylock, so the idle script only has to say --daemonize.
 
 daemonize
 
-color={{ trimPrefix "#" .palette.bg_dim }}
+color={{ trimPrefix "#" $palette.bg_dim }}
 
 indicator-radius=90
 indicator-thickness=6
 indicator-caps-lock
 
-ring-color={{ trimPrefix "#" .palette.surface }}
-inside-color={{ trimPrefix "#" .palette.bg }}
-text-color={{ trimPrefix "#" .palette.text }}
+ring-color={{ trimPrefix "#" $palette.surface }}
+inside-color={{ trimPrefix "#" $palette.bg }}
+text-color={{ trimPrefix "#" $palette.text }}
 
-key-hl-color={{ trimPrefix "#" .palette.accent }}
-bs-hl-color={{ trimPrefix "#" .palette.warning }}
+key-hl-color={{ trimPrefix "#" $palette.accent }}
+bs-hl-color={{ trimPrefix "#" $palette.warning }}
 
-ring-ver-color={{ trimPrefix "#" .palette.info }}
-inside-ver-color={{ trimPrefix "#" .palette.bg }}
-text-ver-color={{ trimPrefix "#" .palette.text }}
+ring-ver-color={{ trimPrefix "#" $palette.info }}
+inside-ver-color={{ trimPrefix "#" $palette.bg }}
+text-ver-color={{ trimPrefix "#" $palette.text }}
 
-ring-wrong-color={{ trimPrefix "#" .palette.urgent }}
-inside-wrong-color={{ trimPrefix "#" .palette.bg }}
-text-wrong-color={{ trimPrefix "#" .palette.text }}
+ring-wrong-color={{ trimPrefix "#" $palette.urgent }}
+inside-wrong-color={{ trimPrefix "#" $palette.bg }}
+text-wrong-color={{ trimPrefix "#" $palette.text }}
 
-ring-clear-color={{ trimPrefix "#" .palette.ok }}
-inside-clear-color={{ trimPrefix "#" .palette.bg }}
+ring-clear-color={{ trimPrefix "#" $palette.ok }}
+inside-clear-color={{ trimPrefix "#" $palette.bg }}

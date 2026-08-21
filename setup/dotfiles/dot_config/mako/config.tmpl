@@ -1,3 +1,4 @@
+{{- $palette := index .themes .theme -}}
 # mako.
 #
 # Colours come from .chezmoidata/palette.toml. Edit them there, not here.
@@ -7,9 +8,9 @@
 
 font=JetBrainsMono Nerd Font 10
 
-background-color={{ .palette.surface }}
-text-color={{ .palette.text }}
-border-color={{ .palette.accent }}
+background-color={{ $palette.surface }}
+text-color={{ $palette.text }}
+border-color={{ $palette.accent }}
 border-size=2
 border-radius=0
 
@@ -34,13 +35,13 @@ format=<b>%s</b>\n%b
 
 # Quieter than normal: present, but not asking for anything.
 [urgency=low]
-border-color={{ .palette.muted }}
-text-color={{ .palette.text_dim }}
+border-color={{ $palette.muted }}
+text-color={{ $palette.text_dim }}
 
 # Something is wrong, so it uses the palette's urgent colour and does not
 # disappear on its own - dismissing it has to be deliberate.
 [urgency=critical]
-border-color={{ .palette.urgent }}
+border-color={{ $palette.urgent }}
 default-timeout=0
 
 # Do not disturb. Notifications are still received and still land in the

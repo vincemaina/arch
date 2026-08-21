@@ -1,13 +1,15 @@
+{{- $palette := index .themes .theme -}}
 # Appearance.
 #
-# Colours come from .chezmoidata/palette.toml. Edit them there, not here.
+# Colours come from .chezmoidata/themes.toml, from whichever theme is selected.
+# Edit them there, not here.
 
-set $bg          {{ .palette.bg }}
-set $surface     {{ .palette.surface }}
-set $text        {{ .palette.text }}
-set $text_dim    {{ .palette.text_dim }}
-set $accent      {{ .palette.accent }}
-set $urgent      {{ .palette.urgent }}
+set $bg          {{ $palette.bg }}
+set $surface     {{ $palette.surface }}
+set $text        {{ $palette.text }}
+set $text_dim    {{ $palette.text_dim }}
+set $accent      {{ $palette.accent }}
+set $urgent      {{ $palette.urgent }}
 
 # `output bg` is the right place to configure this, but sway does not render
 # backgrounds itself: it hands the job to swaybg, which is why swaybg is a
@@ -20,7 +22,12 @@ set $urgent      {{ .palette.urgent }}
 # `fill` scales and crops to cover the output, so the image works on any
 # resolution without letterboxing. The image is a smooth gradient, so cropping
 # loses nothing.
-output * bg {{ .chezmoi.homeDir }}/.local/share/wallpapers/deep-violet.png fill
+#
+# The wallpaper belongs to the theme rather than being chosen separately: the
+# bar and the borders are tuned to sit against it, and a palette swap that left
+# the old image behind would clash. `swaymsg reload` restarts swaybg, so this is
+# also the reason a theme switch needs nothing extra to change the background.
+output * bg {{ .chezmoi.homeDir }}/.local/share/wallpapers/{{ $palette.wallpaper }} fill
 
 # Thin borders instead of title bars: the window list belongs in the bar, not
 # repeated above every window. See the Sway section of DECISIONS.md.

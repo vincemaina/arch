@@ -1,3 +1,4 @@
+{{- $palette := index .themes .theme -}}
 /* Waybar. Colours from .chezmoidata/palette.toml — edit them there, not here.
  *
  * Every module is a coloured pill. An earlier version of this file made
@@ -10,20 +11,20 @@
  * warning or urgent when it needs you, which stands out precisely because the
  * resting colours are stable and familiar. */
 
-@define-color bg          {{ .palette.bg }};
-@define-color bar         {{ .palette.bar }};
-@define-color surface     {{ .palette.surface }};
-@define-color surface_alt {{ .palette.surface_alt }};
-@define-color muted       {{ .palette.muted }};
-@define-color text        {{ .palette.text }};
-@define-color accent      {{ .palette.accent }};
-@define-color secondary   {{ .palette.secondary }};
-@define-color tertiary    {{ .palette.tertiary }};
-@define-color ok          {{ .palette.ok }};
-@define-color warning     {{ .palette.warning }};
-@define-color urgent      {{ .palette.urgent }};
-@define-color info        {{ .palette.info }};
-@define-color text_dim    {{ .palette.text_dim }};
+@define-color bg          {{ $palette.bg }};
+@define-color bar         {{ $palette.bar }};
+@define-color surface     {{ $palette.surface }};
+@define-color surface_alt {{ $palette.surface_alt }};
+@define-color muted       {{ $palette.muted }};
+@define-color text        {{ $palette.text }};
+@define-color accent      {{ $palette.accent }};
+@define-color secondary   {{ $palette.secondary }};
+@define-color tertiary    {{ $palette.tertiary }};
+@define-color ok          {{ $palette.ok }};
+@define-color warning     {{ $palette.warning }};
+@define-color urgent      {{ $palette.urgent }};
+@define-color info        {{ $palette.info }};
+@define-color text_dim    {{ $palette.text_dim }};
 
 * {
     font-family: "JetBrainsMono Nerd Font", monospace;

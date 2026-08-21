@@ -1,0 +1,202 @@
+# The desktop palettes, defined once.
+#
+# Every themed file is a chezmoi template that reads whichever of these is
+# selected, so changing a colour here changes it everywhere on the next
+# `sync.sh`, and changing which theme is selected changes all of them at once.
+#
+# WHAT SELECTS A THEME
+#
+# `theme` below is the default, and it is the value the installer uses: a fresh
+# machine has no chezmoi configuration file yet. A machine overrides it in
+# ~/.config/chezmoi/chezmoi.toml under [data], which is deliberately not part of
+# this repository - switching themes should not leave a diff to explain. Config
+# data takes precedence over .chezmoidata, which is what makes that work.
+#
+# `theme` switches it; ~/.local/bin/theme is what writes that file.
+#
+# WHAT A THEME COVERS
+#
+# The desktop's own chrome: sway's borders, the bar, the terminal, the launcher,
+# notifications, the lock screen, the prompt - and the wallpaper, so the bar has
+# something to sit against rather than clash with.
+#
+# It does not cover GTK applications. Those follow GTK_THEME, which is read once
+# at session start and cannot be re-coloured from a palette without shipping
+# real GTK themes. They stay Adwaita dark, and the price of that is a rule:
+# EVERY THEME HERE MUST BE A DARK THEME. A light one would leave every dialog
+# looking like it belonged to a different computer. See DECISIONS.md.
+#
+# WRITING A NEW ONE
+#
+# Names are by role rather than by colour, so a palette swap does not leave a
+# variable called "cyan" holding something orange. Every theme must define every
+# key every other theme defines - a missing one is a template error at apply
+# time, and checks/session.sh checks for it before you get there.
+#
+# Two contrast constraints, both learned rather than assumed, and both checked
+# by checks/session.sh:
+#
+#   * `muted` carries the cpu and memory readouts and must stay legible against
+#     `bg`. The obvious darker grey measured 4.45:1, which is under the
+#     readable threshold; these sit around 5-6:1.
+#   * `tertiary` fills the focused workspace disc and `text` is the number on
+#     top of it. A tertiary that is too light leaves the number barely there -
+#     which is exactly what a first draft of the ember theme did, at 2.76:1.
+
+theme = "neon"
+
+[themes.neon]
+    bg          = "#0b0e14"  # window background
+    bar         = "#000000"  # the bar's base. Black, and deliberately not
+                             # tinted here: the stylesheet mixes accent and
+                             # tertiary into it to build the gradient, so the
+                             # bar follows those two rather than needing a
+                             # colour of its own to keep in step
+    bg_dim      = "#06080d"  # lock screen, behind everything
+    surface     = "#151b26"  # inactive borders, hover
+    surface_alt = "#1f2937"  # separators
+    muted       = "#7284a0"  # present but not the point. Deliberately lighter than
+                             # a neon palette suggests: at 5.1:1 against the
+                             # background the cpu and memory readouts stay legible.
+                             # The obvious darker grey measured 4.45:1, which is
+                             # under the readable threshold.
+    text        = "#d5e0f0"  # normal foreground, cool white
+    text_dim    = "#8fa0bb"  # unfocused titles
+
+    accent      = "#00e5ff"  # focus. The one colour that means "here"
+    secondary   = "#ff5cf4"  # secondary emphasis
+    tertiary    = "#7c4dff"  # a third hue, violet. Picked to sit with the
+                             # wallpaper rather than against it, and used where
+                             # something needs a colour that is neither the accent
+                             # nor the emphasis - the bar's edges, for instance
+    ok          = "#3ddc97"  # healthy, charging
+    warning     = "#ffc857"  # attention, nothing wrong yet
+    urgent      = "#ff4d6d"  # something is wrong
+    info        = "#4da3ff"  # neutral emphasis
+
+    # The sixteen ANSI colours the terminal needs, kept here so the terminal moves
+    # with the rest of the desktop rather than being remembered separately.
+    #
+    # The bright variants are genuinely lighter rather than more saturated. On a
+    # background this dark, pushing saturation further is what turns neon into
+    # eye strain, particularly for text that stays on screen.
+
+    wallpaper = "neon.png"
+
+[themes.neon.term]
+    black          = "0b0e14"
+    red            = "ff4d6d"
+    green          = "3ddc97"
+    yellow         = "ffc857"
+    blue           = "4da3ff"
+    magenta        = "ff5cf4"
+    cyan           = "00e5ff"
+    white          = "8fa0bb"
+    bright_black   = "6e7fa0"  # comments. 4.8:1, not the usual 2.8:1
+    bright_red     = "ff7a90"
+    bright_green   = "6ff0b8"
+    bright_yellow  = "ffd98a"
+    bright_blue    = "7cc0ff"
+    bright_magenta = "ff8ef8"
+    bright_cyan    = "6df3ff"
+    bright_white   = "d5e0f0"
+# Warm, and the opposite end of the range from neon: firelight rather than
+# signage. Where neon runs cyan through magenta over a blue-black, this runs
+# gold through pink over a brown-black, and the bar's edges are brick.
+#
+# The tertiary here is the one value that was tuned rather than chosen. The
+# obvious burnt orange (#e0691f) looked right in isolation and left the focused
+# workspace number at 2.76:1 against its own disc - the sort of thing that only
+# shows up once a theme is actually on screen. Taking it darker fixes the number
+# and keeps the ember reading.
+[themes.ember]
+    bg          = "#14100d"  # window background, black with a brown cast
+    bar         = "#000000"  # as neon: the stylesheet tints it
+    bg_dim      = "#0c0908"  # lock screen, behind everything
+    surface     = "#241c16"  # inactive borders, hover
+    surface_alt = "#33271e"  # separators
+
+    muted       = "#a3907c"  # 6.2:1 against bg
+    text        = "#f3e6d8"  # normal foreground, warm white
+    text_dim    = "#c0ab95"  # unfocused titles
+
+    accent      = "#ffb347"  # focus. Gold
+    secondary   = "#ff7a9c"  # secondary emphasis. Warm pink
+    tertiary    = "#b8451f"  # brick. The bar's edges and the focused workspace
+
+    ok          = "#7bc86c"  # healthy, charging
+    warning     = "#ffd166"  # attention, nothing wrong yet
+    urgent      = "#ff4d5e"  # something is wrong
+    info        = "#6ec5d6"  # neutral emphasis. The one cool colour in the set,
+                             # which is what stops the cpu readout disappearing
+                             # into the three warm ones either side of it
+
+    wallpaper   = "ember.png"
+
+# ANSI colours keep their own identities rather than being recoloured to match.
+# A theme that makes `blue` gold would break every program that assumes a diff
+# is red and green, or that ls colours directories blue. What changes is warmth
+# and saturation, not which hue a name refers to.
+[themes.ember.term]
+    black          = "14100d"
+    red            = "ff4d5e"
+    green          = "8fbf6a"
+    yellow         = "ffd166"
+    blue           = "7f9fd8"
+    magenta        = "ff7a9c"
+    cyan           = "6ec5d6"
+    white          = "c0ab95"
+    bright_black   = "8a7969"  # comments, kept readable rather than the usual
+                               # near-invisible grey
+    bright_red     = "ff8590"
+    bright_green   = "b0dd8e"
+    bright_yellow  = "ffe0a3"
+    bright_blue    = "a8c0ea"
+    bright_magenta = "ffa9bf"
+    bright_cyan    = "9adde8"
+    bright_white   = "f3e6d8"
+
+# The quiet one. Same cool family as neon but with the saturation taken out, for
+# when a screen full of neon is more than you want to look at. It is the theme
+# that proves the mechanism is about more than hue: nothing here is a rotation
+# of the neon palette, the whole thing is lower contrast by intent.
+[themes.slate]
+    bg          = "#11151a"  # window background
+    bar         = "#000000"  # as neon: the stylesheet tints it
+    bg_dim      = "#0b0e12"  # lock screen, behind everything
+    surface     = "#1b222b"  # inactive borders, hover
+    surface_alt = "#27313d"  # separators
+
+    muted       = "#8296a8"  # 6.0:1 against bg
+    text        = "#dbe4ec"  # normal foreground
+    text_dim    = "#9fb0c0"  # unfocused titles
+
+    accent      = "#7aa2f7"  # focus. Soft blue rather than a signal colour
+    secondary   = "#9d7cd8"  # secondary emphasis. Muted violet
+    tertiary    = "#4e6f9c"  # steel. The bar's edges and the focused workspace
+
+    ok          = "#8fc98f"  # healthy, charging
+    warning     = "#e0c07a"  # attention, nothing wrong yet
+    urgent      = "#e07a8a"  # something is wrong. Still the loudest thing here,
+                             # because everything around it got quieter
+    info        = "#6fb3c4"  # neutral emphasis
+
+    wallpaper   = "slate.png"
+
+[themes.slate.term]
+    black          = "11151a"
+    red            = "e07a8a"
+    green          = "8fc98f"
+    yellow         = "e0c07a"
+    blue           = "7aa2f7"
+    magenta        = "9d7cd8"
+    cyan           = "6fb3c4"
+    white          = "9fb0c0"
+    bright_black   = "7a8b9c"  # comments
+    bright_red     = "f0a0ac"
+    bright_green   = "b0dfb0"
+    bright_yellow  = "f0d9a8"
+    bright_blue    = "a8c2fb"
+    bright_magenta = "bda3e6"
+    bright_cyan    = "9ad0dd"
+    bright_white   = "dbe4ec"

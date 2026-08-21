@@ -1,3 +1,4 @@
+{{- $palette := index .themes .theme -}}
 # Prompt. Colours from .chezmoidata/palette.toml, so it matches the desktop.
 #
 # starship rather than powerlevel10k: an official package rather than a git
@@ -13,21 +14,21 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
 format = """
-[](fg:{{ .palette.accent }})\
+[](fg:{{ $palette.accent }})\
 $directory\
-[](fg:{{ .palette.accent }} bg:{{ .palette.surface_alt }})\
+[](fg:{{ $palette.accent }} bg:{{ $palette.surface_alt }})\
 $git_branch\
 $git_status\
-[](fg:{{ .palette.surface_alt }} bg:{{ .palette.surface }})\
+[](fg:{{ $palette.surface_alt }} bg:{{ $palette.surface }})\
 $cmd_duration\
 $status\
-[](fg:{{ .palette.surface }})
+[](fg:{{ $palette.surface }})
 $character"""
 
 add_newline = true
 
 [directory]
-style = "bg:{{ .palette.accent }} fg:{{ .palette.bg }} bold"
+style = "bg:{{ $palette.accent }} fg:{{ $palette.bg }} bold"
 format = "[  $path ]($style)"
 truncation_length = 3
 truncate_to_repo = true
@@ -35,12 +36,12 @@ truncation_symbol = "…/"
 
 [git_branch]
 symbol = ""
-style = "bg:{{ .palette.surface_alt }} fg:{{ .palette.text }}"
+style = "bg:{{ $palette.surface_alt }} fg:{{ $palette.text }}"
 format = "[ $symbol $branch ]($style)"
 
 # Counts rather than bare markers: "which files" is usually the next question.
 [git_status]
-style = "bg:{{ .palette.surface_alt }} fg:{{ .palette.warning }}"
+style = "bg:{{ $palette.surface_alt }} fg:{{ $palette.warning }}"
 format = "[$all_status$ahead_behind ]($style)"
 conflicted = "="
 ahead = "⇡${count}"
@@ -56,17 +57,17 @@ deleted = "✘${count}"
 # Only reports when something took long enough that you may have looked away.
 [cmd_duration]
 min_time = 2000
-style = "bg:{{ .palette.surface }} fg:{{ .palette.muted }}"
+style = "bg:{{ $palette.surface }} fg:{{ $palette.muted }}"
 format = "[  $duration ]($style)"
 
 # Silent on success, explicit on failure - the code itself, because "which
 # failure" is usually the question.
 [status]
 disabled = false
-style = "bg:{{ .palette.surface }} fg:{{ .palette.urgent }}"
+style = "bg:{{ $palette.surface }} fg:{{ $palette.urgent }}"
 format = "[ ✘$status ]($style)"
 
 [character]
-success_symbol = "[❯]({{ .palette.accent }})"
-error_symbol = "[❯]({{ .palette.urgent }})"
-vimcmd_symbol = "[❮]({{ .palette.ok }})"
+success_symbol = "[❯]({{ $palette.accent }})"
+error_symbol = "[❯]({{ $palette.urgent }})"
+vimcmd_symbol = "[❮]({{ $palette.ok }})"
