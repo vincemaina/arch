@@ -44,10 +44,6 @@
  * screenshot: about 12 across the bar, dropping to 6 and rising back through
  * the rows beneath it, then 15 for the wallpaper. The band is darker than the
  * bar and the wallpaper both, which is what separates them. */
-@keyframes bar-drift {
-    0%   { background-position:   0% 50%; }
-    100% { background-position: 200% 50%; }
-}
 
 window#waybar {
     background: transparent;
@@ -68,34 +64,10 @@ window#waybar > box {
      * The proportions are what make it a tint rather than a paint job. 10% and
      * 22% of a saturated colour into black is enough to see and not enough to
      * compete with the modules sitting on top of it. */
-    /* Twice the width of the bar, so there is somewhere to slide to. The
-     * gradient repeats violet-magenta-violet-magenta-violet across it, and
-     * moving one full bar-width lands on an identical point - which is what
-     * makes the loop seamless rather than snapping back. */
-    background-image: linear-gradient(90deg,
+    background: linear-gradient(90deg,
         mix(@bar, @tertiary, 0.10) 0%,
-        mix(@bar, @secondary, 0.22) 25%,
-        mix(@bar, @tertiary, 0.10) 50%,
-        mix(@bar, @secondary, 0.22) 75%,
+        mix(@bar, @secondary, 0.22) 50%,
         mix(@bar, @tertiary, 0.10) 100%);
-    background-size: 200% 100%;
-
-    /* Slow on purpose. Fast enough to notice if you look, slow enough that it
-     * never asks to be looked at - the bar should feel alive rather than
-     * animated.
-     *
-     * WHAT THIS COSTS, because it is not free and the number is surprising:
-     * waybar goes from 0.3% CPU to 10.1%, measured over ten seconds each way.
-     * That is continuous, for as long as the session is up.
-     *
-     * The duration does NOT affect it. GTK redraws every frame while an
-     * animation is running, so a forty-second drift costs exactly what a
-     * four-second one would - slowing it down to save power does nothing. The
-     * choice is binary: animate or do not.
-     *
-     * Delete this one line to stop it. Everything else here stays valid; the
-     * gradient just holds still. */
-    animation: bar-drift 40s linear infinite;
 
     /* A gradient hairline instead of a shadow.
      *
@@ -112,6 +84,16 @@ window#waybar > box {
      * The colours run tertiary to secondary and back, so the line is brightest
      * where the bloom behind it is strongest, and the two read as one thing
      * rather than two decorations that happen to share an edge. */
+    /* The glow. An inset shadow in the emphasis colour, thrown upward from the
+     * bottom edge, so the bar looks lit from the strip beneath it rather than
+     * merely bordered by it.
+     *
+     * Inset deliberately: an outer glow would need the surface to be taller
+     * than the bar to have anywhere to fall - the same constraint that made
+     * the drop shadow need a margin - whereas an inset one is painted inside
+     * the bar and needs nothing. It is static, so it costs nothing per frame. */
+    box-shadow: inset 0 -6px 12px -8px mix(@bar, @secondary, 0.55);
+
     border-bottom: 1px solid transparent;
     border-image: linear-gradient(90deg,
         @tertiary 0%,
@@ -188,8 +170,17 @@ window#waybar > box {
     box-shadow: none;
 }
 
+/* The window title is the one piece of text on the bar that changes with what
+ * you are doing, and it sat in the dim colour reserved for things you are not
+ * meant to read. It is now the brightest thing up there.
+ *
+ * The text-shadow is the glow: the same colour as the text, no offset, blurred.
+ * That is how a glow is spelled in CSS - a shadow that has not moved. It costs
+ * nothing per frame, unlike the animation this replaced. */
 #window {
-    color: @text_dim;
+    color: @secondary;
+    font-weight: bold;
+    text-shadow: 0 0 8px @secondary;
     margin: 0 8px;
 }
 
