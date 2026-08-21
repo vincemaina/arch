@@ -766,6 +766,33 @@ io.write(string.format("%s %s %s", tostring(vim.g.colors_name),
         fail "the editor paints its own background, so it will not match the other terminal tools"
     fi
 
+    # Every keybinding was chosen, and a description is the proof.
+    #
+    # Neovim ships 87 global mappings before any configuration, and none of them
+    # was chosen - which is the opposite of how sway's bindings work here, where
+    # the full table is printed and a duplicate fails. Those are deleted unless
+    # explicitly kept, and the enforceable half is this: a description is
+    # something a person wrote, so a mapping without one arrived without being
+    # chosen. A plugin adding its own defaults fails this check.
+    #
+    # <Plug> mappings are excluded because they cannot be typed - they are
+    # internal targets other mappings point at, not shortcuts anyone can press.
+    undescribed="$(nvim --headless -c 'lua
+local out = {}
+for _, mode in ipairs({"n","i","v","x","o","s","c","t"}) do
+  for _, m in ipairs(vim.api.nvim_get_keymap(mode)) do
+    if not m.lhs:match("^<Plug>") and (m.desc == nil or m.desc == "") then
+      out[#out+1] = mode .. " " .. m.lhs
+    end
+  end
+end
+io.write(table.concat(out, ", "))' -c quit 2>/dev/null)"
+    if [[ -n "$undescribed" ]]; then
+        fail "editor keybindings with no description, so nobody chose them: $undescribed"
+    else
+        pass "every editor keybinding carries a description, so all of them were chosen"
+    fi
+
     # Parsers are declared packages rather than runtime downloads, so a missing
     # one is package drift rather than something neovim should fix itself.
     missing_parsers=""

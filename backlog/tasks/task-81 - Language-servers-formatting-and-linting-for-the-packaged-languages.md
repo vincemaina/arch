@@ -1,9 +1,11 @@
 ---
 id: TASK-81
 title: 'Language servers, formatting and linting for the packaged languages'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-21 14:21'
+updated_date: '2026-08-21 15:46'
 labels:
   - dev
   - dotfiles

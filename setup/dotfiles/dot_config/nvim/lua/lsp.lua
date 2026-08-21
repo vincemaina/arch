@@ -94,11 +94,65 @@ local npm_servers = {
 }
 
 -- ---------------------------------------------------------------------------
+-- Servers that come from pacman
+-- ---------------------------------------------------------------------------
+--
+-- These are on PATH, so they are named plainly rather than by absolute path -
+-- unlike the npm ones above, which live somewhere nothing searches.
+
+local packaged_servers = {
+  -- Types, navigation and hover. Not linting or formatting: pyright does
+  -- neither, which is why ruff is here too.
+  pyright = {
+    cmd = { 'pyright-langserver', '--stdio' },
+    filetypes = { 'python' },
+    root_markers = root('pyproject.toml', 'setup.py', 'setup.cfg',
+                        'requirements.txt', 'Pipfile'),
+    settings = {
+      python = {
+        analysis = {
+          autoSearchPaths = true,
+          useLibraryCodeForTypes = true,
+          -- basic rather than strict. Strict reports a great deal about code
+          -- that works, which is the fastest way to start ignoring
+          -- diagnostics altogether.
+          typeCheckingMode = 'basic',
+        },
+      },
+    },
+  },
+
+  -- Linting and formatting, and fast enough to run on every keystroke. ruff
+  -- deliberately has no hover or go-to-definition, so it sits alongside
+  -- pyright rather than replacing it.
+  ruff = {
+    cmd = { 'ruff', 'server' },
+    filetypes = { 'python' },
+    root_markers = root('pyproject.toml', 'ruff.toml', '.ruff.toml'),
+  },
+
+  ts_ls = {
+    cmd = { 'typescript-language-server', '--stdio' },
+    filetypes = { 'javascript', 'javascriptreact', 'typescript',
+                  'typescriptreact' },
+    root_markers = root('tsconfig.json', 'jsconfig.json', 'package.json'),
+  },
+
+  marksman = {
+    cmd = { 'marksman', 'server' },
+    filetypes = { 'markdown' },
+    root_markers = root('.marksman.toml'),
+  },
+}
+
+-- ---------------------------------------------------------------------------
 
 function M.setup()
   local enabled = {}
 
-  for name, config in pairs(npm_servers) do
+  local all = vim.tbl_extend('error', npm_servers, packaged_servers)
+
+  for name, config in pairs(all) do
     -- Only enable a server whose executable is actually there. A missing one
     -- would otherwise fail on every matching file with an error about a command
     -- that could not be spawned, which says nothing useful about the cause -
@@ -114,7 +168,7 @@ function M.setup()
   end
 
   M.enabled = enabled
-  M.expected = vim.tbl_keys(npm_servers)
+  M.expected = vim.tbl_keys(all)
 end
 
 -- ---------------------------------------------------------------------------

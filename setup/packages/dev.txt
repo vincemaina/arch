@@ -43,6 +43,25 @@ tree-sitter-bash
 # manifest and visible in exactly the same way.
 nodejs
 npm
+
+# Language servers from the official repositories. The ones that are NOT here -
+# html, css, json and emmet - have no package and come from npm instead; see
+# dot_local/lib/language-servers/.
+#
+# pyright for types and navigation, ruff for linting and formatting. Two tools
+# rather than one because they do different halves and neither does both well:
+# pyright has no formatter and ruff has no type checker.
+pyright
+ruff
+
+# javascript and typescript. The server is written in typescript and needs the
+# typescript compiler package at runtime, which is a dependency rather than
+# something to install separately.
+typescript-language-server
+typescript
+
+# markdown
+marksman
 ripgrep
 fd
 fzf

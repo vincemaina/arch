@@ -38,7 +38,7 @@
 -- right in normal mode while you are part-way through a sequence.
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
-vim.keymap.set({ 'n', 'v' }, '<Space>', '<Nop>', { silent = true })
+vim.keymap.set({ 'n', 'v' }, '<Space>', '<Nop>', { silent = true, desc = 'Leader (does nothing on its own)' })
 
 -- ---------------------------------------------------------------------------
 -- Options
@@ -105,6 +105,87 @@ o.updatetime = 250
 o.confirm = true
 
 -- ---------------------------------------------------------------------------
+-- Nothing is bound that was not chosen
+-- ---------------------------------------------------------------------------
+--
+-- Neovim ships 87 global mappings before any configuration at all. Most are
+-- fine and a few are genuinely useful, but none of them was chosen, and the
+-- cost of that is meeting one by accident and not knowing what happened - which
+-- is the opposite of how every other keybinding on this desktop works, where
+-- checks/sway-bindings.sh prints the complete table and fails on a duplicate.
+--
+-- So: every default mapping is deleted unless it is named below. Adding one
+-- back is a line here, which means it was decided rather than inherited.
+--
+-- This does NOT touch vim's own grammar. dd, ciw, yy, %, K and the rest are the
+-- editor's commands, not mappings, and are unaffected - the list below is only
+-- about things nvim maps on top.
+--
+-- The 40 bracket pairs ([b ]b [q ]q [t ]t and friends) are the clearest case
+-- for this: useful if you know them, invisible if you do not, and none of them
+-- was ever mentioned.
+
+-- Built-in plugins are disabled rather than un-mapped, because they load AFTER
+-- this file and would simply put their mappings back. matchit is the one that
+-- matters: it adds %, [%, ]%, g% and a%, none of which was chosen. Vim's own %
+-- is a built-in motion and is unaffected - matchit only extends it to language
+-- keywords.
+vim.g.loaded_matchit = 1
+vim.g.loaded_matchparen = 0     -- kept: highlighting the matching bracket is passive
+vim.g.loaded_netrwPlugin = 1    -- yazi is the file manager; netrw maps gx and more
+vim.g.loaded_tutor_mode_plugin = 1
+
+local KEEP = {
+  -- LSP, which is the whole reason the editor is worth using for code. These
+  -- became defaults in 0.11 and are documented in :help lsp-defaults.
+  ['grn'] = 'rename the symbol under the cursor',
+  ['gra'] = 'code actions',
+  ['grr'] = 'find references',
+  ['gri'] = 'go to implementation',
+  ['grt'] = 'go to type definition',
+  ['gO']  = 'list symbols in this document',
+
+  -- Commenting, which replaced a plugin everyone used to install.
+  ['gc']  = 'comment a motion',
+  ['gcc'] = 'comment this line',
+
+  -- Kept because this config sets them itself, further down.
+  ['<Esc>'] = 'clear the search highlight',
+  ['J'] = 'join lines without moving the cursor',
+  ['n'] = 'next match, centred',
+  ['N'] = 'previous match, centred',
+}
+
+-- Deleting is done before anything below adds its own, so the additions cannot
+-- be removed by their own policy.
+local removed = 0
+for _, mode in ipairs({ 'n', 'i', 'v', 'x', 'o', 's', 'c', 't' }) do
+  for _, map in ipairs(vim.api.nvim_get_keymap(mode)) do
+    if not KEEP[map.lhs] then
+      -- pcall because a handful are <Plug> mappings that refuse to be deleted,
+      -- and one refusing is not a reason to stop removing the rest.
+      if pcall(vim.keymap.del, mode, map.lhs) then
+        removed = removed + 1
+      end
+    end
+  end
+end
+
+-- EVERY MAPPING CARRIES A DESCRIPTION, and that is the enforceable half of the
+-- policy. A description is what a person chose to write, so anything arriving
+-- without one arrived without being chosen - a plugin's defaults, or a line
+-- added in a hurry. checks/session.sh fails on a mapping with no description,
+-- which turns "shortcuts should all be deliberate" from an intention into
+-- something that breaks the build.
+--
+-- It is also what the shortcuts helper reads, so writing the description is not
+-- an extra chore - it is the thing that makes the binding show up in the list.
+
+-- Readable by the shortcuts helper, and by anyone wondering what happened.
+vim.g.removed_default_mappings = removed
+vim.g.kept_default_mappings = KEEP
+
+-- ---------------------------------------------------------------------------
 -- Keymaps
 -- ---------------------------------------------------------------------------
 --
@@ -114,7 +195,7 @@ o.confirm = true
 
 -- Escape clears the search highlight as well as leaving whatever mode you are
 -- in. Nothing else wants Escape in normal mode.
-vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
+vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>', { desc = 'Clear search highlight' })
 
 -- Move between splits without the Ctrl-w prefix. Note these are nvim splits,
 -- not sway windows - sway has $mod+h/j/k/l for that, and the two do not
@@ -127,9 +208,9 @@ vim.keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Split right' })
 -- Keep the cursor where it was when joining lines, and keep the search result
 -- centred when jumping through matches. Both are small and both are the kind of
 -- thing that is invisible until it is missing.
-vim.keymap.set('n', 'J', 'mzJ`z')
-vim.keymap.set('n', 'n', 'nzzzv')
-vim.keymap.set('n', 'N', 'Nzzzv')
+vim.keymap.set('n', 'J', 'mzJ`z', { desc = 'Join lines, keeping the cursor put' })
+vim.keymap.set('n', 'n', 'nzzzv', { desc = 'Next match, centred' })
+vim.keymap.set('n', 'N', 'Nzzzv', { desc = 'Previous match, centred' })
 
 -- ---------------------------------------------------------------------------
 -- Per-language indentation
