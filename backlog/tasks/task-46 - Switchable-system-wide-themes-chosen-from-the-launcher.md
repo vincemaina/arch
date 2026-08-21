@@ -1,11 +1,11 @@
 ---
 id: TASK-46
 title: 'Switchable system-wide themes, chosen from the launcher'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-20 21:35'
-updated_date: '2026-08-21 03:14'
+updated_date: '2026-08-21 03:34'
 labels:
   - desktop
   - feel
@@ -41,13 +41,13 @@ Worth deciding at the same time: whether the sixteen ANSI terminal colours trave
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 More than one named palette exists, and switching between them changes sway, waybar, foot, rofi, mako, swaylock and the prompt together rather than some of them
-- [ ] #2 A theme is chosen from the launcher, not by editing the repository
-- [ ] #3 Each consumer is actually reloaded rather than assumed to reload, with the ones that cannot - foot keeps existing windows, waybar needs a restart - stated rather than silently inconsistent
-- [ ] #4 Whether GTK follows the theme is decided; a theme that changes the bar but leaves every dialog unchanged is worse than no themes
-- [ ] #5 Whether the ANSI terminal colours and the wallpaper belong to a theme is decided rather than left implicit
-- [ ] #6 Switching a theme does not leave the repository holding uncommitted changes that make the next diff confusing
-- [ ] #7 The approach is recorded in DECISIONS.md, since it changes what palette.toml means from "the colours" to "the current colours"
+- [x] #1 More than one named palette exists, and switching between them changes sway, waybar, foot, rofi, mako, swaylock and the prompt together rather than some of them
+- [x] #2 A theme is chosen from the launcher, not by editing the repository
+- [x] #3 Each consumer is actually reloaded rather than assumed to reload, with the ones that cannot - foot keeps existing windows, waybar needs a restart - stated rather than silently inconsistent
+- [x] #4 Whether GTK follows the theme is decided; a theme that changes the bar but leaves every dialog unchanged is worse than no themes
+- [x] #5 Whether the ANSI terminal colours and the wallpaper belong to a theme is decided rather than left implicit
+- [x] #6 Switching a theme does not leave the repository holding uncommitted changes that make the next diff confusing
+- [x] #7 The approach is recorded in DECISIONS.md, since it changes what palette.toml means from "the colours" to "the current colours"
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -105,3 +105,75 @@ Decisions taken with the user before starting (they settle AC #4 and #5):
 8. Record the approach in DECISIONS.md (AC #7), including what palette.toml
    meant before and why the GTK boundary is where it is.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Verification evidence.
+
+AC1 - rendering the dotfiles once per theme and diffing shows all seven
+consumers change: sway appearance (7 lines), waybar stylesheet (13), foot
+(19), rofi (11), mako (6), swaylock (17), starship (12), plus a different
+wallpaper each. Switched the live desktop to ember and to slate and back,
+screenshotting the bar each time.
+
+AC2 - launched ~/.local/bin/theme with no argument and screenshotted the
+result: rofi shows the three themes with the current one preselected. Note
+rofi is a layer-shell surface and does not appear in swaymsg get_tree, so
+it has to be verified by screenshot rather than by querying the tree.
+desktop-file-validate passes on theme.desktop and its Exec resolves.
+
+AC3 - swaybg was confirmed running with the new image after each switch
+(pgrep -a swaybg), waybar restarted, makoctl reload invoked. foot's
+inability is stated by the script at switch time rather than assumed:
+SIGUSR1 toggles between [colors-dark] and [colors-light] already in the
+config, which is not a config reload, so open terminals keep their colours.
+
+AC6 - git status reported 0 changed files before, after switching to ember,
+and after switching back. The selection lives in ~/.config/chezmoi, outside
+the repository.
+
+Behaviour preservation - rendering every template at HEAD and after the
+restructure produced byte-identical output for the theme already in use;
+the only differences were two comments and the wallpaper's filename.
+
+Checks - checks/session.sh 52 passed 0 failed (six of them new),
+checks/sway-commands.sh clean, checks/sway-bindings.sh reports no duplicate.
+The six new checks were each confirmed to fail when they should, by
+breaking key parity, contrast and a wallpaper name in a scratch copy.
+
+Not done, deliberately - GTK still reads GTK_THEME once at session start and
+stays Adwaita dark. That is the decision recorded for AC4, not an omission,
+and it constrains every future theme to being dark.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Themes are switchable from the launcher. .chezmoidata/palette.toml became
+themes.toml with a table per theme; every themed template resolves the
+selected theme in its first line. Which theme is selected is machine-local,
+in chezmoi's config under [data], so switching leaves no diff - verified by
+git status before, during and after a round trip.
+
+Three themes ship: the existing palette as neon, plus ember (warm) and slate
+(desaturated). Each carries its own sixteen ANSI colours and its own
+wallpaper, generated from its own palette by tools/wallpaper.py - rebuilt
+here as standard-library-only tooling because the original generator needed
+numpy and Pillow and had not survived.
+
+The reloads live in a run_onchange_ script rather than in the switcher, so
+editing a colour and running sync.sh reloads too; the rendered script embeds
+the theme name and a hash of the palette, which is what makes chezmoi re-run
+it in both cases. sway reload also restarts swaybg so the wallpaper follows;
+waybar is restarted because no stylesheet reload exists; rofi, swaylock and
+starship need nothing; foot cannot reload and says so.
+
+A theme covers desktop chrome and the wallpaper, not GTK - which fixes every
+theme as a dark theme, and is recorded in DECISIONS.md as a constraint on
+future themes rather than left to be discovered.
+
+Verified with checks/session.sh (52 passed, 0 failed, six new checks all
+confirmed to fail when they should), a before/after render diff proving the
+restructure changed no output, and screenshots of all three themes live.
+<!-- SECTION:FINAL_SUMMARY:END -->
