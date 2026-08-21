@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-21 14:21'
-updated_date: '2026-08-21 19:50'
+updated_date: '2026-08-21 20:30'
 labels:
   - dev
   - dotfiles
@@ -69,6 +69,10 @@ AC4 - FORMAT ON SAVE IS OFF, deliberately. Opening a file to read and saving out
 Every language here formats through its server except markdown, so prettier is declared in packages/dev.txt for that one gap and reached through formatprg, needing no plugin. prettier is declared but not yet installed on this machine - it arrives with the next sync.sh, and the markdown path is the one part of formatting not yet exercised.
 
 AC5 - the gap that was: html, css, json and emmet had no packaged server and are now installed from npm under TASK-84. SQL remains the known gap and is TASK-83.
+
+MARKDOWN FORMATTING NOW EXERCISED, which was the one gap left when this was closed. prettier 3.8.1 arrived with sync.sh. <leader>f on a markdown file, driven through the real keymap rather than the function behind it: formatprg resolves to 'prettier --parser markdown', the heading loses its extra spaces, '*' list markers become '-', and runs of blank lines and internal spaces collapse.
+
+Checked that the wiring is faithful rather than merely that something changed: piping the same file through prettier directly produces output identical to what the editor produced, byte for byte. One input, '*     item two', keeps its wide indentation in both - that is prettier's own decision about an ambiguous list, not the formatprg path distorting anything.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
