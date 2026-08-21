@@ -68,6 +68,9 @@ Two consequences worth holding onto:
 # Is any key bound twice? Prints the full binding table.
 ./checks/sway-bindings.sh
 
+# Does what is installed match the manifests, in both directions?
+./checks/packages.sh
+
 # A report, not a check: every shortcut, grouped by the context it applies in.
 ./tools/shortcuts.sh
 
@@ -146,6 +149,17 @@ Single source of machine identity (`USERNAME`, `HOSTNAME`, `TIMEZONE`, `LOCALE`,
 - `sync.sh` is the asymmetry to watch: it globs `packages/*.txt` — `base.txt` included — through the comment-stripping grep. So a comment added to `base.txt` breaks a fresh install while sync keeps working, which means it will not show up on the machine you are testing on.
 
 Manifests list *intentional top-level* packages, not transitive dependencies. A dependency may still be listed explicitly when the system relies on that capability directly (e.g. `polkit`), so a dependency-graph change cannot silently remove it.
+
+**That last sentence describes an intention, and until TASK-13 nothing delivered
+it.** Listing a package that something else already pulls in does not make
+pacman treat it as wanted in its own right: `pacman -T` reports it satisfied so
+`sync.sh` never installs it, and `pacman -S --needed` skips an installed package
+without changing its install reason. `polkit` itself was marked "installed as a
+dependency" on the reference machine, along with `mesa`, `adwaita-cursors` and
+`xdg-desktop-portal-gtk` - so removing whatever pulled them in would have taken
+them, exactly as if they had never been listed. Both install paths now mark
+every declared package explicit after installing, and `checks/packages.sh`
+fails if one drifts back.
 
 ### Dotfiles (chezmoi)
 
@@ -257,13 +271,14 @@ Two things will silently break it, and `checks/session.sh` covers both:
 
 ## Checks
 
-Three scripts, run from the repo on the target machine:
+Four scripts, run from the repo on the target machine:
 
 | Script | Answers |
 | --- | --- |
 | `checks/sway-commands.sh` | Does every command the session invokes come from a declared package? |
 | `checks/sway-bindings.sh` | Is any key bound twice? Prints the full binding table. |
 | `checks/session.sh` | Does the running machine match what the repo intends? |
+| `checks/packages.sh` | Does what is installed match `packages/*.txt`, both ways? |
 
 `tools/` holds things that produce output rather than verdicts.
 `tools/shortcuts.sh` lists every shortcut by context and flags keys that mean

@@ -25,6 +25,28 @@ echo "==> Installing development packages"
 
 pacman -S --needed --noconfirm "${DEV_PACKAGES[@]}"
 
+echo "==> Marking every declared package as explicitly installed"
+
+# `pacman -S --needed` skips a package that is already installed, and does NOT
+# change its install reason while skipping it. A manifest entry that something
+# in base.txt already pulled in as a dependency therefore stays marked as a
+# dependency - so `pacman -Rns` on whatever pulled it in would take it, which is
+# precisely what packages/README.md says listing it prevents. polkit is the
+# example that file gives, and polkit was in exactly that state. TASK-13.
+#
+# Idempotent: a package already explicit is left alone. Only packages actually
+# installed are passed, because a name satisfied by a provider under a different
+# name is not installed under the declared one and `pacman -D` errors on it.
+mapfile -t DECLARED_DEPS < <(
+    comm -12 <(LC_ALL=C pacman -Qdq | sort) \
+             <(printf '%s\n' "${DESKTOP_PACKAGES[@]}" "${DEV_PACKAGES[@]}" | sort -u)
+)
+
+if [[ ${#DECLARED_DEPS[@]} -gt 0 ]]; then
+    printf '    %s\n' "${DECLARED_DEPS[@]}"
+    pacman -D --asexplicit --noconfirm -- "${DECLARED_DEPS[@]}" >/dev/null
+fi
+
 echo
 echo "==> Installing machine-wide configuration"
 

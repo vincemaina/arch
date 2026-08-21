@@ -123,6 +123,39 @@ else
     fi
 fi
 
+# DECLARED IS NOT THE SAME AS EXPLICITLY INSTALLED, and until TASK-13 nothing
+# noticed the difference.
+#
+# packages/README.md promises that listing a package which something else also
+# depends on - polkit is the example it gives - stops a dependency-graph change
+# removing it silently. That promise was never kept by anything. `pacman -T`
+# above reports such a package as satisfied, so it is never in MISSING and
+# pacman is never told it is wanted in its own right; `pacman -S --needed`
+# skips an installed package without changing its install reason either. So it
+# stayed marked "installed as a dependency", and `pacman -Rns` on whatever
+# pulled it in would still have taken it.
+#
+# Four packages on this machine were in exactly that state: polkit, mesa,
+# adwaita-cursors and xdg-desktop-portal-gtk.
+#
+# Marking them is the whole fix, and it is idempotent - a package already
+# explicit is left alone, so this is a no-op on a machine that is in order.
+mapfile -t DEP_MARKED < <(
+    comm -12 <(LC_ALL=C pacman -Qdq 2>/dev/null | sort) \
+             <(printf '%s\n' "${WANTED[@]}" | sort -u) || true
+)
+
+if [[ ${#DEP_MARKED[@]} -gt 0 ]]; then
+    echo "    ${#DEP_MARKED[@]} declared but marked as dependencies:"
+    printf '      %s\n' "${DEP_MARKED[@]}"
+    if $DRY_RUN; then
+        echo "    Would mark the above as explicitly installed"
+    else
+        sudo pacman -D --asexplicit -- "${DEP_MARKED[@]}" >/dev/null
+        echo "    Marked as explicitly installed, so removing what pulled them in cannot take them"
+    fi
+fi
+
 # ----------------------------------------------------------------------
 # Machine-wide configuration
 # ----------------------------------------------------------------------
