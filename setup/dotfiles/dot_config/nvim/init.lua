@@ -136,14 +136,18 @@ vim.g.loaded_netrwPlugin = 1    -- yazi is the file manager; netrw maps gx and m
 vim.g.loaded_tutor_mode_plugin = 1
 
 local KEEP = {
-  -- LSP, which is the whole reason the editor is worth using for code. These
-  -- became defaults in 0.11 and are documented in :help lsp-defaults.
-  ['grn'] = 'rename the symbol under the cursor',
-  ['gra'] = 'code actions',
-  ['grr'] = 'find references',
-  ['gri'] = 'go to implementation',
-  ['grt'] = 'go to type definition',
-  ['gO']  = 'list symbols in this document',
+  -- The LSP bindings are NOT kept here, deliberately. They became defaults in
+  -- 0.11, and keeping a default is not the same as choosing one - which this
+  -- config found out the expensive way. The pruning above removed K and ]d and
+  -- [d along with everything else unlisted, because they were not written down,
+  -- so hovering and stepping through diagnostics silently stopped working while
+  -- rename and code actions kept going. The list looked deliberate and had a
+  -- hole in it.
+  --
+  -- They are all set explicitly in lua/lsp.lua now, next to the servers they
+  -- depend on, each with a description the shortcuts panel can show. Defaults
+  -- describe themselves as 'vim.lsp.buf.code_action()', which is a function
+  -- name rather than an answer to "what does this key do".
 
   -- Commenting, which replaced a plugin everyone used to install.
   ['gc']  = 'comment a motion',

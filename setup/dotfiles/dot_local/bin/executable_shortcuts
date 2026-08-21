@@ -197,15 +197,20 @@ def sway_shortcuts():
 def nvim_shortcuts():
     """Asked of neovim rather than parsed out of its config.
 
-    Cached against init.lua's modification time, because starting neovim costs
-    more than everything else here put together and the answer only changes
-    when the config does.
+    Cached against the config's modification time, because starting neovim
+    costs more than everything else here put together and the answer only
+    changes when the config does.
+
+    EVERY lua file, not just init.lua. Stamping on init.lua alone meant a
+    mapping added in lua/lsp.lua left the cache valid and the panel showing a
+    list that no longer matched the editor - the same failure as hashing
+    package.json without the lockfile, and just as quiet.
     """
-    init = HOME / ".config" / "nvim" / "init.lua"
-    try:
-        stamp = str(int(init.stat().st_mtime))
-    except OSError:
+    config = HOME / ".config" / "nvim"
+    mtimes = [f.stat().st_mtime for f in config.rglob("*.lua")]
+    if not mtimes:
         return []
+    stamp = str(int(max(mtimes)))
 
     cache_file = CACHE / f"nvim-{stamp}.json"
     if cache_file.exists():
@@ -239,6 +244,11 @@ io.write(vim.json.encode(out))
         merged.setdefault(key, []).append(item["mode"])
     entries = []
     for (lhs, desc), modes in merged.items():
+        # neovim reports the leader already expanded, so a leader mapping comes
+        # back as a literal leading space - " f" rather than "<leader>f", which
+        # renders as a mapping with no key at all.
+        if lhs.startswith(" "):
+            lhs = "<leader>" + lhs[1:]
         suffix = "" if modes == ["n"] else "  [" + "".join(sorted(modes)) + "]"
         entries.append((lhs + suffix, desc))
     entries.sort(key=lambda e: e[0].lower())

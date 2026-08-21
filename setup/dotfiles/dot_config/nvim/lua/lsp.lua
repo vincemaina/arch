@@ -74,6 +74,15 @@ local npm_servers = {
     root_markers = root('package.json'),
     capabilities = snippet_capabilities(),
     init_options = { provideFormatter = true },
+    -- Validation is OFF until asked for, per dialect. Without this the server
+    -- attaches, answers completions and reports nothing at all - a misspelled
+    -- property is simply accepted in silence, which reads as "css has no
+    -- diagnostics" rather than as a missing setting.
+    settings = {
+      css  = { validate = true },
+      scss = { validate = true },
+      less = { validate = true },
+    },
   },
 
   jsonls = {
@@ -213,5 +222,99 @@ vim.diagnostic.config({
   severity_sort = true,
   float = { border = 'rounded', source = true },
 })
+
+-- ---------------------------------------------------------------------------
+-- The keys
+-- ---------------------------------------------------------------------------
+--
+-- Set here rather than left as 0.11's defaults, because the shortcuts policy
+-- for this desktop is that every binding is one that was chosen - and because
+-- the defaults were not surviving init.lua's pruning intact. That pruning
+-- deletes every mapping not named in its KEEP list; the LSP entries named there
+-- were the ones somebody remembered, so K, ]d and [d were removed and nobody
+-- noticed until hover was reached for and did nothing.
+--
+-- Set globally rather than buffer-local on LspAttach. Buffer-local is tidier -
+-- the keys would exist only where a server can answer them - but the shortcuts
+-- panel asks a headless neovim what is mapped, with no file open, and would
+-- therefore never see them. Discoverable beats tidy.
+--
+-- gd is the addition. 0.11 ships grr, gri and grt but nothing for the jump
+-- people actually make most, because <C-]> goes through tagfunc instead - which
+-- works and is not what anyone's hands do.
+local keys = {
+  { 'gd',  vim.lsp.buf.definition,      'Go to definition' },
+  { 'gD',  vim.lsp.buf.declaration,     'Go to declaration' },
+  { 'grr', vim.lsp.buf.references,      'Find references' },
+  { 'gri', vim.lsp.buf.implementation,  'Go to implementation' },
+  { 'grt', vim.lsp.buf.type_definition, 'Go to type definition' },
+  { 'grn', vim.lsp.buf.rename,          'Rename the symbol under the cursor' },
+  { 'gra', vim.lsp.buf.code_action,     'Code actions' },
+  { 'gO',  vim.lsp.buf.document_symbol, 'List symbols in this document' },
+  { 'K',   vim.lsp.buf.hover,           'Show what is under the cursor' },
+  { ']d',  function() vim.diagnostic.jump({ count =  1, float = true }) end, 'Next diagnostic' },
+  { '[d',  function() vim.diagnostic.jump({ count = -1, float = true }) end, 'Previous diagnostic' },
+  { '<leader>d', vim.diagnostic.open_float, 'Show the diagnostic under the cursor' },
+  { '<leader>q', vim.diagnostic.setloclist, 'List every diagnostic in this file' },
+}
+
+for _, k in ipairs(keys) do
+  vim.keymap.set('n', k[1], k[2], { desc = k[3] })
+end
+
+-- gra in visual mode too, since a code action over a selection is how an
+-- extract-to-function is offered.
+vim.keymap.set('v', 'gra', vim.lsp.buf.code_action, { desc = 'Code actions' })
+
+-- ---------------------------------------------------------------------------
+-- Formatting
+-- ---------------------------------------------------------------------------
+--
+-- FORMAT ON SAVE IS DELIBERATELY OFF.
+--
+-- It is the default in most example configurations, and it is the wrong default
+-- here. Opening a file to read it and saving out of habit would reformat the
+-- whole thing, in a repository that has its own style and no formatter config
+-- of its own - producing a diff nobody asked for, in a file that was not being
+-- worked on. That is the same objection as the shortcuts policy this editor
+-- follows: nothing should happen that was not chosen.
+--
+-- So formatting is a key, and the key is <leader>f.
+--
+-- Every language here formats through its language server except markdown -
+-- ruff for python, ts_ls for javascript and typescript, and the vscode servers
+-- for html, css and json all advertise textDocument/formatting. marksman does
+-- not, so markdown goes through prettier as an ordinary formatprg, which is a
+-- built-in mechanism and needs no plugin.
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = 'markdown',
+  callback = function()
+    vim.opt_local.formatprg = 'prettier --parser markdown'
+  end,
+  desc = 'marksman does not format; prettier does',
+})
+
+local function format()
+  for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
+    if client:supports_method('textDocument/formatting') then
+      vim.lsp.buf.format({ async = false })
+      return
+    end
+  end
+
+  -- No server offers it. formatprg is the fallback, applied to the whole buffer
+  -- with the cursor put back - gggqG on its own leaves you at the top.
+  if vim.bo.formatprg ~= '' then
+    local view = vim.fn.winsaveview()
+    vim.cmd('silent normal! gggqG')
+    vim.fn.winrestview(view)
+    return
+  end
+
+  vim.notify('Nothing formats ' .. (vim.bo.filetype == '' and 'this buffer'
+    or vim.bo.filetype), vim.log.levels.WARN)
+end
+
+vim.keymap.set('n', '<leader>f', format, { desc = 'Format the buffer' })
 
 return M

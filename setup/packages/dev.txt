@@ -62,6 +62,14 @@ typescript
 
 # markdown
 marksman
+
+# Formatting. Every other language this editor is set up for has a language
+# server that formats - ruff for python, ts_ls for javascript and typescript,
+# and the vscode servers for html, css and json - so prettier is here for the
+# one gap rather than as a general formatter. marksman does navigation and
+# link checking for markdown and no formatting at all.
+prettier
+
 ripgrep
 fd
 fzf
