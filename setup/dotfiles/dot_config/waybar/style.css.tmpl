@@ -31,28 +31,39 @@
     min-height: 0;
 }
 
+/* The window surface is transparent and the visible bar is its child box.
+ *
+ * That indirection is what buys the shadow. GTK clips a box-shadow at the
+ * surface edge, and waybar's surface is exactly as tall as the bar - so a
+ * shadow on `window#waybar` has nowhere to fall and simply does not appear,
+ * which was tried first and measured as having no effect. Painting the bar on
+ * the inner box and giving that box a bottom margin makes the surface taller
+ * than the bar, and the shadow lands in the gap.
+ *
+ * Measured rather than eyeballed, by sampling brightness down a column of a
+ * screenshot: about 12 across the bar, dropping to 6 and rising back through
+ * the rows beneath it, then 15 for the wallpaper. The band is darker than the
+ * bar and the wallpaper both, which is what separates them. */
 window#waybar {
-    /* Black at 95%, rather than a tinted colour at full opacity.
-     *
-     * The 5% that shows through is where the bar's hue comes from, so it picks
-     * up whatever the wallpaper is doing beneath it and keeps doing so if the
-     * wallpaper changes. Painting the tint into the hex instead would fix it
-     * to one wallpaper and drift the moment that changed.
-     *
-     * Kept high deliberately: at lower opacity the bar stops reading as a
-     * separate surface and starts blending into the wallpaper, which is the
-     * failure this replaced. */
-    background: linear-gradient(90deg,
-        alpha(@bar, 0.95) 0%,
-        alpha(@bar_bloom, 0.95) 50%,
-        alpha(@bar, 0.95) 100%);
-
-    /* The bloom sits where the bar is emptiest. Modules cluster at both ends
-     * and the middle carries only the window title, so a swell of colour there
-     * fills the gap without competing with anything. It is dark enough to read
-     * as depth rather than as decoration - the gradient is doing the same job
-     * the transparency does, giving the bar somewhere to be other than flat. */
+    background: transparent;
     color: @text;
+}
+
+window#waybar > box {
+    /* Fully opaque. The bar is chrome and should sit in front of the desktop
+     * rather than partly in it; the colour it needs now comes from the
+     * gradient rather than from whatever happens to be behind it.
+     *
+     * The bloom sits where the bar is emptiest - modules cluster at both ends
+     * and the middle carries only the window title - so a swell of colour
+     * there fills the gap without competing with anything. */
+    background: linear-gradient(90deg,
+        @bar 0%,
+        @bar_bloom 50%,
+        @bar 100%);
+
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.95);
+    margin-bottom: 8px;
 }
 
 /* The shared pill shape. Dark text on a saturated background reads better at
