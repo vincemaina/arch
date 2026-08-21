@@ -26,9 +26,23 @@ set -euo pipefail
 ASSOCIATIONS=(
     "imv.desktop:image/png image/jpeg image/gif image/webp image/bmp image/tiff"
     # Opening a folder should land in the file manager being used, which is a
-    # terminal one. yazi.desktop declares Terminal=true, so xdg-open starts it
-    # inside a terminal rather than trying to draw a window it does not have.
+    # terminal one. yazi.desktop declares Terminal=true, which means glib has to
+    # find a terminal to run it in - see ~/.local/bin/xdg-terminal-exec, without
+    # which this association resolved correctly and then opened nothing at all.
+    # It was declared here and believed to work for some time before anyone ran
+    # `xdg-open` on a directory and watched.
     "yazi.desktop:inode/directory"
+
+    # Editing, rather than viewing. text/plain already resolves to nvim through
+    # the entry nvim ships, but several things that are plainly code do not:
+    # a shell script is text/x-shellscript, which had no association at all, and
+    # JSON is application/json, which resolved to the browser. Opening a config
+    # file from the launcher and getting a read-only browser tab is the wrong
+    # answer to an unambiguous question.
+    #
+    # HTML is deliberately left alone. Opening one is far more often "look at
+    # this page" than "edit this markup", and the browser is right for that.
+    "nvim.desktop:text/x-shellscript application/json application/x-shellscript text/x-python text/x-lua text/markdown application/toml text/x-makefile"
 )
 
 for entry in "${ASSOCIATIONS[@]}"; do

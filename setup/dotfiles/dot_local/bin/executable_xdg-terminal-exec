@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: foot
+
+# Run a command in a terminal window, for desktop entries that need one.
+#
+#   xdg-terminal-exec <command> [args...]
+#
+# WHY THIS EXISTS
+#
+# A desktop entry with Terminal=true says "run me in a terminal" without saying
+# which terminal. Something has to decide, and on this machine nothing did:
+# every such entry silently did nothing.
+#
+# The chain is worth knowing, because the failure is invisible at every step.
+# rofi hands a chosen file to xdg-open; xdg-open delegates to `gio open`; gio
+# resolves the mime type to a desktop entry; and if that entry is Terminal=true,
+# glib has to find a terminal to run it in. glib's answer is to look for a
+# program called xdg-terminal-exec on PATH - the freedesktop mechanism for
+# exactly this - and if it finds none it gives up with "Unable to find terminal
+# required for application", which nothing surfaces to the user. From a launcher
+# there is no tty and no error: the file simply does not open.
+#
+# Confirmed rather than deduced: `gio launch /usr/share/applications/nvim.desktop
+# file.py` prints that error verbatim, and providing this script makes the same
+# command open a window.
+#
+# WHY NOT SHIP OUR OWN DESKTOP ENTRIES INSTEAD
+#
+# That was the alternative - a nvim.desktop of our own naming foot explicitly,
+# the way `set $explorer foot --app-id=explorer -e yazi` does in the sway config.
+# It works, and it fixes one entry at a time forever. This fixes the category,
+# including entries shipped by packages that we do not control and would
+# otherwise have to shadow one by one. It is also the mechanism glib is already
+# looking for, so it is less invention rather than more.
+#
+# The alternative that was NOT chosen: installing a terminal glib recognises
+# without help. Older glib carried a hardcoded list - xterm, gnome-terminal,
+# konsole - and satisfying it would mean installing an X11 terminal on a Wayland
+# system purely to be found by a lookup.
+#
+# WHAT GLIB ACTUALLY PASSES
+#
+# The command and its arguments, and nothing else - verified by logging them:
+# `nvim /tmp/a.py` arrives as two arguments. The draft freedesktop spec allows
+# options before the command, so leading options are skipped rather than being
+# passed to foot as though they were the program to run, but no caller here
+# sends any.
+
+# Skip any leading options, per the draft spec. `--` ends them explicitly.
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --) shift; break ;;
+        -*) shift ;;
+        *)  break ;;
+    esac
+done
+
+if [[ $# -eq 0 ]]; then
+    echo "xdg-terminal-exec: nothing to run" >&2
+    exit 2
+fi
+
+# A distinct app_id so sway can tell these windows apart from terminals opened
+# by hand, should a rule ever be wanted. Deliberately no floating rule: this is
+# how a file gets opened to work on, and tiling is right for a window you stay
+# in. Compare the explorer on $mod+e, which floats because glancing at a
+# directory is a different act from editing a file.
+exec foot --app-id=xdg-terminal -- "$@"

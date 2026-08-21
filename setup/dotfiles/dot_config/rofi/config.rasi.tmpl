@@ -38,12 +38,31 @@ configuration {
     sort:           true;
     sorting-method: "fzf";
 
-    /* Searches recursively from home and opens the result with xdg-open, so a
-     * file goes to the right program and a directory goes to the file manager.
-     * This is the "find a file" mode; filebrowser is the "walk the tree" one. */
+    /* Searches recursively from home and opens the result, so a file goes to
+     * the right program and a directory goes to the file manager. This is the
+     * "find a file" mode; filebrowser is the "walk the tree" one.
+     *
+     * `gio open` rather than `xdg-open`, and that is the difference between
+     * this working and doing nothing at all.
+     *
+     * xdg-open is a shell script that picks a strategy from the detected
+     * desktop environment. Sway is not one it recognises, so it takes the
+     * generic path - and the generic path parses the .desktop file itself and
+     * executes the command directly, ignoring Terminal=true completely. From a
+     * terminal that is arguably right: `xdg-open notes.md` opening the editor
+     * in the terminal you typed it in is what you wanted. From a launcher there
+     * is no terminal, so nvim starts, finds no tty and dies, and nothing is
+     * reported anywhere.
+     *
+     * gio is glib's own implementation and honours Terminal=true properly: it
+     * looks for xdg-terminal-exec on PATH, which is why ~/.local/bin ships one
+     * and why environment.d puts that directory on the session PATH.
+     *
+     * Traced rather than guessed - `bash -x xdg-open file.py` ends in
+     * `env nvim /tmp/file.py` with no terminal anywhere in sight. */
     recursivebrowser {
         directory: "~";
-        command:   "xdg-open";
+        command:   "gio open";
 
         /* Application state, caches, repository internals and dependency
          * directories - none of them things anyone searches for by name, and

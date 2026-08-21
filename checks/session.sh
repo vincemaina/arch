@@ -557,6 +557,101 @@ done < <(python3 "$bar_check")
 rm -f "$bar_check"
 
 # ----------------------------------------------------------------------
+section "Opening files (TASK-47)"
+
+# Choosing a file in the launcher has to end with a window. Every link in that
+# chain fails silently, and one of them was broken for months without anyone
+# noticing: the association from inode/directory to yazi was declared, believed,
+# and opened nothing at all.
+#
+# The chain is: rofi hands the path to `gio open`; gio resolves the mime type to
+# a desktop entry; if that entry is Terminal=true, glib looks for a program
+# called xdg-terminal-exec on PATH to run it in. A break anywhere produces no
+# error, because there is no terminal to print one to.
+
+if ! command -v gio &>/dev/null; then
+    skip "gio is not installed, so the launcher cannot open anything"
+else
+    # rofi must ask gio rather than xdg-open. xdg-open takes its generic path on
+    # sway - a desktop it does not recognise - and that path executes the
+    # desktop entry's command directly, ignoring Terminal=true, so the editor
+    # starts with no tty and dies.
+    rofi_config="$HOME/.config/rofi/config.rasi"
+    if [[ ! -f "$rofi_config" ]]; then
+        skip "rofi is not configured, so the file finder cannot be checked"
+    elif grep -A3 'recursivebrowser' "$rofi_config" | grep -q 'command:.*gio open'; then
+        pass "the file finder opens files with gio, which honours Terminal=true"
+    else
+        fail "the file finder does not use 'gio open' - xdg-open ignores Terminal=true on sway, so choosing a file in the launcher will do nothing"
+    fi
+fi
+
+# glib finds this by name on PATH and there is no way to give it an absolute
+# path, which is the one case the absolute-path habit cannot cover.
+if [[ ! -x "$HOME/.local/bin/xdg-terminal-exec" ]]; then
+    fail "xdg-terminal-exec is missing, so every Terminal=true entry - the editor, the file manager - opens nothing"
+elif [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    fail "~/.local/bin is not on PATH, so glib cannot find xdg-terminal-exec and Terminal=true entries open nothing"
+else
+    pass "xdg-terminal-exec is present and on PATH, so terminal applications get a terminal"
+fi
+
+# The session's PATH, not this shell's. environment.d is read when the user
+# manager starts, so a fresh sync is not enough and a check against $PATH here
+# would pass while the desktop stayed broken.
+session_path="$(systemctl --user show-environment 2>/dev/null | sed -n 's/^PATH=//p')"
+if [[ -z "$session_path" ]]; then
+    skip "no user session to ask about PATH"
+elif [[ ":$session_path:" == *":$HOME/.local/bin:"* ]]; then
+    pass "the session hands ~/.local/bin to what it launches"
+else
+    fail "the session PATH lacks ~/.local/bin, so anything launched from the bar or the launcher cannot find the helpers (log out and in after adding it)"
+fi
+
+# An association pointing at a desktop entry that does not exist resolves
+# cleanly and then does nothing, which is the shape of the yazi bug.
+missing_handlers=""
+for pair in "text/plain:an ordinary text file" \
+            "text/x-shellscript:a shell script" \
+            "application/json:a JSON file" \
+            "inode/directory:a directory"; do
+    mime="${pair%%:*}"
+    what="${pair#*:}"
+    handler="$(xdg-mime query default "$mime" 2>/dev/null)"
+    if [[ -z "$handler" ]]; then
+        missing_handlers+="  nothing opens $what ($mime)"$'\n'
+        continue
+    fi
+    if ! find /usr/share/applications /usr/local/share/applications \
+              "$HOME/.local/share/applications" \
+              -maxdepth 1 -name "$handler" -print -quit 2>/dev/null | grep -q .; then
+        missing_handlers+="  $what opens with $handler, which is not installed"$'\n'
+    fi
+done
+if [[ -n "$missing_handlers" ]]; then
+    fail "some file types open nothing:"$'\n'"${missing_handlers%$'\n'}"
+else
+    pass "text, shell scripts, JSON and directories each open with an installed application"
+fi
+
+# Distinguishing "not configured" from "configured but not yet in effect"
+# matters, because they need different things doing. environment.d is read when
+# the user manager starts, so a value added there is correct on disk and absent
+# from the running session until the next login - and telling someone their
+# configuration is missing when it is merely pending sends them to fix a file
+# that is already right.
+declared_editor="$(sed -n 's/^EDITOR=//p' "$HOME/.config/environment.d/"*.conf 2>/dev/null | tail -1)"
+if [[ -n "${EDITOR:-}" ]] && command -v "${EDITOR%% *}" &>/dev/null; then
+    pass "EDITOR is $EDITOR, so git and systemctl edit agree with the launcher"
+elif [[ -n "$declared_editor" ]] && command -v "${declared_editor%% *}" &>/dev/null; then
+    skip "EDITOR is set to $declared_editor in environment.d but not in this session - log out and in"
+elif [[ -n "$declared_editor" ]]; then
+    fail "EDITOR is set to '$declared_editor' in environment.d, which is not installed"
+else
+    fail "EDITOR is unset, so git and systemctl edit fall back to their own default rather than the chosen editor"
+fi
+
+# ----------------------------------------------------------------------
 section "Desktop entries"
 
 # A desktop entry whose Exec cannot be resolved fails silently: Terminal=false

@@ -1774,6 +1774,45 @@ Losing the window title also loses the one case it was good for: a tabbed contai
 
 ---
 
+## Neovim as the editor, and how a file gets opened
+
+**Decision:** Neovim is the editor, set as `EDITOR`, `VISUAL` and the handler for the file types that are plainly code. Files are opened from the launcher through `gio open`, not `xdg-open`, and `~/.local/bin/xdg-terminal-exec` supplies the terminal that terminal applications need.
+
+### Why Neovim
+
+The question worth asking was the one on TASK-65: a text editor connected to other tools, or a cohesive environment that subsumes them. That is a real fork, and Emacs is the serious case for the second answer — `org-mode` alone would absorb the notes, todo and calendar-agenda tickets into one system, `org-caldav` covers the Google sync, and `magit` is a strong answer to the git-tool ticket. Four tickets collapsing into one tool is not a small argument.
+
+It was rejected in favour of keeping those as separate, replaceable pieces. Neovim is 30 MiB against Emacs's 264 MiB, was already installed and already the handler for `text/plain`, and starts fast enough to be the thing that opens when you press enter on a file. Helix was the third candidate and is genuinely good with no configuration at all, but has no plugin system yet, which makes it a bet on never needing to extend it.
+
+The cost is accepted rather than hidden: notes, todo and the calendar stay three separate builds, and the editor's own environment — LSP, debugging, git integration — is assembled rather than arriving whole.
+
+### Why the opening chain is what it is
+
+This part was not a preference. Choosing a file in the launcher did nothing at all, and finding out why took tracing rather than reading.
+
+`xdg-open` is a shell script that picks a strategy from the detected desktop. Sway is not one it recognises, so it takes the generic path — and **the generic path parses the desktop entry itself and executes the command directly, ignoring `Terminal=true`**. Traced with `bash -x`, it ends in `env nvim /tmp/file.py`. From a terminal that is arguably correct, and is why `xdg-open` is left alone there. From a launcher there is no terminal, so the editor starts, finds no tty, and dies without reporting anything.
+
+`gio open` is glib's own implementation and honours `Terminal=true` properly: it looks for a program named `xdg-terminal-exec` on `PATH` and runs the command inside it. That program is a freedesktop convention rather than a package here, and is three lines.
+
+Two consequences worth stating, because both were load-bearing:
+
+- **`~/.local/bin` had to go on the session `PATH`.** glib looks for `xdg-terminal-exec` by name, and unlike every previous instance of this problem there is no way to hand it an absolute path. The absolute-path habit that fixed the desktop entries and the bar's click commands cannot fix this one.
+- **The same bug had already been shipped.** The `inode/directory` → `yazi.desktop` association was declared, commented as working, and never opened anything. It is the repository's signature failure: configuration that looks correct and does nothing.
+
+### Trade-off
+
+The launcher and the terminal now open files by different routes — `gio` from the launcher, `xdg-open` in a shell. That is deliberate, since the right behaviour genuinely differs, but it means "what opens this file" has two answers and only one of them honours `Terminal=true`.
+
+### Alternatives considered
+
+**Shipping our own desktop entries that name `foot` explicitly**, the way `set $explorer foot --app-id=explorer -e yazi` does. It works, and it fixes one entry at a time forever, including having to shadow entries that packages ship. Supplying `xdg-terminal-exec` fixes the category once.
+
+**Installing a terminal glib recognises without help.** Older glib carried a hardcoded list — `xterm`, `gnome-terminal`, `konsole` — so this would mean installing an X11 terminal on a Wayland system purely to satisfy a lookup.
+
+**Setting `XDG_CURRENT_DESKTOP` to something `xdg-open` recognises**, so it takes a gio path. Rejected as lying to every other program that reads it to decide how to behave.
+
+---
+
 # Testing Strategy
 
 ## VM-first development
