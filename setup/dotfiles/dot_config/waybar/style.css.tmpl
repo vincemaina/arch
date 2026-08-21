@@ -12,7 +12,6 @@
 
 @define-color bg          {{ .palette.bg }};
 @define-color bar         {{ .palette.bar }};
-@define-color bar_bloom   {{ .palette.bar_bloom }};
 @define-color surface     {{ .palette.surface }};
 @define-color surface_alt {{ .palette.surface_alt }};
 @define-color muted       {{ .palette.muted }};
@@ -51,16 +50,22 @@ window#waybar {
 
 window#waybar > box {
     /* Fully opaque. The bar is chrome and should sit in front of the desktop
-     * rather than partly in it; the colour it needs now comes from the
-     * gradient rather than from whatever happens to be behind it.
+     * rather than partly in it; the colour it needs comes from the gradient
+     * rather than from whatever happens to be behind it.
      *
-     * The bloom sits where the bar is emptiest - modules cluster at both ends
-     * and the middle carries only the window title - so a swell of colour
-     * there fills the gap without competing with anything. */
+     * The gradient takes the same path as the border below it - dark cyan at
+     * the edges through dark magenta at the centre - so the two read as one
+     * thing. mix() blends the accents into black rather than naming new
+     * colours, which keeps them derived from the palette: change accent or
+     * secondary and the bar follows, with no third colour to keep in step.
+     *
+     * The proportions are what make it a tint rather than a paint job. 10% and
+     * 22% of a saturated colour into black is enough to see and not enough to
+     * compete with the modules sitting on top of it. */
     background: linear-gradient(90deg,
-        @bar 0%,
-        @bar_bloom 50%,
-        @bar 100%);
+        mix(@bar, @accent, 0.10) 0%,
+        mix(@bar, @secondary, 0.22) 50%,
+        mix(@bar, @accent, 0.10) 100%);
 
     /* A gradient hairline instead of a shadow.
      *

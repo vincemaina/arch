@@ -16,9 +16,6 @@ bar         = "#000000"  # the bar. Black, and deliberately not tinted: the
                          # stylesheet gives it slight transparency, so what
                          # colour it has comes from the wallpaper behind it and
                          # follows a wallpaper change for free
-bar_bloom   = "#2a0a3a"  # the swell of colour through the middle of the bar,
-                         # where it is otherwise emptiest. Dark enough to stay
-                         # behind the modules rather than compete with them
 bg_dim      = "#06080d"  # lock screen, behind everything
 surface     = "#151b26"  # inactive borders, hover
 surface_alt = "#1f2937"  # separators
