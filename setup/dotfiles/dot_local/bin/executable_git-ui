@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: foot lazygit git swaymsg notify-send python3
+
+# lazygit, in a terminal, for the repository you are looking at.
+#
+#   git-ui              the repository containing the focused window's
+#                       working directory
+#   git-ui <path>       the repository containing that path
+#
+# WHY THERE IS A SCRIPT HERE AT ALL
+#
+# `foot -e lazygit` on its own would be one line in the desktop entry. It would
+# also open in whatever directory the launcher happened to inherit - $HOME, on
+# this machine, which is not a repository - and lazygit's answer to that is a
+# prompt asking whether to `git init` here. A launcher entry that offers to
+# create a repository in your home directory is the sort of thing that only
+# looks wrong once you have pressed enter.
+#
+# So the directory is worked out first, and if there is no repository the
+# answer is a notification rather than a window. Same reasoning as everywhere
+# else here: the failure has to be visible.
+#
+# WHY THE FOCUSED WINDOW
+#
+# rofi has no working directory to pass on, and neither does a keybinding. The
+# window you are looking at does: it is nearly always the terminal you were
+# just typing in, and the repository you want is the one it is standing in.
+# terminal-here.desktop makes the same assumption about a folder.
+#
+# foot's own pid is not the interesting one - the shell running inside it is a
+# child, and the shell is what has been cd'd around - so the tree is walked
+# down to the newest leaf and its cwd is read from /proc.
+
+app_id=git-ui
+
+die() {
+    # notify-send rather than stderr: nothing launched from rofi or a
+    # keybinding has a terminal to print to, so stderr goes nowhere at all.
+    notify-send --app-name=git-ui --urgency=normal "git-ui" "$1" || true
+    echo "git-ui: $1" >&2
+    exit 1
+}
+
+focused_cwd() {
+    swaymsg -t get_tree 2>/dev/null | python3 -c '
+import json, os, sys
+
+try:
+    tree = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+
+pid = None
+def walk(node):
+    global pid
+    if node.get("focused") and node.get("pid"):
+        pid = node["pid"]
+    for child in node.get("nodes", []) + node.get("floating_nodes", []):
+        walk(child)
+walk(tree)
+if pid is None:
+    sys.exit(1)
+
+# Children by parent, from /proc/<pid>/stat field 4. The comm field is
+# parenthesised and may itself contain spaces, so split after the last ")"
+# rather than on whitespace.
+children = {}
+starts = {}
+for entry in os.listdir("/proc"):
+    if not entry.isdigit():
+        continue
+    try:
+        with open(f"/proc/{entry}/stat") as fh:
+            stat = fh.read()
+        rest = stat[stat.rindex(")") + 2:].split()
+    except (OSError, ValueError):
+        continue
+    children.setdefault(int(rest[1]), []).append(int(entry))
+    starts[int(entry)] = int(rest[19])
+
+# Descend to the newest leaf: in a terminal that is the shell, or whatever the
+# shell is currently running.
+while children.get(pid):
+    pid = max(children[pid], key=lambda p: starts.get(p, 0))
+
+try:
+    print(os.readlink(f"/proc/{pid}/cwd"))
+except OSError:
+    sys.exit(1)
+' 2>/dev/null
+}
+
+start="${1:-}"
+if [[ -z "$start" ]]; then
+    start="$(focused_cwd || true)"
+fi
+[[ -n "$start" ]] || start="$PWD"
+[[ -d "$start" ]] || start="$(dirname "$start")"
+
+root="$(git -C "$start" rev-parse --show-toplevel 2>/dev/null || true)"
+[[ -n "$root" ]] || die "$start is not inside a git repository"
+
+# Tiled, not floating, and so no window rule is needed for it. Reading a diff,
+# staging it and writing a commit message is work you stay in for a while,
+# which is what 40-window-rules.conf says tiling is for - unlike the explorer
+# or the calendar, which are glance-and-close and float.
+#
+# The app_id is set anyway so the window can be named later - by a rule, or by
+# a toggle - without having to go and find where it was launched from.
+exec foot --app-id="$app_id" --title="git-ui" --working-directory="$root" -e lazygit

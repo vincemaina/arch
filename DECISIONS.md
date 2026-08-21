@@ -2156,6 +2156,56 @@ A secure unattended secret-management approach can be added later if needed.
 
 ---
 
+## lazygit as the git interface, and delta deliberately not yet
+
+**Decision:** Install lazygit, reached on `$mod+g` and from the launcher through
+a helper that opens it on the focused window's repository.
+
+### Why
+
+The alternative was a pager — `git-delta` — and the two are not the same
+question, which is what the choice turned on. delta makes a diff readable. It
+does not stage a hunk and it does not resolve a conflict, which are the two jobs
+that actually send people looking for something better than the CLI.
+
+Compared by driving each against a clone of this repository's real history
+rather than by reading feature lists. `tig` shows its status as a list of
+filenames with no diff until you press enter; `gitui` leaves the diff pane empty
+until a file is selected; lazygit arrives with the diff, the log, the branches
+and the stash already drawn. Staging one of three hunks took the same number of
+keystrokes as `git add -p` — the difference is that `add -p` asks you to decide
+on hunk one before it will show you hunks two and three, and lazygit shows you
+all three first.
+
+Conflict resolution is what settled whether a graphical merge tool was also
+wanted. It is not: on a real conflicting merge lazygit filters to the
+conflicting files and resolves a side in one keypress.
+
+**delta is deliberately absent, and this is the interesting half.** It is cheap
+at 5 MiB and it would be the obvious companion — but it is configured in a
+gitconfig, and until TASK-37 there was no tracked gitconfig at all. Adding one
+for delta alone would have created a second home for git settings a few days
+before the first one existed. lazygit ships explicit delta support, so it can be
+added to the command line and to lazygit together, and nothing here changes.
+
+### Trade-off
+
+About a second to a full first frame, against a few milliseconds for
+`git status`, and it is the largest of the three TUIs at 19 MiB. It depends only
+on git and glibc.
+
+### Alternatives considered
+
+**difftastic** — structural diffing, and genuinely better output. Rejected on
+size: 114 MiB, six times lazygit, for the reading half of the problem only.
+
+**tig and gitui** — both smaller, both above.
+
+**Nothing, and better git aliases** — the honest baseline. Rejected because
+`add -p` deciding blind is the specific friction this is for.
+
+---
+
 ## Git identity lives in `install.conf`, and is committed
 
 **Decision:** Put `GIT_NAME` and `GIT_EMAIL` in `setup/install.conf` alongside

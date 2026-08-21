@@ -1,0 +1,89 @@
+{{- $palette := index .themes .theme -}}
+# lazygit, the git front end on $mod+g and in the launcher.
+#
+# Colours come from the selected theme in .chezmoidata/themes.toml. Edit them
+# there, not here.
+#
+# WHAT IS SET HERE AND WHY
+#
+# Only settings with a reason. lazygit ships around two hundred options and
+# copying a config in wholesale is exactly what CLAUDE.md warns against, so
+# everything below is either a colour that would otherwise ignore the desktop
+# theme, or a default that is wrong for a machine built from this repository.
+
+gui:
+  theme:
+    # The focused panel's border is the accent - the same colour sway uses for
+    # the focused window, so "here" means the same thing inside the terminal as
+    # outside it.
+    activeBorderColor:
+      - "{{ $palette.accent }}"
+      - bold
+    # Inactive borders are `muted` rather than `surface`. surface is the colour
+    # sway uses for an unfocused window BORDER against the desktop, and at
+    # 5 columns wide on a dark terminal background it is invisible; muted is
+    # the palette's "present but not the point" colour and is contrast-checked
+    # against bg by checks/session.sh.
+    inactiveBorderColor:
+      - "{{ $palette.muted }}"
+    searchingActiveBorderColor:
+      - "{{ $palette.secondary }}"
+      - bold
+    optionsTextColor:
+      - "{{ $palette.muted }}"
+    # The selected line. tertiary as the background and the default text on top
+    # is the one fg/bg pair in this palette whose contrast is already enforced -
+    # it is the focused workspace disc and its number, and checks/session.sh
+    # has a floor for it. Picking the pair that is already checked means a new
+    # theme cannot land a selection you cannot read.
+    selectedLineBgColor:
+      - "{{ $palette.tertiary }}"
+    inactiveViewSelectedLineBgColor:
+      - "{{ $palette.surface_alt }}"
+    cherryPickedCommitFgColor:
+      - "{{ $palette.bg }}"
+    cherryPickedCommitBgColor:
+      - "{{ $palette.secondary }}"
+    markedBaseCommitFgColor:
+      - "{{ $palette.bg }}"
+    markedBaseCommitBgColor:
+      - "{{ $palette.warning }}"
+    unstagedChangesColor:
+      - "{{ $palette.urgent }}"
+    defaultFgColor:
+      - "{{ $palette.text }}"
+
+  # Square corners, matching mako's border-radius=0 and sway's borders. The
+  # default is rounded, which is the only thing on this desktop that would be.
+  border: single
+
+  # The file tree gets icons because the terminal font has them:
+  # ttf-jetbrains-mono-nerd, the same font foot and waybar use. Without a
+  # version set lazygit draws no icons at all rather than drawing broken ones.
+  nerdFontsVersion: "3"
+
+  # The command log stays on, deliberately. It prints the actual git command
+  # behind every keypress, which is what keeps this a front end to git rather
+  # than a replacement for knowing it - "minimal enough to stay fast and
+  # understandable".
+  showCommandLog: true
+
+# A first-run panel thanking you for using lazygit and linking a video. It
+# appears once per machine, which means once on every machine built from this
+# repository, and it is the first thing a new install would show.
+disableStartupPopups: true
+
+os:
+  # `e` on a file opens the editor. Without this lazygit falls back to $EDITOR,
+  # which is set by environment.d for the user manager's children and is not
+  # something a terminal launched from a keybinding can be relied on to carry.
+  # editPreset also teaches lazygit how to open a file AT A LINE, which a bare
+  # $EDITOR cannot express.
+  editPreset: nvim
+
+update:
+  # Packages on this machine come from pacman. A front end that checks GitHub
+  # for a newer version of itself and offers to install it would put a second,
+  # invisible package manager on the system - the thing packages/README.md and
+  # the AUR decision in TASK-43 are both about.
+  method: never

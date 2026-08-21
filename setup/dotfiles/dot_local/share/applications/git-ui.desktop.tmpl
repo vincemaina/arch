@@ -1,0 +1,21 @@
+# Exec is an absolute path for the same reason theme's and notification-centre's
+# are: ~/.local/bin is not on the PATH that sway and rofi hand to what they
+# spawn, so a bare `Exec=git-ui` works when tested from a terminal and silently
+# does nothing from the launcher.
+#
+# Terminal=false even though this opens a terminal. Terminal=true asks the
+# launcher to find a terminal and run the command inside it; git-ui opens its
+# own, with an app_id a window rule can name, which the launcher's choice would
+# not have.
+
+[Desktop Entry]
+Type=Application
+Name=Git
+GenericName=Git front end
+Comment=Read the diff, stage part of it, commit and push, for the repository you are looking at
+Icon=git
+Exec={{ .chezmoi.homeDir }}/.local/bin/git-ui
+Terminal=false
+Categories=Development;RevisionControl;
+Keywords=git;diff;commit;stage;branch;merge;conflict;lazygit;log;
+NoDisplay=false
