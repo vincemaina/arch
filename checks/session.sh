@@ -697,6 +697,48 @@ else
         pass "opening python, markdown and sql files produces no errors"
     fi
 
+    # Every file gets SOME highlighting - the invariant that actually matters.
+    #
+    # The check above only looks for errors, and this failed without one:
+    # installing a parser made vim.treesitter.start() succeed, which DISABLES
+    # regex syntax highlighting, and Arch keeps the highlight queries in
+    # /usr/share/tree-sitter rather than on nvim's runtimepath - so python files
+    # opened completely grey and nothing said why. Worse than before the parser
+    # was installed, and the checks were green throughout.
+    #
+    # So this asserts the thing a person would notice: treesitter is on with a
+    # query, or vim's own syntax is. Never neither.
+    hl_probe="$(mktemp -d)"
+    printf 'import os\n' > "$hl_probe/p.py"
+    printf 'const a = 1;\n' > "$hl_probe/p.js"
+    printf '#!/bin/bash\necho hi\n' > "$hl_probe/p.sh"
+    printf '# Title\n' > "$hl_probe/p.md"
+    unhighlighted=""
+    for f in "$hl_probe"/p.*; do
+        # Treesitter being ACTIVE is not the same as treesitter highlighting
+        # anything: with a parser and no query, highlighter.active is still set
+        # and the file is blank. A first version of this check tested exactly
+        # that and passed while the bug was reintroduced. So the query has to be
+        # confirmed too.
+        result="$(nvim --headless "$f" -c 'lua
+local b = vim.api.nvim_get_current_buf()
+local ts = false
+if vim.treesitter.highlighter.active[b] ~= nil then
+  local lang = vim.treesitter.language.get_lang(vim.bo.filetype)
+  local ok, query = pcall(vim.treesitter.query.get, lang, "highlights")
+  ts = ok and query ~= nil
+end
+local regex = vim.b.current_syntax ~= nil
+io.write((ts or regex) and "ok" or "none")' -c quit 2>/dev/null)"
+        [[ "$result" == "ok" ]] || unhighlighted+="${f##*/} "
+    done
+    rm -rf "$hl_probe"
+    if [[ -n "$unhighlighted" ]]; then
+        fail "these open with no highlighting at all: ${unhighlighted}- a parser without its query disables regex syntax and replaces it with nothing"
+    else
+        pass "python, javascript, shell and markdown all open highlighted"
+    fi
+
     # Parsers are declared packages rather than runtime downloads, so a missing
     # one is package drift rather than something neovim should fix itself.
     missing_parsers=""

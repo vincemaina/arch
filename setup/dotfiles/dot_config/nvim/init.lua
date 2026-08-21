@@ -189,20 +189,50 @@ vim.api.nvim_create_autocmd('TextYankPost', {
 -- decision as the missing language servers - see TASK-84 and TASK-43. Until
 -- then those filetypes get vim's regex highlighting, which is worse but not
 -- nothing.
+-- The queries have to be findable, and by default they are not.
+--
+-- A parser is only half of treesitter highlighting: the other half is a set of
+-- queries saying which nodes are a keyword, a string, a function name. Arch's
+-- tree-sitter-* packages ship both, but they put the queries in
+-- /usr/share/tree-sitter/queries/<lang>/, which is not on nvim's runtimepath -
+-- nvim only looks along that path, and its own bundled queries live in
+-- /usr/share/nvim/runtime/queries/.
+--
+-- Without this line the result is worse than having no parser at all.
+-- vim.treesitter.start() succeeds, and starting it DISABLES the regex syntax
+-- highlighting that was colouring the file perfectly well - then finds no
+-- queries and highlights nothing. A python file opens completely grey, with no
+-- error anywhere to say why. That is exactly what happened, and it got past a
+-- check that only looked for errors on startup.
+vim.opt.runtimepath:append('/usr/share/tree-sitter')
+
 -- pcall around `start` itself, and not around a check beforehand. The obvious
 -- guard - pcall(vim.treesitter.get_parser, ...) - looks right and does not
 -- work: get_parser returns nil rather than raising when there is no parser, so
 -- pcall reports success and `start` then throws anyway. Opening any python or
 -- sql file printed a stack trace, which is exactly the sort of thing that looks
 -- correct in the file and is wrong on screen.
+-- A parser is not enough: the highlight query has to exist too.
+--
+-- vim.treesitter.start() DISABLES regex syntax highlighting, so starting it
+-- with a parser but no query leaves the file completely grey - worse than never
+-- having installed the parser. Arch ships tree-sitter-bash with a parser and no
+-- queries at all, so bash is exactly that case and there will be others.
+--
+-- Checking for the query before starting makes the failure impossible rather
+-- than fixing it one language at a time: no query means treesitter stays off
+-- and vim's regex highlighting keeps colouring the file, which is worse than
+-- treesitter and much better than nothing.
 vim.api.nvim_create_autocmd('FileType', {
   callback = function(args)
     local lang = vim.treesitter.language.get_lang(args.match)
-    if lang then
+    if not lang then return end
+    local ok, query = pcall(vim.treesitter.query.get, lang, 'highlights')
+    if ok and query then
       pcall(vim.treesitter.start, args.buf, lang)
     end
   end,
-  desc = 'Enable treesitter wherever a parser is actually installed',
+  desc = 'Enable treesitter only where both a parser and a highlight query exist',
 })
 
 -- ---------------------------------------------------------------------------
