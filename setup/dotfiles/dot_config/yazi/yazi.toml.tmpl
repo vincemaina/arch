@@ -1,0 +1,27 @@
+# yazi, the file manager on $mod+e.
+#
+# WHY `edit` IS A SCRIPT AND NOT `nvim`
+#
+# yazi's default rule for a directory is
+#
+#     { url = "*/", use = [ "edit", "open", "reveal" ] }
+#
+# with `edit` first, so Enter on a folder runs whatever `edit` is. That was
+# harmless while `edit` was yazi's default ${EDITOR:-vi} and EDITOR was unset,
+# because it failed - and the moment it was pointed at a working nvim, Enter on
+# a folder started opening the folder in the editor.
+#
+# ~/.local/bin/yazi-open is the fix: a directory asks yazi to navigate into it,
+# and anything else opens in nvim. Both halves of Enter behave the way they
+# should, and no [open] rule has to be overridden - an override was tried and
+# taken back out, because a rule matching "*/" turned out to catch files too.
+#
+# The path is absolute because it must be. yazi inherits its PATH from whatever
+# started it, which is sway, and ~/.local/bin is not on the session PATH - the
+# same trap that made the bar's click commands and the desktop entries silently
+# do nothing.
+
+[opener]
+edit = [
+    { run = '{{ .chezmoi.homeDir }}/.local/bin/yazi-open "$@"', desc = "nvim", block = true, for = "unix" },
+]

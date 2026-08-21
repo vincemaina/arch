@@ -1,0 +1,25 @@
+# yazi keybindings.
+#
+# Additions only. prepend_keymap is merged in front of yazi's defaults rather
+# than replacing them, so everything the manual documents still works.
+
+[mgr]
+prepend_keymap = [
+    # A terminal where you are looking, and then get out of the way.
+    #
+    # `o` for the thing under the cursor and Ctrl+o for the directory you are
+    # in. `o` is unbound in yazi's defaults - checked by extracting all 73 of
+    # them from the binary rather than by remembering - so neither shadows
+    # anything.
+    #
+    # These do NOT close yazi, which was asked for and could not be made to
+    # work - see the note in ~/.local/bin/yazi-terminal. Chaining `quit` in an
+    # array here silently runs nothing at all, and `ya emit quit` from the
+    # helper exits 0 and leaves yazi open.
+    #
+    # $0 is the hovered entry. Absolute path to the helper for the same reason
+    # the opener uses one: yazi's PATH comes from sway, which does not have
+    # ~/.local/bin on it.
+    { on = "o", run = "shell '{{ .chezmoi.homeDir }}/.local/bin/yazi-terminal \"$0\"'", desc = "Terminal at cursor" },
+    { on = "<C-o>", run = "shell '{{ .chezmoi.homeDir }}/.local/bin/yazi-terminal'", desc = "Terminal here" },
+]

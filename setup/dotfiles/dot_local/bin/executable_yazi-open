@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: nvim ya
+
+# What yazi's `edit` opener runs.
+#
+# yazi's own default rule for a directory is
+#
+#     { url = "*/", use = [ "edit", "open", "reveal" ] }
+#
+# with `edit` first - so pressing Enter on a folder runs whatever `edit` is.
+# While `edit` was ${EDITOR:-vi} and EDITOR was unset that failed harmlessly;
+# pointing it at a working nvim meant Enter on a folder opened the folder in the
+# editor. Enter should go into the folder.
+#
+# There is no opener that navigates, because openers are shell commands and
+# navigation is yazi's business. `ya emit` is the way across: it sends an action
+# to the running instance, so the opener can ask yazi to do the yazi thing.
+#
+# WHY A SCRIPT AND NOT AN INLINE `if`
+#
+# Because yazi does not run openers through a full shell. `run = 'touch /tmp/x'`
+# works and `run = 'if [ -d "$1" ]; then ...; fi'` silently does nothing at all -
+# no error, no window, nothing. Substitution like "$@" works, control flow does
+# not. A script is a single command, which is what the opener can actually run.
+
+if [[ -d "$1" ]]; then
+    # Enter on a directory means go into it.
+    exec ya emit enter
+fi
+
+exec nvim "$@"

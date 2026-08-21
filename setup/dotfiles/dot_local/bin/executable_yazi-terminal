@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: foot
+
+# Open a terminal from yazi, at the place you are looking at.
+#
+#   yazi-terminal            the directory yazi is showing
+#   yazi-terminal <path>     that directory, or the one containing that file
+#
+# Called from two bindings: `o` passes the hovered entry, Ctrl+o passes nothing
+# and so lands where you are standing. Hovering a file rather than a folder
+# gives a terminal in the folder that file is in, which is the only useful
+# reading of "open a terminal here" when "here" is a file.
+#
+# setsid and a background job rather than yazi's own --orphan flag: yazi does
+# not validate command flags when it loads a keymap - an invented flag was
+# accepted in silence - so a wrong one would fail at the moment the key was
+# pressed and nowhere else. These are shell features that are certain.
+
+target="${1:-$PWD}"
+[[ -d "$target" ]] || target="$(dirname "$target")"
+
+setsid foot --working-directory="$target" >/dev/null 2>&1 &
+
+
+# NOT DONE: closing yazi behind the terminal. It was asked for and does not
+# work yet, and a comment saying so is better than code that pretends.
+#
+# Two mechanisms were tried and measured. Chaining `quit` in the keymap - which
+# yazi documents as an array of commands - silently ran NOTHING at all when the
+# array ended in `quit`: not the shell command, not the quit. An array of one
+# element works fine, so the array form itself is sound.
+#
+# And `ya emit quit` from here, which is the same mechanism yazi-open uses
+# successfully to navigate. YAZI_ID is set in this environment and the command
+# exits 0, and yazi stays open regardless - so `quit` is either not a valid
+# emit action or is ignored for the current instance.
+#
+# Until one of those is understood, closing the file manager is a keypress.
