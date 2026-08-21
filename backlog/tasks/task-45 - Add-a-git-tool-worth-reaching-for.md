@@ -4,7 +4,7 @@ title: Add a git tool worth reaching for
 status: To Do
 assignee: []
 created_date: '2026-08-20 20:50'
-updated_date: '2026-08-20 20:50'
+updated_date: '2026-08-21 10:23'
 labels:
   - dev
 dependencies:
@@ -49,4 +49,6 @@ This is a keyboard-driven desktop, so a TUI in a terminal fits the session bette
 - [ ] #3 It is tried on a real diff from this repository before being committed to, not chosen from a feature list
 - [ ] #4 Its relationship to TASK-37 is resolved: anything that is a gitconfig setting waits for that file to exist rather than creating a second home for git settings
 - [ ] #5 The choice is recorded in DECISIONS.md, since TASK-27 exists because tools keep being picked without a reason being written down
+- [ ] #6 Resolving a merge conflict is covered specifically, not assumed to fall out of whatever front end is chosen - it is the case where the bare CLI is worst and the one that decides whether a separate merge tool is also wanted
+- [ ] #7 The everyday path - see what changed, stage some of it, commit, push - is quicker than the bare CLI it replaces, tried on real work rather than judged from a screenshot
 <!-- AC:END -->
