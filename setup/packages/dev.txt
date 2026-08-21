@@ -12,6 +12,20 @@ zoxide
 eza
 bat
 
+# "Where did the disk go". dust ranks the biggest directories anywhere in a
+# tree in one word, where du needs a --max-depth guessed in advance and a
+# sort/tail pipeline after it - and the guess is what hides the answer. On this
+# machine `du -sh ~/*` shows .local at 1.4G and stops; dust names the three
+# cached Claude Code versions inside it, 969 MiB and 46% of home, without being
+# asked to look. Faster too: 126-134 ms against 217-219 ms for the du pipeline
+# over /usr, warm cache, three runs each.
+#
+# Nothing already installed does this: btop reports filesystem free space, not
+# per-directory, and yazi has no size command at all - checked against the
+# defaults extracted from its binary, not from memory. In extra, 2.97 MiB,
+# depends on nothing but glibc and libgcc. See TASK-49.
+dust
+
 neovim
 
 # Treesitter grammars, from pacman rather than from a plugin that downloads and

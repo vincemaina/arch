@@ -95,8 +95,11 @@ ttf-jetbrains-mono-nerd
 
 ttf-dejavu
 
-# File explorer
-thunar
+# Removable and network volumes for GIO, which is what the GTK file chooser
+# reaches them through - so a USB stick appears in a Save As dialog. It was
+# installed alongside thunar and outlived it: pacman lists it as Optional For
+# rather than a dependency, so dropping thunar left it standing. See
+# DECISIONS.md and TASK-44.
 gvfs
 
 # System monitor
@@ -135,9 +138,11 @@ imv
 rofi
 rofi-calc
 
-# Terminal file manager. The GUI one is not opened, and in a keyboard-driven
-# session a TUI file manager costs nothing while it is closed. Trial against
-# thunar - see TASK-27.
+# The file manager, on $mod+e, floating. It replaced thunar rather than sitting
+# beside it: thunar was reachable from nothing on this desktop, was opened once
+# in its life, and could not even do thumbnails because tumbler was never
+# declared. Removing it took 20.53 MiB and six XFCE dependencies with it.
+# See TASK-44 and DECISIONS.md for what was given up.
 yazi
 
 # Mesa, declared rather than inherited. Everything graphical depends on it

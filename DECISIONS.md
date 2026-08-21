@@ -454,7 +454,8 @@ session list is derived rather than maintained by hand. That matters for a
 possible second desktop later: adding one becomes installing it, with no login
 configuration to update.
 
-It is also GTK, like Waybar and Thunar, so it introduces no second toolkit, and
+It is also GTK, like Waybar and the GTK portal, so it introduces no second
+toolkit, and
 it is styled with ordinary CSS.
 
 ### Alternatives considered
@@ -613,7 +614,7 @@ settings files.
 
 ### Why
 
-Thunar, pavucontrol and qutebrowser each picked their own defaults, so the
+pavucontrol and qutebrowser each picked their own defaults, so the
 desktop looked assembled from parts rather than designed. The bar had been
 carefully styled, which made the mismatch elsewhere more obvious rather than
 less.
@@ -777,7 +778,8 @@ windows, which is the sort of small inconsistency that makes a desktop feel
 assembled rather than designed.
 
 Adwaita because GTK applications expect it, and the desktop is already GTK
-through Waybar and Thunar. Choosing anything else would mean overriding a
+through Waybar and `xdg-desktop-portal-gtk`. Choosing anything else would mean
+overriding a
 default that is otherwise correct everywhere.
 
 Note that `environment.d` is read when the user manager starts, so a change
@@ -994,7 +996,8 @@ needing elevated privileges had nothing to present a password prompt and simply
 failed. Sway, unlike a full desktop environment, ships no agent of its own.
 
 `polkit-gnome` depends only on GTK3 and polkit itself. The desktop already pulls
-GTK3 in through Waybar and Thunar, so it adds essentially nothing. The Qt-based
+GTK3 in through Waybar and `xdg-desktop-portal-gtk`, so it adds essentially
+nothing. The Qt-based
 agents would drag in a second toolkit for one dialog.
 
 ### Trade-off
@@ -1076,27 +1079,116 @@ Together they provide both full-screen and region screenshots without a larger s
 
 ---
 
-## Thunar
+## No graphical file manager, reversing an earlier decision
 
-**Decision:** Use Thunar as the graphical file manager.
+**Decision:** Drop Thunar. `yazi` on `$mod+e` is the file manager, and a
+directory opened from anywhere else gets a shell in it via
+`terminal-here.desktop`.
 
-### Why
+This reverses the original decision, which is reproduced rather than deleted
+because it was never wrong on its own terms — it was simply never tested:
 
-A graphical file manager is still useful even in a keyboard-centric system.
+> **Decision:** Use Thunar as the graphical file manager.
+>
+> ### Why
+>
+> A graphical file manager is still useful even in a keyboard-centric system.
+>
+> Thunar is lightweight, mature, and does not require adopting the rest of XFCE.
 
-Thunar is lightweight, mature, and does not require adopting the rest of XFCE.
+### Why it changed
+
+**Nothing on the desktop can reach it.** `inode/directory` resolves to
+`terminal-here.desktop`, not to Thunar. No sway binding, no Waybar click
+command, no helper in `dot_local/bin/` and no desktop entry names it. The only
+route left is typing "Thunar" into the launcher, where it contributes three
+entries nobody wants — the file manager, Bulk Rename and Thunar Preferences.
+
+**It was opened once, during an investigation, and never in work.** Installed
+2026-08-20 01:09 and started once at 12:38 the same day, per `pacman.log` and
+the journal. `~/.config/Thunar/accels.scm` is 127 lines and every one of them is
+a comment: the default keymap, written on first run and never edited.
+
+**The thing it should have been best at does not work here.** Thumbnail previews
+need `tumbler`, which is not installed and never was declared. The journal from
+its single run says so directly:
+
+```
+thunar[17264]: ThunarThumbnailer: Failed to retrieve supported types:
+GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+```
+
+So "see a folder of images at a glance" — the strongest argument for keeping a
+GUI file manager on a keyboard-driven desktop — was the one thing this
+installation of it could not do. `imv` is declared for looking at images.
+
+**It costs 20.53 MiB across seven packages.** `pacman -Rsp thunar` takes thunar,
+libexif, exo, libxfce4ui, xfconf, libgtop and libxfce4util with it. None of
+those is declared in a manifest; they arrive only as Thunar's dependencies, so
+removing the one line removes all seven on a fresh install.
+
+### What is given up
+
+Named concretely, because "nothing" would be untrue:
+
+- **Dragging files between windows.** yazi cannot originate a Wayland drag, so
+  attaching a file by dragging it into qutebrowser is gone; the file chooser
+  dialog is the route instead.
+- **Bulk Rename.** A graphical multi-file rename with a preview column. yazi's
+  `r` renames one entry at a time.
+- **A mouse-usable file manager.** Someone not already thinking in keystrokes
+  has nothing to click.
+- **Right-click custom actions** (`uca.xml`), which were never configured.
+
+Thumbnails are deliberately not on that list. They were never working.
+
+### What is not given up
+
+**File dialogs.** Save As and Open come from the FileChooser portal, which is
+implemented by `xdg-desktop-portal-gtk` — a separately declared package that
+stays. `/usr/share/xdg-desktop-portal/portals/gtk.portal` declares
+`org.freedesktop.impl.portal.FileChooser`, the backend is running as
+`xdg-desktop-portal-gtk.service`, and `org.freedesktop.portal.FileChooser` is
+present on the session bus. Thunar contributes nothing to it: it ships no portal
+backend and no GTK or GIO module, and `ldd /usr/lib/xdg-desktop-portal-gtk`
+links nothing from XFCE.
+
+### Trade-off
+
+The observation window was two days, not the fortnight the question was framed
+around — this machine was built on 2026-08-20. A fortnight would have measured
+taste. Reachability measures something stronger and does not need waiting for:
+nothing routes to Thunar, so a fortnight of use could only ever have recorded
+someone deliberately typing its name.
+
+`sync.sh` never removes packages, so machines already running this setup keep
+Thunar until it is removed by hand. `checks/packages.sh` reports the drift.
 
 ---
 
 ## GVFS
 
-**Decision:** Install GVFS alongside Thunar.
+**Decision:** Keep GVFS, which arrived with Thunar and outlived it.
 
 ### Why
 
-GVFS improves file-management integration for removable storage and other mounted resources.
+GIO reaches removable and network volumes through GVFS, and GIO is what the GTK
+file chooser uses for anything that is not already a local path. Without it the
+portal's dialog can only see paths that are already mounted and visible in the
+filesystem.
 
-It provides useful desktop functionality without requiring a full desktop environment.
+`pacman -Qi gvfs` lists it as `Optional For: glib2, thunar` and
+`Required By: None` — so it was never a Thunar dependency, it was a declared
+package that happened to be listed next to one. Removing Thunar does not touch
+it.
+
+### Trade-off
+
+5.26 MiB and a `udisks2` dependency for a capability that a machine with no
+removable media and no network shares never exercises. It stays because the
+failure mode without it is the same silent kind this repository keeps hitting: a
+file dialog that simply shows nothing where a USB stick should be, with nothing
+to indicate why.
 
 ---
 
@@ -1262,6 +1354,77 @@ less
 These are small, broadly useful command-line tools that improve navigation, searching, documentation, and everyday development work without adding significant background overhead.
 
 They are kept separate from the base system so the project can evolve toward different machine profiles later.
+
+---
+
+## dust rather than a `du` pipeline
+
+**Decision:** Install `dust` for disk-usage archaeology. Do not add a
+disk-usage panel to the session.
+
+### Why
+
+`du` answers the question you asked; the trouble is that the question you can
+ask it is the wrong one. The reflex is `du -sh ~/*`, which stops at the top
+level, and the useful answer is almost never at the top level. Making it useful
+means `du -h --max-depth=N ~ | sort -h | tail`, where `N` has to be guessed
+before you know where the space is.
+
+Measured on this machine. `du -sh ~/*` reports `.local` at 1.4G and stops.
+`dust` ranks the biggest directories at any depth and names the actual culprit
+unprompted: three cached Claude Code versions in `~/.local/share/claude/versions`,
+969 MiB, 46% of home. It draws a proportion bar beside each so the shape of the
+answer is visible without reading the numbers.
+
+It is also faster than the pipeline it replaces, which was the opposite of the
+first measurement taken — a cold-cache run of `dust` was compared against a
+warm-cache `du` and came out three times slower. Warm on both sides, three runs
+each:
+
+| over `/usr` | run 1 | run 2 | run 3 |
+| --- | --- | --- | --- |
+| `dust -n 20 /usr` | 134 ms | 126 ms | 131 ms |
+| `du -h --max-depth=3 /usr \| sort -h \| tail -20` | 219 ms | 219 ms | 217 ms |
+
+Over a home directory both finish in under 30 ms and the difference does not
+matter.
+
+**Nothing installed already does this.** `btop` reports filesystem free space,
+not per-directory totals. `yazi` shows a size per entry and has no
+directory-tree size command — checked by extracting its default bindings from
+the binary rather than from memory. `tree` does not aggregate.
+
+It costs 2.97 MiB from `extra`, depending on nothing but `glibc` and `libgcc`.
+
+### Trade-off
+
+This is not a daily tool. It earns its place on the same terms as `eza`, `bat`
+and `fd` — a better answer to a question that already gets asked — but it gets
+asked monthly rather than hourly, and 3 MiB for a monthly question is the honest
+cost.
+
+### Alternatives considered
+
+**`ncdu`** (529 KiB) and **`gdu`** (21 MiB) are interactive browsers: you enter
+them, navigate, and can delete in place. That is a second thing shaped like
+`yazi`, and `yazi` is already bound to a key. A one-shot ranked report composes
+with a shell and a scrollback; a TUI does not.
+
+**`dua-cli`** (3.7 MiB) does both — a one-shot mode and an interactive one — and
+is a reasonable alternative that was rejected for being larger while its
+one-shot output is a plain list without the proportion bars that make `dust`'s
+readable at a glance.
+
+**`diskus`** (814 KiB) is a faster `du -sh` for a single directory and answers
+none of this.
+
+**A floating disk-usage window at login** was the original idea and is rejected.
+It puts a filesystem walk on the critical path of every login to answer a
+question nobody asked at that moment, and the login greeting already reports
+filesystem usage — `fastfetch`'s config carries a `disk` module. What is missing
+from that report is not the free-space number, it is which directory to blame,
+and that is worth one command when the question comes up rather than a scan
+every time the machine starts.
 
 ---
 
@@ -1574,7 +1737,7 @@ Any of these means changing compositor, which belongs to that decision rather th
 
 Measured rather than assumed. On a headless output at 1280x800 scale 2, the same GTK application was launched twice, once with `GDK_BACKEND=wayland` and once with `GDK_BACKEND=x11`, and confirmed to take different paths - sway reported `shell=xdg_shell` against `shell=xwayland`. The XWayland window had visibly softer text, and picked up different icons besides, which suggests the theme resolution differs by backend as well as the scaling.
 
-What can be done is keep applications off XWayland, which `environment.d/10-appearance.conf` already does with `QT_QPA_PLATFORM`, `SDL_VIDEODRIVER` and `MOZ_ENABLE_WAYLAND`. Nothing this setup installs needs XWayland today - qutebrowser, Thunar and pavucontrol all run natively, and XWayland only started at all when one was deliberately forced onto it - so the limitation currently costs nothing.
+What can be done is keep applications off XWayland, which `environment.d/10-appearance.conf` already does with `QT_QPA_PLATFORM`, `SDL_VIDEODRIVER` and `MOZ_ENABLE_WAYLAND`. Nothing this setup installs needs XWayland today - qutebrowser and pavucontrol both run natively, and XWayland only started at all when one was deliberately forced onto it - so the limitation currently costs nothing.
 
 ### Trade-off
 
