@@ -12,8 +12,8 @@
 
 [palette]
 bg          = "#0b0e14"  # window background
-bar         = "#06040c"  # the bar. Nearly black, and deliberately not tinted:
-                         # the stylesheet gives it slight transparency, so what
+bar         = "#000000"  # the bar. Black, and deliberately not tinted: the
+                         # stylesheet gives it slight transparency, so what
                          # colour it has comes from the wallpaper behind it and
                          # follows a wallpaper change for free
 bg_dim      = "#06080d"  # lock screen, behind everything
