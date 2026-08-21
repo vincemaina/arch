@@ -102,6 +102,14 @@ window#waybar > box {
         @tertiary 0%,
         @secondary 50%,
         @tertiary 100%) 1;
+
+    /* Breathing room at the ends. Padding on the box rather than margins on
+     * the outermost modules: padding sits inside the background and the
+     * border, so the gradient and the hairline still run the full width of the
+     * screen while nothing inside them sits flush against the edge. Doing it
+     * with module margins instead would mean remembering to move it every time
+     * the first or last module changes. */
+    padding: 0 10px;
 }
 
 /* The shared pill shape. Dark text on a saturated background reads better at
@@ -124,9 +132,11 @@ window#waybar > box {
 #clock,
 #network {
     background: transparent;
-    /* Wider than the pills needed. Without a block behind them the readings
-     * have nothing but space to separate them, so the space has to do more. */
-    padding: 0 11px;
+    /* Enough to keep the hover pill off its own text, and no more. The gap
+     * between readings is the bar's spacing plus this; wider padding made the
+     * hover pill look inflated without making the resting bar any easier to
+     * read. */
+    padding: 0 7px;
     margin: 4px 0;
     border-radius: 14px;
 }
@@ -174,7 +184,7 @@ window#waybar > box {
 /* Workspaces are the exception: they are navigation, not a readout, so only
  * the one you are on is filled in. */
 #workspaces {
-    margin: 4px 3px;
+    margin: 3px 6px;
 }
 
 /* Circles, not pills. A workspace is one character, so a shape that grows with
@@ -188,6 +198,7 @@ window#waybar > box {
 #workspaces button {
     color: @muted;
     background: transparent;
+    font-weight: bold;
     padding: 0;
     margin: 0 3px;
     min-width: 22px;
@@ -196,8 +207,11 @@ window#waybar > box {
     border-radius: 50%;
 }
 
+/* Light on violet, not dark. The dark foreground is right on the bright
+ * accents - cyan, green, amber - but violet is itself a dark colour, and
+ * near-black on it left the number barely there. */
 #workspaces button.focused {
-    color: @bg;
+    color: @text;
     background: @tertiary;
     box-shadow: 0 0 6px @tertiary;
 }
@@ -211,10 +225,6 @@ window#waybar > box {
     color: @text;
     background: @surface_alt;
     box-shadow: none;
-}
-
-#workspaces {
-    margin: 3px 6px;
 }
 
 /* The window title is the one piece of text on the bar that changes with what
