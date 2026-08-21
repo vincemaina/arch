@@ -586,26 +586,32 @@ else
     fi
 fi
 
-# glib finds this by name on PATH and there is no way to give it an absolute
-# path, which is the one case the absolute-path habit cannot cover.
-if [[ ! -x "$HOME/.local/bin/xdg-terminal-exec" ]]; then
-    fail "xdg-terminal-exec is missing, so every Terminal=true entry - the editor, the file manager - opens nothing"
-elif [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-    fail "~/.local/bin is not on PATH, so glib cannot find xdg-terminal-exec and Terminal=true entries open nothing"
-else
-    pass "xdg-terminal-exec is present and on PATH, so terminal applications get a terminal"
-fi
-
-# The session's PATH, not this shell's. environment.d is read when the user
-# manager starts, so a fresh sync is not enough and a check against $PATH here
-# would pass while the desktop stayed broken.
+# glib looks this up BY NAME on PATH and there is nowhere to give it an absolute
+# path - the one case the absolute-path habit that fixes everything else here
+# cannot cover. Which is why it is installed to /usr/local/bin rather than to
+# ~/.local/bin: the latter is not on the session PATH, and putting it there
+# through environment.d did not work, so the helper existed and was never found.
+#
+# Checked against the session's PATH rather than this shell's. An interactive
+# shell has ~/.local/bin from .zshrc, so a check against $PATH here would pass
+# while every launcher stayed broken.
+xte="$(command -v xdg-terminal-exec 2>/dev/null || true)"
 session_path="$(systemctl --user show-environment 2>/dev/null | sed -n 's/^PATH=//p')"
-if [[ -z "$session_path" ]]; then
-    skip "no user session to ask about PATH"
-elif [[ ":$session_path:" == *":$HOME/.local/bin:"* ]]; then
-    pass "the session hands ~/.local/bin to what it launches"
+
+if [[ -z "$xte" ]]; then
+    fail "xdg-terminal-exec is not installed, so every Terminal=true entry - the editor, the file manager - opens nothing. Run ./sync.sh"
+elif [[ -z "$session_path" ]]; then
+    skip "no user session to confirm xdg-terminal-exec is reachable from"
 else
-    fail "the session PATH lacks ~/.local/bin, so anything launched from the bar or the launcher cannot find the helpers (log out and in after adding it)"
+    reachable=false
+    while IFS= read -r dir; do
+        [[ -x "$dir/xdg-terminal-exec" ]] && reachable=true && break
+    done < <(printf '%s' "$session_path" | tr ':' '\n')
+    if $reachable; then
+        pass "xdg-terminal-exec is at $xte, on the session's own PATH"
+    else
+        fail "xdg-terminal-exec exists at $xte but is not on the session PATH, so nothing launched from the bar or launcher can find it"
+    fi
 fi
 
 # An association pointing at a desktop entry that does not exist resolves

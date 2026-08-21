@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# requires: foot
-
 # Run a command in a terminal window, for desktop entries that need one.
 #
 #   xdg-terminal-exec <command> [args...]
@@ -25,6 +23,19 @@ set -euo pipefail
 # Confirmed rather than deduced: `gio launch /usr/share/applications/nvim.desktop
 # file.py` prints that error verbatim, and providing this script makes the same
 # command open a window.
+#
+# WHY THIS IS MACHINE-WIDE AND NOT A DOTFILE
+#
+# Because glib looks it up BY NAME on PATH, and there is no way to hand it an
+# absolute path. That is the one case the absolute-path habit - which fixed the
+# desktop entries and the bar's click commands - cannot cover.
+#
+# It lived in ~/.local/bin first, and that failed: ~/.local/bin is not on the
+# session PATH, and putting it there through environment.d did not work either.
+# systemd took EDITOR from environment.d and ignored PATH, which was only
+# visible by starting a unit and printing its environment. /usr/local/bin is on
+# the default PATH of every process on the machine, so nothing has to be
+# arranged for this to be found.
 #
 # WHY NOT SHIP OUR OWN DESKTOP ENTRIES INSTEAD
 #

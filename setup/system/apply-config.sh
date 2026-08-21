@@ -49,6 +49,26 @@ for mapping in "${CONFIG_FILES[@]}"; do
     install -Dm644 "$SYSTEM_ROOT/$src" "$dest"
 done
 
+# Executables, which need a different mode from the config files above.
+#
+# xdg-terminal-exec is here rather than in the dotfiles for one reason: glib
+# looks it up BY NAME on PATH when it has to run a Terminal=true desktop entry,
+# and there is nowhere to give it an absolute path. Every other helper this
+# repository installs is reached by absolute path precisely because ~/.local/bin
+# is not on the session PATH; this is the one that cannot be. /usr/local/bin is
+# on the default PATH of every process, so it is found without anything being
+# arranged.
+EXECUTABLES=(
+    "bin/xdg-terminal-exec:/usr/local/bin/xdg-terminal-exec"
+)
+
+for mapping in "${EXECUTABLES[@]}"; do
+    src="${mapping%%:*}"
+    dest="${mapping#*:}"
+    echo "    $dest"
+    install -Dm755 "$SYSTEM_ROOT/$src" "$dest"
+done
+
 # Enabling works inside the installer chroot; starting does not, because there
 # is no running system there to start anything on.
 #

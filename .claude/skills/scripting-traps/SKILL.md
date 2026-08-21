@@ -260,6 +260,63 @@ env = dict(p.split("=", 1) for p in
 subprocess.run(["sh", "-c", command], env=env)
 ```
 
+## Logging out does not restart `systemd --user`
+
+**Symptom.** A change to `~/.config/environment.d/` is made, the user logs out
+of the graphical session and back in, and the variable is still not set. It
+looks as though the file is being ignored.
+
+**Cause.** `environment.d` is read by the **user manager**, and the user manager
+is not tied to the graphical session. It starts at first login and keeps running
+across logouts. So logging out of sway restarts sway, not `systemd --user`, and
+the generators never re-run.
+
+```bash
+ps -o lstart= -p "$(pgrep -u "$(id -u)" -x systemd | head -1)"
+# started at boot, not at the login you just performed
+```
+
+**Fix.** `systemctl --user daemon-reload` re-runs the environment generators
+without a reboot. Confirm the result by starting something, not by reading the
+file back:
+
+```bash
+systemd-run --user --pipe --wait --quiet sh -c 'echo $EDITOR'
+```
+
+Note that already-running processes keep the environment they started with, so
+sway and everything it spawned still have the old values until the next login.
+
+## `environment.d` cannot prepend to `PATH`
+
+**Symptom.** The same file sets two variables. After `daemon-reload` one of them
+is present and the other is not:
+
+```
+EDITOR=nvim                                    # applied
+PATH=/usr/local/sbin:/usr/local/bin:/usr/bin   # unchanged, ours ignored
+```
+
+**Cause.** The generator produces the right value — running
+`/usr/lib/systemd/user-environment-generators/30-systemd-environment-d-generator`
+by hand shows `PATH` with the addition. The manager does not adopt it, because
+`PATH` is already set in its environment. Variables it does not already have are
+taken; `PATH` is not.
+
+**Fix.** Do not rely on it. If something must be found **by name**, put it
+somewhere already on the default `PATH` — `/usr/local/bin` is on every process's
+`PATH` on this machine and needs no session arrangement at all. That is where
+`xdg-terminal-exec` lives, because glib looks it up by name and there is nowhere
+to give it an absolute path.
+
+For everything else, keep using absolute paths, which is what the desktop
+entries and the bar's click commands already do.
+
+**The general lesson**, which is the part worth keeping: *two variables in one
+file are not one test.* Both looked configured; only one worked. Check the
+variable you care about, in the environment that will actually use it, by
+starting a process there.
+
 ## Desktop entries need an absolute `Exec`
 
 **Symptom.** A launcher entry does nothing at all. No error anywhere, because

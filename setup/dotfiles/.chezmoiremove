@@ -18,3 +18,9 @@
 .local/share/wallpapers/neon.png
 .local/share/wallpapers/ember.png
 .local/share/wallpapers/slate.png
+
+# xdg-terminal-exec moved to /usr/local/bin, installed by apply-config.sh.
+# glib looks it up by name on PATH, and ~/.local/bin is not on the session PATH
+# - so the copy here was never found, and leaving it would be a second one to
+# wonder about.
+.local/bin/xdg-terminal-exec
