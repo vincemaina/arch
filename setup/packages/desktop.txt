@@ -66,10 +66,23 @@ polkit-gnome
 # Brightness
 brightnessctl
 
-# ?
+# The volume mixer, opened by clicking the audio readout in the bar. The `# ?`
+# that stood here was answered by TASK-58: it is genuinely the pulseaudio
+# module's on-click, not a leftover.
 pavucontrol
 
-network-manager-applet
+# network-manager-applet was here until TASK-92. It draws a tray icon, and this
+# desktop has no tray for it to draw into - `busctl --user list` showed no
+# StatusNotifierWatcher and no org.kde.* name at all, so there was nowhere on
+# the machine for the icon to go. It cost 11.9 MiB resident to be invisible,
+# started by an autostart entry shipped inside its own package rather than by
+# anything here. Network settings are reachable through nmtui and nmcli, which
+# come with NetworkManager itself.
+#
+# It was also, accidentally, the only thing holding openssh: openssh <- gcr-4
+# <- libnma-common <- network-manager-applet, and git does not depend on
+# openssh. See TASK-38, which declared openssh in base.txt precisely so that
+# removing this could not take ssh with it.
 
 # Notifications
 mako

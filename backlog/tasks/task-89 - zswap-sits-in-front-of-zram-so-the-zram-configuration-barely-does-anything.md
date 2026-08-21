@@ -1,11 +1,11 @@
 ---
 id: TASK-89
 title: 'zswap sits in front of zram, so the zram configuration barely does anything'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-21 20:42'
-updated_date: '2026-08-21 20:56'
+updated_date: '2026-08-21 23:49'
 labels:
   - performance
   - foundation
@@ -41,8 +41,8 @@ Whichever is chosen, DECISIONS.md needs the comparison it does not currently hav
 - [x] #1 The measurement is reproduced on the machine before anything is changed: zswpout, zswpwb and zram mm_stat are recorded, so the effect of the change can be compared against them
 - [x] #2 A decision is made and recorded in DECISIONS.md comparing zswap against zram, in the same style as the existing zram-versus-swapfile entry
 - [x] #3 Whatever is chosen is applied by setup/system/apply-config.sh so it reaches both a fresh install and a sync, not by hand on one machine
-- [ ] #4 After the change, the pages are shown to be going where the decision says they should - not inferred from the config file
-- [ ] #5 TASK-72's question about zram sizing is answerable afterwards, because it is clear which layer is holding the pages
+- [x] #4 After the change, the pages are shown to be going where the decision says they should - not inferred from the config file
+- [x] #5 TASK-72's question about zram sizing is answerable afterwards, because it is clear which layer is holding the pages
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -64,4 +64,23 @@ APPLIED THROUGH tmpfiles, AND THE REASON MATTERS. zswap.enabled=0 on the kernel 
 checks/session.sh now fails when zswap is enabled, and it FAILS RIGHT NOW - correctly. The kernel enables zswap on every boot, so this machine stays in the old state until ./sync.sh applies the new file, which needs a password I do not have. That red check is the accurate report, not an oversight.
 
 AC4 IS NOT DONE and cannot be by me: showing the pages going where the decision says needs the change to be live. After ./sync.sh, /sys/module/zswap/parameters/enabled should read N, and from then on zswpout should stop climbing while zram's mm_stat starts to. Those are the numbers to compare against the block above.
+
+AC4 SETTLED, AFTER ./sync.sh APPLIED IT. /sys/module/zswap/parameters/enabled now reads N, written by /etc/tmpfiles.d/zswap.conf, without a reboot - apply-config.sh --activate ran systemd-tmpfiles during the sync.
+
+Shown rather than inferred, by inducing swap pressure with a bounded 1.4 GiB allocation against 2.4 GiB available and watching where the pages went:
+
+               before      after      delta
+  zswpout      921,221    921,221          0   nothing enters zswap any more
+  pswpout        9,415    124,047    114,632   every page goes straight to zram
+  zram stored     2 MiB    105 MiB
+
+Against the before-measurement in the note above, where 920,911 pages went into zswap and 9,415 - one percent - ever reached zram, this is the reversal the decision predicted: zero percent into zswap, all of it into zram. The device TASK-9 sized and tuned is now the one holding the pages.
+
+The machine recovered cleanly: memory back to 2,597 MiB available, no OOM kill. A first reading of the journal appeared to show earlyoom killing something during the test; it had matched the words in earlyoom's own startup banner - 'Will avoid killing process names that match...' - printed when sync.sh restarted the service. Nothing was killed, and all six session units stayed active.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+zswap turned off through /etc/tmpfiles.d/zswap.conf, installed by apply-config.sh so it reaches a fresh install and a sync alike, rather than through the kernel command line which sync deliberately never applies. Proven by measurement on both sides: before, 920,911 pages went into zswap and 1% ever reached zram; after, a bounded allocation sent 114,632 pages straight to zram and zero into zswap. checks/session.sh fails if zswap is ever enabled again, since the Arch kernel turns it on at every boot.
+<!-- SECTION:FINAL_SUMMARY:END -->

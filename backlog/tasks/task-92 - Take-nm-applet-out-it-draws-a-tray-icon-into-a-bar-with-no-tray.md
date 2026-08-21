@@ -1,10 +1,11 @@
 ---
 id: TASK-92
 title: 'Take nm-applet out: it draws a tray icon into a bar with no tray'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-08-21 21:10'
-updated_date: '2026-08-21 21:22'
+updated_date: '2026-08-21 23:49'
 labels:
   - desktop
   - repo
@@ -53,4 +54,22 @@ TASK-38 declared openssh in base.txt for exactly this reason, but declaring is n
 SO THE ORDER IS: ./sync.sh first, confirm 'pacman -Qi openssh' says 'Explicitly installed', and only then remove the applet. checks/packages.sh reports the state either way.
 
 Worth noting the applet is not the only thing in that chain - gvfs also pulls gcr-4, and gvfs is justified independently (the file chooser traced through it in the journal). So openssh may well survive anyway. 'May well' is not a reason to skip the check.
+
+Done, in the order the note above insisted on, and the order turned out to matter.
+
+./sync.sh ran first and marked every declared package explicit, so openssh moved from 'installed as a dependency' to 'Explicitly installed'. Only then was the applet removed. openssh survived - 'ssh -T git@github.com' still authenticates - which it would not have done a day ago, when the only thing holding it was the chain through this package.
+
+Removing it also took libnma, libnma-common and nm-connection-editor. gcr-4 stayed, held by gvfs, which is justified independently.
+
+The manifest half was still outstanding and would have undone the whole thing: network-manager-applet was still listed in packages/desktop.txt, so the next sync would have reinstalled it. Removed, with the reasoning in its place - including that it was accidentally holding ssh, so nobody re-adds it without meeting that.
+
+Verified the network is unaffected: NetworkManager reports connected, the wired connection is active, connectivity is fine, and nmtui is there for settings. The applet was drawing an icon, not managing anything.
+
+Also answered the stale '# ?' comment above pavucontrol while in the file - TASK-58 traced it, and it genuinely is the audio readout's on-click.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+network-manager-applet removed from the machine and from packages/desktop.txt - it drew a tray icon into a session with no tray at all (busctl showed no StatusNotifierWatcher), costing 11.9 MiB resident to be invisible. Removed only after sync.sh had marked openssh explicit, because this package was the sole thing holding openssh and git does not depend on it; ssh still authenticates to GitHub afterwards. Network management is unaffected - NetworkManager, nmtui and nmcli do the work.
+<!-- SECTION:FINAL_SUMMARY:END -->
