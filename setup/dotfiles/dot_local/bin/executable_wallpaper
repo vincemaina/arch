@@ -1,0 +1,599 @@
+#!/usr/bin/env python3
+# requires: python3 rofi chezmoi
+
+"""Choose and generate the wallpaper for the selected theme.
+
+    wallpaper                 pick a style from the launcher
+    wallpaper aurora          use that style for the current theme
+    wallpaper --list          styles available, and which is current
+    wallpaper --current       the current style name
+    wallpaper --path          where the current image is, generated or not
+    wallpaper --ensure        generate the current image if it is missing
+    wallpaper --regenerate    generate it again even if it exists
+    wallpaper ~/pics/foo.png  use a file of your own instead
+
+WHY THIS IS GENERATED AND NOT SHIPPED
+
+Because the alternative does not scale. Three themes at one image each was
+already 7.8M of tracked PNG. Nine themes at four styles is closer to 94M, and it
+grows every time a theme is added - which would make adding a theme expensive
+precisely when the point is that it should be free.
+
+Generated on demand and cached, a theme costs nothing but a table of colours.
+That is why this lives in the dotfiles rather than in tools/: it is the one piece
+of the theming machinery that has to run on the built machine.
+
+WHY THE IMAGES ARE DERIVED FROM THE PALETTE
+
+The bar, the borders and the glow were all tuned to sit against the background.
+A wallpaper that arrived from somewhere else would clash with the desktop it is
+behind, and a hand-picked image per theme is one more thing to keep in step.
+Every style here reads the same colours the rest of the desktop reads, so a new
+theme gets four matching backgrounds for free.
+
+A file of your own can be selected too - pass a path and it is used as-is. The
+theme's colours will not follow it, which is your business rather than a bug.
+
+HOW THE IMAGES ARE BUILT
+
+Two kinds of style. Smooth ones (mesh, aurora) are evaluated on a small grid and
+bilinearly upscaled, because a gradient has no detail to lose. Line ones
+(contour, grid) upscale a smooth *field* the same way and then compute the lines
+from it at full resolution, so the lines come out sharp rather than four pixels
+of blur - drawing them at low resolution and scaling up was the obvious approach
+and looks like exactly what it is.
+
+Standard library only, deliberately: the first version of this generator needed
+numpy and Pillow, was never committed, and was gone by the time a second
+wallpaper was wanted.
+"""
+
+import json
+import math
+import os
+import pathlib
+import random
+import struct
+import subprocess
+import sys
+import zlib
+
+# The machine-local config has exactly one writer, shared with ~/.local/bin/theme.
+sys.path.insert(0, str(pathlib.Path.home() / ".local" / "lib"))
+import desktop_config                                        # noqa: E402
+
+WIDTH, HEIGHT = 1920, 1080
+SMALL_W, SMALL_H = 320, 180      # smooth styles and fields are evaluated here
+NOISE_AMPLITUDE = 1              # levels of dither, applied at full size
+SEED = 20260821                  # fixed, so regenerating reproduces the image
+
+WALLPAPERS = pathlib.Path.home() / ".local" / "share" / "wallpapers"
+def die(message):
+    print(f"wallpaper: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+# ----------------------------------------------------------------------
+# Where the repository is, and what the selected theme is
+# ----------------------------------------------------------------------
+#
+# Asked of chezmoi rather than read out of themes.toml, so that what this sees is
+# what the templates see - the machine-local override included. Reading the TOML
+# directly would be a second implementation of that merge, and the two would
+# eventually disagree about which theme is current.
+
+def resolve_source():
+    if os.environ.get("ARCH_SETUP_SOURCE"):
+        return os.environ["ARCH_SETUP_SOURCE"]
+    recorded = desktop_config.get_value("sourceDir")
+    if recorded and os.path.isdir(recorded):
+        return recorded
+    if os.path.isdir("/opt/arch-setup"):
+        return "/opt/arch-setup"
+    die("cannot find the setup directory. Run ./sync.sh from the repository once.")
+
+
+_data = None
+
+
+def chezmoi_data():
+    global _data
+    if _data is None:
+        result = subprocess.run(
+            ["chezmoi", "--source", resolve_source(), "data"],
+            capture_output=True, text=True)
+        if result.returncode != 0:
+            die("chezmoi could not read the theme data")
+        _data = json.loads(result.stdout)
+    return _data
+
+
+def current_theme():
+    return chezmoi_data()["theme"]
+
+
+def palette():
+    data = chezmoi_data()
+    return data["themes"][data["theme"]]
+
+
+def current_style():
+    """The style chosen for this theme, or the default if none has been."""
+    chosen = chezmoi_data().get("wallpaper")
+    if not isinstance(chosen, dict):
+        return DEFAULT_STYLE
+    return chosen.get(current_theme(), DEFAULT_STYLE)
+
+
+# ----------------------------------------------------------------------
+# Colour helpers
+# ----------------------------------------------------------------------
+
+def rgb(value):
+    value = value.lstrip("#")
+    return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def mix(a, b, t):
+    return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
+
+
+def value_noise(seed, cells):
+    """A smooth scalar field on [0,1]^2, from an interpolated random grid.
+
+    Value noise rather than anything cleverer: it is either blurred to nothing
+    by the upscale or used to bend coordinates, so its own character never
+    shows.
+    """
+    rnd = random.Random(seed)
+    grid = [[rnd.random() for _ in range(cells + 1)] for _ in range(cells + 1)]
+
+    def sample(u, v):
+        x, y = u * cells, v * cells
+        x0, y0 = min(int(x), cells - 1), min(int(y), cells - 1)
+        fx, fy = x - x0, y - y0
+        fx = fx * fx * (3 - 2 * fx)      # smoothstep, or the grid shows as creases
+        fy = fy * fy * (3 - 2 * fy)
+        top = grid[y0][x0] * (1 - fx) + grid[y0][x0 + 1] * fx
+        bottom = grid[y0 + 1][x0] * (1 - fx) + grid[y0 + 1][x0 + 1] * fx
+        return top * (1 - fy) + bottom * fy
+
+    return sample
+
+
+def octaves(seed, cells, count=3):
+    """Several noise fields at doubling frequency, halving in strength."""
+    layers = [(value_noise(seed + i, cells * 2 ** i), 0.5 ** i) for i in range(count)]
+    total = sum(weight for _, weight in layers)
+
+    def sample(u, v):
+        return sum(fn(u, v) * weight for fn, weight in layers) / total
+
+    return sample
+
+
+def vignette(u, v, strength=0.95, start=0.30):
+    """How far this point should fall back to the base colour.
+
+    The corners going dark is what stops an image reading as one flat wash, and
+    it matters most at the top: the bar is nearly black, and a bright top edge
+    behind it makes the bar look stuck on rather than part of the screen.
+    """
+    dx = (u - 0.5) * (WIDTH / HEIGHT)
+    dy = v - 0.5
+    reach = math.hypot(dx, dy) / math.hypot(0.5 * WIDTH / HEIGHT, 0.5)
+    fade = max(0.0, (reach - start) / (1 - start))
+    return min(1.0, fade * fade) * strength
+
+
+# ----------------------------------------------------------------------
+# The styles
+# ----------------------------------------------------------------------
+#
+# Each returns (rgb_rows, field_rows, lines). rgb_rows is the smooth base, on
+# the small grid. field_rows is an optional scalar on the same grid, which the
+# upscaler interpolates and hands back at full resolution so lines can be drawn
+# sharply. lines, when present, is (colour, spacing, thickness, mode).
+
+def style_mesh(pal):
+    """Soft overlapping colour fields, coordinates warped so shapes are poured
+    rather than drawn. The original, and the default."""
+    warp_u = value_noise(SEED, 3)
+    warp_v = value_noise(SEED + 1, 3)
+    base = rgb(pal["bg_dim"])
+    fields = [
+        (rgb(pal["tertiary"]),  0.30, 0.66, 0.40, 0.78),   # main mass, low left
+        (rgb(pal["secondary"]), 0.56, 0.94, 0.30, 0.62),   # glow along the bottom
+        (rgb(pal["accent"]),    0.90, 0.14, 0.26, 0.20),   # a corner, top right
+        (rgb(pal["tertiary"]),  0.74, 0.46, 0.24, 0.26),   # ties the halves together
+    ]
+    rows = []
+    for py in range(SMALL_H):
+        v = py / (SMALL_H - 1)
+        row = []
+        for px in range(SMALL_W):
+            u = px / (SMALL_W - 1)
+            wu = u + (warp_u(u, v) - 0.5) * 0.16
+            wv = v + (warp_v(u, v) - 0.5) * 0.16
+            r, g, b = base
+            for (fr, fg, fb), cx, cy, radius, strength in fields:
+                dx = (wu - cx) * (WIDTH / HEIGHT)   # or every blob is an ellipse
+                dy = wv - cy
+                weight = strength * math.exp(-(dx * dx + dy * dy) / (2 * radius * radius))
+                r += (fr - r) * weight
+                g += (fg - g) * weight
+                b += (fb - b) * weight
+            fade = vignette(u, v)
+            row.append((r + (base[0] - r) * fade,
+                        g + (base[1] - g) * fade,
+                        b + (base[2] - b) * fade))
+        rows.append(row)
+    return rows, None, None
+
+
+def style_aurora(pal):
+    """Vertical curtains of light, brightest low down and fraying upward.
+
+    The vertical fade is the whole effect: curtains that reach the top edge look
+    like stripes, and stripes behind a bar look like a mistake.
+    """
+    drift = octaves(SEED + 10, 2, 3)
+    base = rgb(pal["bg_dim"])
+    curtains = [
+        (rgb(pal["tertiary"]),  0.24, 0.13, 0.85),
+        (rgb(pal["secondary"]), 0.52, 0.10, 0.70),
+        (rgb(pal["accent"]),    0.78, 0.09, 0.45),
+    ]
+    rows = []
+    for py in range(SMALL_H):
+        v = py / (SMALL_H - 1)
+        # Bright at the bottom, gone by the top. Squared rather than linear so
+        # the upper half stays genuinely dark instead of merely dimmer.
+        height = v * v
+        row = []
+        for px in range(SMALL_W):
+            u = px / (SMALL_W - 1)
+            # The drift bends each curtain sideways by an amount that varies
+            # with height, which is what stops them reading as vertical bars.
+            bend = (drift(u * 0.6, v) - 0.5) * 0.34 * (1.0 - v * 0.4)
+            r, g, b = base
+            for colour, centre, width, strength in curtains:
+                offset = (u + bend - centre) / width
+                weight = strength * height * math.exp(-offset * offset)
+                r += (colour[0] - r) * weight
+                g += (colour[1] - g) * weight
+                b += (colour[2] - b) * weight
+            fade = vignette(u, v, strength=0.75, start=0.42)
+            row.append((r + (base[0] - r) * fade,
+                        g + (base[1] - g) * fade,
+                        b + (base[2] - b) * fade))
+        rows.append(row)
+    return rows, None, None
+
+
+def style_contour(pal):
+    """Topographic lines over a soft ground.
+
+    The field is evaluated small and interpolated; the lines are computed from
+    it at full resolution, so they stay one pixel of blur rather than four.
+    """
+    terrain = octaves(SEED + 20, 3, 4)
+    base = rgb(pal["bg_dim"])
+    low = rgb(pal["tertiary"])
+    high = rgb(pal["secondary"])
+
+    rgb_rows, field_rows = [], []
+    for py in range(SMALL_H):
+        v = py / (SMALL_H - 1)
+        colour_row, field_row = [], []
+        for px in range(SMALL_W):
+            u = px / (SMALL_W - 1)
+            elevation = terrain(u, v)
+            field_row.append(elevation)
+            # The ground is a quiet ramp between two theme colours; the lines
+            # carry the contrast, so this must not compete with them.
+            ground = mix(base, mix(low, high, elevation), 0.14 + 0.13 * elevation)
+            fade = vignette(u, v, strength=0.92, start=0.28)
+            colour_row.append(tuple(ground[i] + (base[i] - ground[i]) * fade
+                                    for i in range(3)))
+        rgb_rows.append(colour_row)
+        field_rows.append(field_row)
+    return rgb_rows, field_rows, (rgb(pal["accent"]), 10.0, 0.05, "contour")
+
+
+def style_grid(pal):
+    """A horizon and a perspective grid receding to it.
+
+    The grid is analytic rather than sampled, so it is computed from the point's
+    own coordinates at full resolution and needs no field of its own - the field
+    here carries the ground colour ramp instead.
+    """
+    base = rgb(pal["bg_dim"])
+    sky_top = base
+    sky_low = mix(base, rgb(pal["tertiary"]), 0.55)
+    sun = rgb(pal["secondary"])
+    ground = mix(base, rgb(pal["tertiary"]), 0.22)
+
+    rgb_rows = []
+    for py in range(SMALL_H):
+        v = py / (SMALL_H - 1)
+        row = []
+        for px in range(SMALL_W):
+            u = px / (SMALL_W - 1)
+            if v < HORIZON:
+                # Sky: a ramp down to the horizon, with a disc sitting on it.
+                t = v / HORIZON
+                colour = mix(sky_top, sky_low, t * t)
+                dx = (u - 0.5) * (WIDTH / HEIGHT)
+                dy = (v - HORIZON) * 1.35
+                glow = math.exp(-(dx * dx + dy * dy) / (2 * 0.13 * 0.13))
+                colour = mix(colour, sun, min(0.85, glow))
+            else:
+                colour = ground
+            fade = vignette(u, v, strength=0.70, start=0.45)
+            row.append(tuple(colour[i] + (base[i] - colour[i]) * fade
+                             for i in range(3)))
+        rgb_rows.append(row)
+    return rgb_rows, None, (rgb(pal["accent"]), 0.0, 0.0, "grid")
+
+
+HORIZON = 0.56          # where the grid's floor begins, in frame fractions
+
+STYLES = {
+    "mesh":    style_mesh,
+    "aurora":  style_aurora,
+    "contour": style_contour,
+    "grid":    style_grid,
+}
+DEFAULT_STYLE = "mesh"
+
+
+# ----------------------------------------------------------------------
+# Upscaling, dithering and writing
+# ----------------------------------------------------------------------
+
+def line_intensities(mode, spacing, thickness, v, field_row):
+    """How strongly a line falls on each pixel of one output row.
+
+    Returned per row rather than per pixel: a callback invoked two million times
+    costs more than the arithmetic it performs.
+    """
+    if mode == "contour":
+        # Distance to the nearest contour, in band fractions. Lines appear where
+        # the elevation crosses a multiple of the spacing.
+        out = []
+        for value in field_row:
+            frac = (value * spacing) % 1.0
+            distance = min(frac, 1.0 - frac)
+            out.append(max(0.0, 1.0 - distance / thickness))
+        return out
+
+    # The perspective grid, computed from the point's own position. Below the
+    # horizon the floor recedes; 1/depth gives both the widening spacing of the
+    # lines running away from the viewer and the fanning of the ones running
+    # across.
+    if v <= HORIZON:
+        return None
+    depth = 1.0 / (v - HORIZON)
+    fade = min(1.0, 0.16 * depth)          # far lines dissolve rather than alias
+    out = []
+    for px in range(WIDTH):
+        u = px / (WIDTH - 1)
+        across = (u - 0.5) * depth
+        frac_x = (across * 1.1) % 1.0
+        frac_z = (depth * 0.55) % 1.0
+        dx = min(frac_x, 1.0 - frac_x)
+        dz = min(frac_z, 1.0 - frac_z)
+        # Perspective compresses the lines running across; widening the
+        # threshold with depth keeps them a constant thickness on screen.
+        near = max(1.0 - dx / (0.035 / max(depth, 1e-6) * 8), 0.0)
+        far = max(1.0 - dz / 0.045, 0.0)
+        out.append(min(1.0, max(near, far) * fade))
+    return out
+
+
+def png_rows(rgb_rows, field_rows, lines):
+    """Upscale to full size, draw any lines, dither, and yield PNG scanlines."""
+    # Horizontal interpolation is identical for every output row, so it is done
+    # once per small row rather than once per output pixel.
+    xs = []
+    for px in range(WIDTH):
+        sx = px * (SMALL_W - 1) / (WIDTH - 1)
+        x0 = min(int(sx), SMALL_W - 2)
+        xs.append((x0, sx - x0))
+
+    def stretch(row):
+        out = []
+        for x0, fx in xs:
+            a, b = row[x0], row[x0 + 1]
+            out.append(a[0] + (b[0] - a[0]) * fx)
+            out.append(a[1] + (b[1] - a[1]) * fx)
+            out.append(a[2] + (b[2] - a[2]) * fx)
+        return out
+
+    def stretch_field(row):
+        return [row[x0] + (row[x0 + 1] - row[x0]) * fx for x0, fx in xs]
+
+    wide = [stretch(row) for row in rgb_rows]
+    wide_field = [stretch_field(row) for row in field_rows] if field_rows else None
+
+    # Dither by table rather than by call. random.uniform per channel is six
+    # million Python-level calls and was most of this program's runtime; one
+    # randbytes per row is a single call into C, and a 256-entry table turns the
+    # byte into a level. Clamping is a table for the same reason.
+    dither = [(-NOISE_AMPLITUDE + (i * (2 * NOISE_AMPLITUDE + 1)) // 256)
+              for i in range(256)]
+    clamp = bytes(min(255, max(0, i - 512)) for i in range(1024))
+
+    line_colour = spacing = thickness = mode = None
+    if lines:
+        line_colour, spacing, thickness, mode = lines
+
+    for py in range(HEIGHT):
+        sy = py * (SMALL_H - 1) / (HEIGHT - 1)
+        y0 = min(int(sy), SMALL_H - 2)
+        fy = sy - y0
+        top, bottom = wide[y0], wide[y0 + 1]
+        row = [a + (b - a) * fy for a, b in zip(top, bottom)]
+
+        if lines:
+            field_row = None
+            if wide_field:
+                ft, fb = wide_field[y0], wide_field[y0 + 1]
+                field_row = [a + (b - a) * fy for a, b in zip(ft, fb)]
+            intensity = line_intensities(
+                mode, spacing, thickness, py / (HEIGHT - 1), field_row)
+            if intensity:
+                lr, lg, lb = line_colour
+                for px, strength in enumerate(intensity):
+                    if strength > 0.0:
+                        i = px * 3
+                        row[i] += (lr - row[i]) * strength
+                        row[i + 1] += (lg - row[i + 1]) * strength
+                        row[i + 2] += (lb - row[i + 2]) * strength
+
+        noise = random.randbytes(WIDTH * 3)
+        yield bytes(clamp[512 + int(value) + dither[n]]
+                    for value, n in zip(row, noise))
+
+
+def write_png(path, rows):
+    """Minimal PNG writer: 8-bit truecolour, filter 0, one IDAT."""
+    raw = b"".join(b"\x00" + row for row in rows)
+
+    def chunk(kind, data):
+        body = kind + data
+        return (struct.pack(">I", len(data)) + body
+                + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF))
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", WIDTH, HEIGHT, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw, 6))
+        + chunk(b"IEND", b"")
+    )
+
+
+def generate(theme, style, pal, path):
+    random.seed(SEED)          # so a regenerated image is the same image
+    write_png(path, png_rows(*STYLES[style](pal)))
+
+
+# ----------------------------------------------------------------------
+# Selection
+# ----------------------------------------------------------------------
+
+def image_path(theme=None, style=None):
+    theme = theme or current_theme()
+    style = style or current_style()
+    if style.startswith("/"):          # a file of your own
+        return pathlib.Path(style)
+    return WALLPAPERS / f"{theme}-{style}.png"
+
+
+def write_choice(theme, style):
+    """Record the style for this theme, preserving everything else in the file.
+
+    Per theme rather than one global choice, so that switching to a theme
+    returns the wallpaper last chosen for it instead of resetting to the
+    default - which is the difference between a preference and a setting you
+    have to redo every time.
+    """
+    desktop_config.set_value(f"data.wallpaper.{theme}", style)
+
+
+def apply_choice():
+    """Re-render the dotfiles, which is what puts the new path into sway."""
+    subprocess.run(["chezmoi", "--source", resolve_source(), "apply", "--force"],
+                   check=True)
+
+
+def main():
+    argument = sys.argv[1] if len(sys.argv) > 1 else ""
+
+    if argument in ("-h", "--help"):
+        print(__doc__.split("WHY THIS IS")[0].strip())
+        return
+
+    if argument == "--list":
+        current = current_style()
+        for name in STYLES:
+            print(("* " if name == current else "  ") + name)
+        if current.startswith("/"):
+            print("* " + current)
+        return
+
+    if argument == "--current":
+        print(current_style())
+        return
+
+    if argument == "--path":
+        print(image_path())
+        return
+
+    if argument in ("--ensure", "--regenerate"):
+        theme, style = current_theme(), current_style()
+        path = image_path(theme, style)
+        if style.startswith("/"):
+            if not path.exists():
+                die(f"{path} does not exist")
+            return
+        if path.exists() and argument == "--ensure":
+            return
+        print(f"    Generating {path.name}", flush=True)
+        generate(theme, style, palette(), path)
+        return
+
+    if argument.startswith("-"):
+        die(f"unknown option {argument}")
+
+    theme = current_theme()
+    wanted = argument
+
+    if not wanted:
+        # The picker runs in the theme being left, since rofi is one of the
+        # things a theme colours. That is the right way round.
+        listing = "\n".join(STYLES)
+        result = subprocess.run(
+            ["rofi", "-dmenu", "-i", "-p", f"Wallpaper ({theme})",
+             "-select", current_style()],
+            input=listing, capture_output=True, text=True)
+        wanted = result.stdout.strip()
+        if not wanted:
+            return
+
+    # A path of your own, rather than one of the generated styles.
+    if wanted not in STYLES:
+        candidate = pathlib.Path(wanted).expanduser()
+        if candidate.is_file():
+            wanted = str(candidate.resolve())
+        else:
+            die(f"no style called '{wanted}', and no such file. "
+                f"Available: {', '.join(STYLES)}")
+
+    if wanted == current_style():
+        print(f"Already using {wanted}.")
+        return
+
+    print(f"Wallpaper: {wanted}")
+    write_choice(theme, wanted)
+
+    # Generate before applying, so that the sway reload triggered by the apply
+    # finds the file already there. The other order shows a black desktop for
+    # however long the render takes.
+    _data_reset()
+    path = image_path()
+    if not path.exists():
+        print(f"    Generating {path.name}", flush=True)
+        generate(current_theme(), current_style(), palette(), path)
+    apply_choice()
+
+
+def _data_reset():
+    global _data
+    _data = None
+
+
+if __name__ == "__main__":
+    main()

@@ -2,3 +2,8 @@
 # chosen one is tracked, and it lives under setup/dotfiles/ so it reaches the
 # machine like any other dotfile.
 docs/wallpapers/*.png
+
+# Python bytecode, which appears whenever a helper script is imported
+# for testing rather than executed.
+__pycache__/
+*.pyc

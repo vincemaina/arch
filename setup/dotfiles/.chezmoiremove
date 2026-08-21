@@ -5,7 +5,16 @@
 # symlinks stay behind on already-installed machines and the leak persists.
 .config/systemd/user/graphical-session.target.wants
 
-# The wallpaper is named after its theme now, so the one file that predated
-# themes would otherwise sit in the target directory forever - chezmoi leaves
-# files it does not manage alone rather than deleting them.
+# Wallpapers used to be shipped as tracked PNGs, one per theme. They are now
+# generated on the machine and named <theme>-<style>.png, so the old files are
+# no longer written by anything and would otherwise sit in the target directory
+# forever - chezmoi leaves files it does not manage alone rather than deleting
+# them.
+#
+# The generated ones are deliberately NOT listed here. They are a cache: losing
+# them costs a second and a half each, but chezmoi removing them on every apply
+# would mean regenerating on every sync.
 .local/share/wallpapers/deep-violet.png
+.local/share/wallpapers/neon.png
+.local/share/wallpapers/ember.png
+.local/share/wallpapers/slate.png

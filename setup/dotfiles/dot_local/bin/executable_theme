@@ -33,7 +33,6 @@ set -euo pipefail
 # editing a colour and running sync.sh reloads too, rather than only a switch.
 
 THEMES_KEY="theme"
-CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml"
 
 die() { echo "theme: $*" >&2; exit 1; }
 
@@ -68,69 +67,20 @@ resolve_source() {
 # The config file
 # ----------------------------------------------------------------------
 #
-# Read with tomllib and written by hand, because tomllib parses and does not
-# serialise. The file is small and shallow, and everything in it is written by
-# this script, so hand-writing it is honest rather than clever - but it is
-# preserved key by key rather than regenerated, so that a value put here by
-# something else (a machine profile, for instance) survives a theme switch.
+# Read and written by ~/.local/lib/desktop_config.py, which is the ONLY thing
+# that writes it. This script and ~/.local/bin/wallpaper both used to carry
+# their own copy of the writer, and they disagreed: this one flattened nested
+# tables, so choosing a wallpaper and then switching theme turned the
+# [data.wallpaper] table into a string and broke every apply afterwards.
+
+CONFIG_HELPER="$HOME/.local/lib/desktop_config.py"
 
 read_config_value() {
-    [[ -f "$CONFIG" ]] || return 1
-    python3 - "$CONFIG" "$1" <<'PY'
-import sys, tomllib
-try:
-    with open(sys.argv[1], 'rb') as fh:
-        config = tomllib.load(fh)
-except (OSError, tomllib.TOMLDecodeError):
-    sys.exit(1)
-value = config.get(sys.argv[2])
-if value is None:
-    sys.exit(1)
-print(value)
-PY
+    python3 "$CONFIG_HELPER" get "$1" 2>/dev/null
 }
 
-write_config() {
-    local key="$1" value="$2" table="$3"   # table is "" for a top-level key
-    mkdir -p "$(dirname "$CONFIG")"
-    python3 - "$CONFIG" "$key" "$value" "$table" <<'PY'
-import os, sys, tomllib
-
-path, key, value, table = sys.argv[1:5]
-
-config = {}
-if os.path.exists(path):
-    with open(path, 'rb') as fh:
-        config = tomllib.load(fh)
-
-if table:
-    config.setdefault(table, {})[key] = value
-else:
-    config[key] = value
-
-def quote(v):
-    return '"' + str(v).replace('\\', '\\\\').replace('"', '\\"') + '"'
-
-lines = [
-    "# chezmoi's machine-local configuration. Written by ~/.local/bin/theme.",
-    "#",
-    "# Deliberately NOT part of the Arch repository. It holds the decisions that",
-    "# belong to this machine rather than to the setup - which theme is selected,",
-    "# and where the checkout driving it lives - so that switching a theme leaves",
-    "# no diff, and so that two machines syncing the same repository can disagree.",
-    "#",
-    "# chezmoi merges this over .chezmoidata, so anything set here wins.",
-    "",
-]
-lines += [f"{k} = {quote(v)}" for k, v in config.items() if not isinstance(v, dict)]
-for name, contents in config.items():
-    if isinstance(contents, dict):
-        lines += ["", f"[{name}]"]
-        lines += [f"{k} = {quote(v)}" for k, v in contents.items()]
-
-with open(path, 'w') as fh:
-    fh.write("\n".join(lines) + "\n")
-PY
+write_config_value() {
+    python3 "$CONFIG_HELPER" set "$1" "$2"
 }
 
 # ----------------------------------------------------------------------
@@ -179,7 +129,7 @@ case "${1:-}" in
         # Used by sync.sh, so that a machine with a checkout uses the checkout
         # rather than the copy install.sh left in /opt.
         [[ -n "${2:-}" ]] || die "--record-source needs a directory"
-        write_config sourceDir "$2" ""
+        write_config_value sourceDir "$2"
         exit 0
         ;;
     -h|--help)
@@ -213,7 +163,7 @@ if [[ "$wanted" == "$(current_theme)" ]]; then
 fi
 
 echo "Switching to $wanted"
-write_config "$THEMES_KEY" "$wanted" data
+write_config_value "data.$THEMES_KEY" "$wanted"
 
 # --force because the target files were written by chezmoi and are being
 # rewritten by chezmoi; there is no user edit to preserve, and a prompt here

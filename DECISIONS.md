@@ -1716,13 +1716,19 @@ Three decisions inside the decision:
 
 **How far a theme reaches.** GTK applications read `GTK_THEME` once at session start and cannot be recoloured from a palette without shipping real GTK themes. They stay Adwaita dark. The price is a rule: **every theme in `themes.toml` must be a dark theme**, because a light one would leave every dialog looking like it belonged to a different computer. That rule is the whole reason the boundary is written down rather than left to be discovered.
 
-The wallpaper is part of a theme, and generated from it by `tools/wallpaper.py` rather than chosen. The bar, the borders and the glow were tuned to sit against the background; a palette swap that left the old picture behind would clash with itself.
+The wallpaper is part of a theme, generated from it rather than chosen, and generated **on the machine** rather than committed. The bar, the borders and the glow were tuned to sit against the background; a palette swap that left the old picture behind would clash with itself. And committing the images does not scale: three themes at one image each was already 7.8M of tracked PNG, and eight themes with four styles apiece would be around 90M, growing by roughly ten megabytes per theme added. That is precisely backwards, because the whole point of the arrangement is that adding a theme should be free. `~/.local/bin/wallpaper` renders and caches them, which is why it is the one piece of the theming machinery that lives in the dotfiles rather than in `tools/`.
+
+Within a theme the background style is chosen separately - four generated styles, or a path to an image of your own - and remembered per theme, so switching away and back returns what you had rather than resetting.
+
+One writer, not two. `theme` and `wallpaper` both record machine-local choices, and for a while each carried its own copy of the TOML writer. They disagreed: the theme switcher's copy flattened nested tables, so choosing a wallpaper and then switching theme turned `[data.wallpaper]` into a string, and every subsequent `chezmoi apply` died inside the sway template. The bug was not that a writer was wrong, it was that there were two. `~/.local/lib/desktop_config.py` is now the only one.
 
 ### Trade-off
 
 `palette.toml` used to mean "the colours". `themes.toml` means "the colours available", and what the desktop is actually wearing is now a machine-local fact that git does not record. Reading the repository no longer tells you what a given machine looks like — `theme --current` does.
 
-Switching is also not instant. It is a `chezmoi apply` plus a set of reloads, which measures at well under a second, but it is a rebuild rather than a variable assignment, and any terminal already open keeps its old colours until it is reopened.
+Switching is also not instant. It is a `chezmoi apply` plus a set of reloads, measured at 0.6s when the wallpaper is already cached and about 2s the first time a theme-and-style pair is used, since the image is rendered then. It is a rebuild rather than a variable assignment, and any terminal already open keeps its old colours until it is reopened.
+
+Generating rather than committing also means the images are not reproducible from the repository alone in the sense a checked-in file would be - they are reproducible from the generator, which is deterministic and seeded, but a machine with no `python3` would have no wallpaper. `python3` is already a hard dependency of half the helper scripts, so this adds no new one.
 
 ### Alternatives considered
 
@@ -1731,6 +1737,8 @@ Switching is also not instant. It is a `chezmoi apply` plus a set of reloads, wh
 **Colours read at runtime instead of rendered.** Not available. None of these programs support it; the closest is foot's two-section toggle, which is a light/dark switch and not a palette.
 
 **Let a theme carry GTK too, by declaring light or dark and rewriting `GTK_THEME`.** Rejected for now. `environment.d` is read when the user manager starts, so GTK would only catch up after a re-login — a switch that is half immediate and half not is worse than one with a stated boundary. Generating a GTK theme per palette was rejected as much the largest option for the least-used surface.
+
+**Committing the generated images anyway.** Rejected on arithmetic. It also has a subtler cost: every theme added would make the repository bigger for everyone who clones it, which turns "add a theme" into a decision rather than a whim.
 
 **Fixed terminal colours across themes.** Rejected. A theme that changes the bar and leaves the terminal in the old palette looks half-applied. The sixteen ANSI colours travel with the theme, but keep their own identities — a theme that made `blue` gold would break every program that assumes a diff is red and green.
 

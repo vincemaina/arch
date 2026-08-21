@@ -317,41 +317,58 @@ else:
     else:
         say("pass", "every theme keeps its readouts above the contrast floor")
 
-    # swaybg fails quietly when its image is missing, so a theme that names one
-    # it does not ship is a blank desktop rather than an error.
-    missing_art = [
-        f"{name} names {palette['wallpaper']}, which is not in setup/dotfiles/"
-        for name, palette in themes.items()
-        if not os.path.isfile(os.path.join(
-            source, "dotfiles", "dot_local", "share", "wallpapers",
-            palette.get("wallpaper", "")))
-    ]
-    if missing_art:
-        for problem in missing_art:
-            say("fail", problem)
+    # No theme ships an image any more: they are generated on the machine from
+    # the palette and cached. Three themes at one image each was already 7.8M of
+    # tracked PNG, and the arrangement this replaced would have grown by about
+    # 10M per theme - so a tracked image here is a regression worth catching
+    # rather than a stylistic preference.
+    generator = os.path.join(source, "dotfiles", "dot_local", "bin",
+                             "executable_wallpaper")
+    if not os.access(generator, os.X_OK):
+        say("fail", "the wallpaper generator is missing or not executable, so no "
+                    "theme can produce a background")
     else:
-        say("pass", "every theme ships the wallpaper it names")
+        say("pass", "the wallpaper generator ships and is executable")
 
-    # The one that catches a switch that only half happened: the theme selected
-    # in the config against the image swaybg is actually displaying. These
-    # disagree when something was applied without the session being reloaded.
+    tracked = []
+    for root, _, files in os.walk(os.path.join(source, "dotfiles")):
+        tracked += [f for f in files if f.lower().endswith((".png", ".jpg", ".jpeg"))]
+    if tracked:
+        say("fail", f"{len(tracked)} image(s) are tracked in setup/dotfiles/ "
+                    f"({', '.join(sorted(tracked)[:3])}...) - wallpapers are "
+                    f"generated now, and committing them grows with every theme")
+    else:
+        say("pass", "no wallpaper images are tracked; a new theme costs no bytes")
+
+    # The one that catches a switch that only half happened: the theme and style
+    # selected in the config against the image swaybg is actually displaying.
+    # These disagree when something was applied without the session reloading.
+    chosen = data.get("wallpaper")
+    style = chosen.get(selected, "mesh") if isinstance(chosen, dict) else "mesh"
     running = ""
     try:
         with os.popen("pgrep -a swaybg 2>/dev/null") as fh:
             for line in fh:
                 parts = line.split()
                 if "-i" in parts:
-                    running = os.path.basename(parts[parts.index("-i") + 1])
+                    running = parts[parts.index("-i") + 1]
     except OSError:
         pass
-    expected = themes[selected].get("wallpaper", "")
+
+    expected = (style if style.startswith("/")
+                else os.path.expanduser(
+                    f"~/.local/share/wallpapers/{selected}-{style}.png"))
     if not running:
         say("skip", "swaybg is not running, so the live theme cannot be confirmed")
-    elif running == expected:
-        say("pass", f"the running desktop is showing {selected}'s wallpaper")
+    elif running != expected:
+        say("fail", f"selected theme is {selected} in {style}, which is "
+                    f"{os.path.basename(expected)}, but swaybg is showing "
+                    f"{os.path.basename(running)} - the session was not reloaded")
+    elif not os.path.isfile(running):
+        say("fail", f"swaybg was told to show {os.path.basename(running)}, which "
+                    f"does not exist - run 'wallpaper --regenerate'")
     else:
-        say("fail", f"selected theme is {selected} ({expected}) but swaybg is "
-                    f"showing {running} - the session was not reloaded")
+        say("pass", f"the desktop is showing {selected} in the {style} style")
 
 print("\n".join(out))
 PYEOF
@@ -366,10 +383,10 @@ fi
 reload_template="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/setup/dotfiles/run_onchange_after_reload-theme.sh.tmpl"
 if [[ ! -f "$reload_template" ]]; then
     fail "nothing reloads the session after a theme change"
-elif [[ "$(grep -c '{{ .theme }}\|sha256sum' "$reload_template")" -lt 2 ]]; then
-    fail "$(basename "$reload_template") no longer embeds the theme name and palette hash, so chezmoi will not re-run it"
+elif [[ "$(grep -c '{{ .theme }}\|dig "wallpaper"\|sha256sum' "$reload_template")" -lt 3 ]]; then
+    fail "$(basename "$reload_template") no longer embeds the theme name, the wallpaper style and the palette hash, so chezmoi will not re-run it in every case that needs it"
 else
-    pass "the reload script re-runs on both a theme switch and a colour edit"
+    pass "the reload script re-runs on a theme switch, a wallpaper change and a colour edit"
 fi
 
 # ----------------------------------------------------------------------

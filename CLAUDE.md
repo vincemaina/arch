@@ -164,7 +164,7 @@ GPT/UEFI, 1 GiB FAT32 ESP + Btrfs root, subvolumes `@`, `@home`, `@snapshots`, m
 ## Theming: several palettes, one selected, all templated
 
 `setup/dotfiles/.chezmoidata/themes.toml` holds every colour of every theme,
-including the sixteen ANSI terminal colours and the theme's wallpaper. Sway
+including the sixteen ANSI terminal colours. Sway
 appearance, the Waybar stylesheet, foot, rofi, mako, swaylock and the starship
 prompt are all `.tmpl` files that resolve the selected theme in their first line
 and read from it, so **changing a colour means editing that one file and running
@@ -177,8 +177,16 @@ Names are by role (`accent`, `urgent`, `muted`), not by colour.
 under `[data]`, deliberately not in the repository — so switching leaves no diff.
 chezmoi merges config data *over* `.chezmoidata`, which is what makes the tracked
 default in `themes.toml` work for the installer, which has no config file at all.
-`~/.local/bin/theme` is the switcher; `theme --current` is how you find out what a
-machine is actually wearing, because git no longer tells you.
+`~/.local/bin/theme` is the switcher and `~/.local/bin/wallpaper` picks the
+background style within a theme, remembered per theme. `theme --current` and
+`wallpaper --current` are how you find out what a machine is actually wearing,
+because git no longer tells you.
+
+**Both write the same file, through one writer.** `~/.local/lib/desktop_config.py`
+is the only thing that reads or writes `chezmoi.toml`. They each had their own
+copy once and the copies disagreed about nested tables, which turned
+`[data.wallpaper]` into a string and broke every subsequent `apply`. Add a
+machine-local value through that helper, not by hand.
 
 Three things worth holding onto before touching a theme:
 
@@ -188,14 +196,17 @@ Three things worth holding onto before touching a theme:
 - **Every theme must define every key every other theme defines**, or selecting it
   fails at render. `checks/session.sh` checks this, along with two contrast floors
   that were both learned by breaking them.
-- **Adding a theme means adding its wallpaper**: `tools/wallpaper.py --theme NAME`
-  generates one from that theme's own colours and it is committed.
+- **Adding a theme costs no bytes.** Wallpapers are generated on the machine by
+  `~/.local/bin/wallpaper` from the theme's own colours, in one of four styles,
+  and cached in `~/.local/share/wallpapers/`. Nothing image-shaped is tracked,
+  and `checks/session.sh` fails if anything image-shaped appears in
+  `setup/dotfiles/` — committing them grew by ~10M per theme, which is backwards.
 
 Nothing here reads colours at runtime — every consumer holds a rendered copy — so
 a change has to be reloaded into each one. That is
-`run_onchange_after_reload-theme.sh.tmpl`, which re-runs whenever the theme name
-or a hash of the selected palette changes. The two lines carrying them read like
-comments and are load-bearing. foot is the one consumer that cannot reload at
+`run_onchange_after_reload-theme.sh.tmpl`, which re-runs whenever the theme name,
+the wallpaper style or a hash of the selected palette changes. The three lines
+carrying them read like comments and are load-bearing. foot is the one consumer that cannot reload at
 all: terminals already open keep their colours.
 
 To check a template renders before applying it anywhere:
@@ -232,10 +243,11 @@ Three scripts, run from the repo on the target machine:
 
 `tools/` holds things that produce output rather than verdicts.
 `tools/shortcuts.sh` lists every shortcut by context and flags keys that mean
-different things in different tools; `tools/wallpaper.py` renders a theme's
-wallpaper from that theme's colours. Keep the distinction: `checks/` exits
-non-zero on a problem, `tools/` produces something to read or to commit. Neither
-reaches the built machine.
+different things in different tools. Keep the distinction: `checks/` exits
+non-zero on a problem, `tools/` produces something to read. Neither reaches the
+built machine — which is why the wallpaper generator lives in `dot_local/bin/`
+and not here: it is the one piece of the theming machinery that has to run on
+the built machine.
 
 `checks/session.sh` is the one to run after any change. It covers swap, the OOM
 handler, session units, the boot path, the greeter's session list, the shell,
@@ -293,9 +305,8 @@ built machine.
 `docs/themes/` holds screenshots of other people's setups, collected as
 inspiration. Look there before proposing a visual direction: a uniform grey bar
 and a first set of wallpapers were both rejected as lifeless, and both times the
-reference material settled it. `docs/wallpapers/` holds generated wallpaper
-candidates and is gitignored; only the chosen one is tracked, under
-`setup/dotfiles/`. `screenshots/` holds captures of this setup, taken to review
+reference material settled it. `docs/wallpapers/` documents how wallpapers are generated;
+no image is tracked anywhere in this repository. `screenshots/` holds captures of this setup, taken to review
 changes to how it looks.
 
 ## Conventions

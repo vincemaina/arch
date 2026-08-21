@@ -20,6 +20,11 @@
 # notifications, the lock screen, the prompt - and the wallpaper, so the bar has
 # something to sit against rather than clash with.
 #
+# No theme names a wallpaper file. ~/.local/bin/wallpaper generates one from
+# these colours, in whichever style is chosen for the theme, and caches it. That
+# is why adding a theme below costs nothing but the colours: there is no image
+# to produce, no binary to commit, and nothing that grows the repository.
+#
 # It does not cover GTK applications. Those follow GTK_THEME, which is read once
 # at session start and cannot be re-coloured from a palette without shipping
 # real GTK themes. They stay Adwaita dark, and the price of that is a rule:
@@ -32,6 +37,12 @@
 # variable called "cyan" holding something orange. Every theme must define every
 # key every other theme defines - a missing one is a template error at apply
 # time, and checks/session.sh checks for it before you get there.
+#
+# Every theme must also keep its semantic four - ok, warning, urgent, info -
+# distinguishable from its accent and secondary. This is not checked mechanically
+# because "distinguishable" is a judgement, but it is the thing that goes wrong
+# when a theme is built around one hue: a green `ok` on a green desktop, or a
+# rose `urgent` on a pink one, says nothing at the moment it needs to.
 #
 # Two contrast constraints, both learned rather than assumed, and both checked
 # by checks/session.sh:
@@ -81,7 +92,6 @@ theme = "neon"
     # background this dark, pushing saturation further is what turns neon into
     # eye strain, particularly for text that stays on screen.
 
-    wallpaper = "neon.png"
 
 [themes.neon.term]
     black          = "0b0e14"
@@ -131,7 +141,6 @@ theme = "neon"
                              # which is what stops the cpu readout disappearing
                              # into the three warm ones either side of it
 
-    wallpaper   = "ember.png"
 
 # ANSI colours keep their own identities rather than being recoloured to match.
 # A theme that makes `blue` gold would break every program that assumes a diff
@@ -181,7 +190,6 @@ theme = "neon"
                              # because everything around it got quieter
     info        = "#6fb3c4"  # neutral emphasis
 
-    wallpaper   = "slate.png"
 
 [themes.slate.term]
     black          = "11151a"
@@ -200,3 +208,201 @@ theme = "neon"
     bright_magenta = "bda3e6"
     bright_cyan    = "9ad0dd"
     bright_white   = "dbe4ec"
+
+# Green, and the one that most changes the desktop's temperature. Deep
+# forest rather than terminal-green: the accent is the bright growth and
+# the frame is jade, so the bar's edges read as canopy rather than as a
+# readout. `ok` is deliberately a different green from `accent` - in a
+# green theme the healthy-battery colour would otherwise be invisible as a
+# signal, because everything is already that colour.
+[themes.verdant]
+    bg          = "#0a1210"
+    bar         = "#000000"
+    bg_dim      = "#060c0a"
+    surface     = "#14201c"
+    surface_alt = "#1f302a"
+    muted       = "#7d9a8c"
+    text        = "#d8ece2"
+    text_dim    = "#9bb8aa"
+    accent      = "#4ade80"
+    secondary   = "#a3e635"
+    tertiary    = "#12795a"
+    ok          = "#34d399"
+    warning     = "#fbbf24"
+    urgent      = "#f87171"
+    info        = "#38bdf8"
+
+[themes.verdant.term]
+    black          = "0a1210"
+    red            = "f87171"
+    green          = "4ade80"
+    yellow         = "fbbf24"
+    blue           = "38bdf8"
+    magenta        = "c084fc"
+    cyan           = "2dd4bf"
+    white          = "9bb8aa"
+    bright_black   = "7d9a8c"
+    bright_red     = "fa9e9e"
+    bright_green   = "84e9a9"
+    bright_yellow  = "fcd36a"
+    bright_blue    = "78d2fa"
+    bright_magenta = "d4abfd"
+    bright_cyan    = "70e2d3"
+    bright_white   = "d8ece2"
+
+# Deep water. Very dark, and almost entirely in the blue-green half of the
+# wheel - the darkest background of any theme here, which makes it the one
+# to reach for in a dark room.
+[themes.abyss]
+    bg          = "#080f16"
+    bar         = "#000000"
+    bg_dim      = "#050a10"
+    surface     = "#101c28"
+    surface_alt = "#1a2b3a"
+    muted       = "#7590a8"
+    text        = "#d3e4f0"
+    text_dim    = "#98b2c6"
+    accent      = "#22d3ee"
+    secondary   = "#818cf8"
+    tertiary    = "#17557f"
+    ok          = "#34d399"
+    warning     = "#fbbf24"
+    urgent      = "#fb7185"
+    info        = "#60a5fa"
+
+[themes.abyss.term]
+    black          = "080f16"
+    red            = "fb7185"
+    green          = "34d399"
+    yellow         = "fbbf24"
+    blue           = "60a5fa"
+    magenta        = "818cf8"
+    cyan           = "22d3ee"
+    white          = "98b2c6"
+    bright_black   = "7590a8"
+    bright_red     = "fc9eac"
+    bright_green   = "75e1ba"
+    bright_yellow  = "fcd36a"
+    bright_blue    = "93c2fc"
+    bright_magenta = "a9b1fa"
+    bright_cyan    = "69e1f3"
+    bright_white   = "d3e4f0"
+
+# Purple through pink. The closest relative of neon, and deliberately so -
+# it is neon with the cyan taken out, for when the desktop should be warm
+# without being orange. Note `urgent` is pushed to a clear red rather than
+# the usual rose, because a rose alarm on a pink desktop says nothing.
+[themes.orchid]
+    bg          = "#120b16"
+    bar         = "#000000"
+    bg_dim      = "#0b0710"
+    surface     = "#1f1426"
+    surface_alt = "#2e1d38"
+    muted       = "#a087ac"
+    text        = "#eddcf2"
+    text_dim    = "#c0a8c9"
+    accent      = "#c084fc"
+    secondary   = "#f472b6"
+    tertiary    = "#7827c9"
+    ok          = "#4ade80"
+    warning     = "#fcd34d"
+    urgent      = "#ff4d4d"
+    info        = "#60a5fa"
+
+[themes.orchid.term]
+    black          = "120b16"
+    red            = "ff4d4d"
+    green          = "4ade80"
+    yellow         = "fcd34d"
+    blue           = "60a5fa"
+    magenta        = "f472b6"
+    cyan           = "67e8f9"
+    white          = "c0a8c9"
+    bright_black   = "a087ac"
+    bright_red     = "ff8686"
+    bright_green   = "84e9a9"
+    bright_yellow  = "fde186"
+    bright_blue    = "93c2fc"
+    bright_magenta = "f89fcd"
+    bright_cyan    = "98effb"
+    bright_white   = "eddcf2"
+
+# Electric blue, and the brightest theme here after neon. Where abyss is
+# murky and low, this is vivid and high-contrast - the two are not the same
+# theme with different numbers.
+[themes.cobalt]
+    bg          = "#0a0f1c"
+    bar         = "#000000"
+    bg_dim      = "#060a14"
+    surface     = "#141b2e"
+    surface_alt = "#1f2a44"
+    muted       = "#8296b8"
+    text        = "#dae3f5"
+    text_dim    = "#a0b0d0"
+    accent      = "#60a5fa"
+    secondary   = "#a78bfa"
+    tertiary    = "#1e50c8"
+    ok          = "#4ade80"
+    warning     = "#fbbf24"
+    urgent      = "#f87171"
+    info        = "#22d3ee"
+
+[themes.cobalt.term]
+    black          = "0a0f1c"
+    red            = "f87171"
+    green          = "4ade80"
+    yellow         = "fbbf24"
+    blue           = "60a5fa"
+    magenta        = "a78bfa"
+    cyan           = "22d3ee"
+    white          = "a0b0d0"
+    bright_black   = "8296b8"
+    bright_red     = "fa9e9e"
+    bright_green   = "84e9a9"
+    bright_yellow  = "fcd36a"
+    bright_blue    = "93c2fc"
+    bright_magenta = "c3b0fc"
+    bright_cyan    = "69e1f3"
+    bright_white   = "dae3f5"
+
+# Almost no colour at all. Focus is signalled by brightness rather than by
+# hue, which is the whole idea - it is the theme for when the desktop
+# should disappear.
+#
+# # The semantic four are the exception and stay coloured, muted right down.
+# # A grey `urgent` is not a signal, and the point of a quiet theme is that
+# # the few things which do speak are heard.
+[themes.mono]
+    bg          = "#0e0e10"
+    bar         = "#000000"
+    bg_dim      = "#08080a"
+    surface     = "#1a1a1e"
+    surface_alt = "#26262c"
+    muted       = "#8b8b95"
+    text        = "#e4e4e8"
+    text_dim    = "#a8a8b2"
+    accent      = "#e4e4e8"
+    secondary   = "#b9b9c4"
+    tertiary    = "#45454f"
+    ok          = "#7fae7f"
+    warning     = "#c3ab6e"
+    urgent      = "#c96a6a"
+    info        = "#7f9dc0"
+
+[themes.mono.term]
+    black          = "0e0e10"
+    red            = "c96a6a"
+    green          = "7fae7f"
+    yellow         = "c3ab6e"
+    blue           = "7f9dc0"
+    magenta        = "a08bab"
+    cyan           = "7fadb0"
+    white          = "a8a8b2"
+    bright_black   = "8b8b95"
+    bright_red     = "da9a9a"
+    bright_green   = "a8c8a8"
+    bright_yellow  = "d6c69c"
+    bright_blue    = "a8bcd4"
+    bright_magenta = "beb0c6"
+    bright_cyan    = "a8c7c9"
+    bright_white   = "e4e4e8"

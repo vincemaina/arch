@@ -20,14 +20,32 @@ set -euo pipefail
 #
 # WHAT MAKES IT RE-RUN
 #
-# run_onchange_ re-runs a script when the *rendered script* changes, so the two
+# run_onchange_ re-runs a script when the *rendered script* changes, so the three
 # lines below are load-bearing rather than informational. The theme name catches
-# a switch; the hash catches an edit to the selected theme's colours without the
-# name changing. Neither is decoration - delete them and this stops running at
-# the moment it is most needed.
+# a switch between themes; the wallpaper name catches a change of style within
+# one theme; the hash catches an edit to the selected theme's colours without
+# either name changing. None of them is decoration - delete one and this stops
+# running in exactly the case it covers.
 #
-# theme:   {{ .theme }}
-# palette: {{ toJson $palette | sha256sum }}
+# theme:     {{ .theme }}
+# wallpaper: {{ dig "wallpaper" .theme "mesh" . }}
+# palette:   {{ toJson $palette | sha256sum }}
+
+# The wallpaper first, and deliberately before the session check below.
+#
+# No theme ships an image; ~/.local/bin/wallpaper renders one from the theme's
+# own colours the first time that theme and style are asked for, and caches it.
+# The sway config written moments ago already names the file, so it has to exist
+# before sway is told to reload - the other order shows a black desktop for as
+# long as the render takes.
+#
+# Outside the session check because generating an image needs no session, and
+# the installer runs this in a chroot where there is no sway at all. Getting
+# that wrong would mean every fresh machine's first login had no wallpaper.
+if [[ -x "$HOME/.local/bin/wallpaper" ]]; then
+    "$HOME/.local/bin/wallpaper" --ensure ||
+        echo "    could not generate the wallpaper; run 'wallpaper --regenerate'" >&2
+fi
 
 # chezmoi runs scripts wherever it is pointed, including at a scratch
 # destination - rendering to /tmp to preview a template is NOT a dry run, which
