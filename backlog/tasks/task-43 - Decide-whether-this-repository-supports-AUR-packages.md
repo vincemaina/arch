@@ -4,13 +4,13 @@ title: Decide whether this repository supports AUR packages
 status: To Do
 assignee: []
 created_date: '2026-08-20 17:39'
-updated_date: '2026-08-20 17:39'
+updated_date: '2026-08-21 14:22'
 labels:
   - repo
   - foundation
 dependencies:
   - TASK-31
-priority: low
+priority: high
 type: spike
 ordinal: 41000
 ---
@@ -46,3 +46,18 @@ The reason not to decide this yet, and why it depends on TASK-31: niri is in ext
 - [ ] #5 If adopted, the reproducibility cost of building user-submitted PKGBUILDs is stated in DECISIONS.md rather than left implied
 - [ ] #6 If declined, DECISIONS.md records it as a decision, so the next tool that wants it does not reopen the question from scratch
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Raised from low. This was filed as a curiosity and is now gating real work.
+
+TASK-84 needs html, css, json, emmet and sql language servers, none of which is
+in the official repositories, and TASK-73 decided against Mason because it
+installs binaries where the manifests cannot see them. So the editor's support
+for four of the six languages named waits on the answer here.
+
+Worth noting the fallback if the answer is no: a tracked list of npm packages,
+which keeps them declared at the cost of more machinery. That is not an argument
+for saying yes, but it means a no is not a dead end.
+<!-- SECTION:NOTES:END -->
