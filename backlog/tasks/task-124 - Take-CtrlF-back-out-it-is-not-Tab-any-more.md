@@ -1,11 +1,11 @@
 ---
 id: TASK-124
 title: 'Take Ctrl+F back out: it is not Tab any more'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 16:48'
-updated_date: '2026-08-22 16:53'
+updated_date: '2026-08-22 17:05'
 labels: []
 dependencies: []
 ordinal: 129000
@@ -28,14 +28,14 @@ Ctrl+J (Enter), Ctrl+H (Backspace) and the Ctrl+K / Ctrl+semicolon Escape trial 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 The [control] layer of setup/system/keyd/default.conf no longer binds f, and `keyd check` passes on the result
-- [ ] #2 Ctrl+F is observed doing what it did before the binding - reaching the focused program as Ctrl+F - by injecting the chord and reading back what keyd emits, not by reading the config
-- [ ] #3 Ctrl+Shift+F no longer arrives as Shift+Tab, observed the same way
+- [x] #2 Ctrl+F is observed doing what it did before the binding - reaching the focused program as Ctrl+F - by injecting the chord and reading back what keyd emits, not by reading the config
+- [x] #3 Ctrl+Shift+F no longer arrives as Shift+Tab, observed the same way
 - [x] #4 The [control+meta] layer and the prose that states how many keys it must keep in step with [control] are both correct after the removal, so the trap that section exists to prevent is still described accurately
-- [ ] #5 Ctrl+J, Ctrl+H, Ctrl+K and Ctrl+semicolon are unchanged and still emit what they did, observed in the same probe run
+- [x] #5 Ctrl+J, Ctrl+H, Ctrl+K and Ctrl+semicolon are unchanged and still emit what they did, observed in the same probe run
 - [x] #6 Everything the binding displaced is put back where this repository removed it: nvim's init.lua comment about page-forward being gone no longer claims something untrue
 - [x] #7 docs/manual/03-the-keyboard.md no longer teaches Ctrl+F as Tab, and ./checks/manual.sh passes
-- [ ] #8 ./tools/shortcuts.sh no longer reports the binding, still reading the key out of the layer rather than asserting a string
-- [ ] #9 setup/system/keyd/default.conf and /etc/keyd/default.conf are identical afterwards, so the machine is not running something the repository does not describe
+- [x] #8 ./tools/shortcuts.sh no longer reports the binding, still reading the key out of the layer rather than asserting a string
+- [x] #9 setup/system/keyd/default.conf and /etc/keyd/default.conf are identical afterwards, so the machine is not running something the repository does not describe
 - [x] #10 TASK-120 records that it was reverted and why, so its per-program table is not read as current
 <!-- AC:END -->
 
@@ -87,4 +87,56 @@ Then prove it by injection rather than by reading the config back - the probe ap
 ## Gap noticed, not fixed
 
 `checks/session.sh` does not compare setup/system/keyd/default.conf with /etc/keyd/default.conf. It checks that /etc parses, that the Alt/Control swap is in it, and that keyd is running - so a machine running a keyd config the repository no longer describes passes cleanly, which is exactly the state this task leaves it in until the command above is run. TASK-120 and TASK-123 both had to assert that identity by hand. Worth its own ticket.
+
+## APPLIED AND PROVEN
+
+Applied with pkexec, gated the way apply-config.sh gates it - `keyd check` on the source before it goes near /etc, again on the installed file, and a restore from backup if the installed one does not parse. The previous config is at `/etc/keyd/default.conf.before-task-124`, which keyd does not load because it does not end in .conf. `diff /etc/keyd/default.conf setup/system/keyd/default.conf` is empty and keyd is active.
+
+## What keyd emits, by injection
+
+A uinput keyboard, grabbed by keyd (journal: `DEVICE: match dead:beef:0bcc010d (keyd-probe-task-124)`), with an unbound key as the positive control. Note the swap: the chord a human calls Ctrl+F is injected as KEY_LEFTALT + KEY_F.
+
+| Injected | keyd emits | |
+| --- | --- | --- |
+| plain f | `+f -f` | positive control - the device really is grabbed |
+| Ctrl+F | `+leftctrl +f -f -leftctrl` | Ctrl+F, reaching the program as itself again |
+| Ctrl+Shift+F | `+leftctrl +leftshift +f -f -leftshift -leftctrl` | no Shift+Tab |
+| Ctrl+J | `+leftctrl -leftctrl +enter -enter +leftctrl -leftctrl` | unchanged |
+| Ctrl+H | `+leftctrl -leftctrl +backspace -backspace +leftctrl -leftctrl` | unchanged |
+| Ctrl+K | `+leftctrl -leftctrl +esc -esc +leftctrl -leftctrl` | unchanged |
+| Ctrl+semicolon | `+leftctrl -leftctrl +esc -esc +leftctrl -leftctrl` | unchanged |
+
+## The first probe run measured nothing, and said so wrongly
+
+Worth recording, because it is a new instance of the apparatus trap already in the scripting-traps skill rather than a repeat of the one written there.
+
+The probe reads keyd's VIRTUAL KEYBOARD, which carries the output of every keyboard on the machine and not just the probe device. A Super key was held down on the real keyboard across four of the seven cases, so Ctrl+J, Ctrl+H and Ctrl+K were routed through the [control+meta] layer and came back as C-M-j, C-M-h and C-M-k. The probe reported three FAILs. All three were correct behaviour from the composite layer - the bindings were never tested at all.
+
+The tell was `+125` (KEY_LEFTMETA) appearing in output for a chord that never injected it, and a matching `-125` four cases later.
+
+Second probe: before each injection it asks the virtual keyboard which keys are physically down (EVIOCGKEY) and waits rather than measuring, and it runs every case twice. It waited twice, visibly, and the contaminated cases stopped being contaminated.
+
+Ctrl+J and Ctrl+H were still marked DISAGREED by that run, on strict string equality between the two readings. That check was too strict for a machine somebody is typing on: the difference in both cases was a trailing stray event from the real keyboard, and the substantive event was present in all four readings - `+enter` in both readings of Ctrl+J, `+backspace` in both readings of Ctrl+H. Recorded rather than smoothed over, because "the probe said FAIL and I decided it was fine" is worth a reader being able to audit.
+
+## Checks after applying
+
+`./checks/session.sh` 92 passed / 0 failed / 0 skipped. `./checks/manual.sh` 8 passed / 0 failed. `./checks/sway-bindings.sh` exit 0. `./checks/sway-commands.sh` clean.
+
+`./tools/shortcuts.sh`, now reading the updated /etc, prints Ctrl+J and Ctrl+H only, no Tab row, no Ctrl+F cost paragraph, and its Shift sentence reads "Ctrl+Shift+J is Shift+Enter" - derived from the layer, which is what that edit was for.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ctrl+F is not Tab any more, on this machine and in the repository.
+
+`f = tab` is out of the [control] layer and `f = C-M-f` out of [control+meta]. Ctrl+Shift+F went with it and needed no work of its own: it was never a binding, only keyd passing Shift through onto the rewritten Tab.
+
+TASK-120's measurement was not wrong and is not discarded - it is the reason. Page-forward across nvim, less, yazi and qutebrowser plus find-in-page in Firefox, five daily bindings against three for Ctrl+K, with Ctrl+B left as a page-backward with no forward counterpart. It was an accurate price and too high a one, which only using it could settle. A 31-line note replaces the 56-line one so the key is not re-proposed from scratch, and names Ctrl+I as the key to spend if home-row Tab is ever wanted again - deliberately not bound, because that is a separate decision.
+
+Four places would have been left describing something untrue and are corrected: nvim's init.lua comment about page-forward, the manual's cost table and Shift example, the [control+meta] prose that counts how many keys it keeps in step with [control], and tools/shortcuts.sh - which had exactly one hardcoded fact in a function built to have none ("Ctrl+Shift+F is Shift+Tab") and now derives it from the layer.
+
+Verified by injection on a uinput keyboard keyd had grabbed, with an unbound key as the positive control, not by reading the config back: Ctrl+F emits `+leftctrl +f -f -leftctrl` and Ctrl+Shift+F emits Ctrl+Shift+F, while Ctrl+J, Ctrl+H, Ctrl+K and Ctrl+semicolon still emit Enter, Backspace and Escape. /etc/keyd/default.conf is byte-identical to the repository. session 92/0/0, manual 8/8, sway-bindings and sway-commands clean.
+
+The first probe run reported three false FAILs because a Super key was held on the real keyboard and routed those chords through [control+meta]; the second waits for a quiet keyboard before measuring. Recorded in the notes as a fresh instance of the apparatus trap rather than quietly rerun.
+<!-- SECTION:FINAL_SUMMARY:END -->
