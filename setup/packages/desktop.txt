@@ -118,8 +118,29 @@ gvfs
 # System monitor
 btop
 
-# Web browser
+# TWO BROWSERS, DELIBERATELY - see TASK-91.
+#
+# qutebrowser is the everyday one: keyboard-driven, vim-style, which is the
+# whole reason it suits this desktop. 11 MiB itself, though the honest figure is
+# the 282 MiB of qt6-webengine underneath - it is a Chromium engine wearing a
+# very small coat, not a small browser.
 qutebrowser
+
+# firefox is the one for what qutebrowser cannot do, and the list is short but
+# unavoidable: WebExtensions, and DRM. qt6-webengine ships zero Widevine files,
+# so qutebrowser cannot play Netflix or anything else behind DRM at all - not a
+# configuration gap, an absent codec.
+#
+# Firefox rather than a Chromium, and the choice is mostly made for us:
+#   - brave, google-chrome and ungoogled-chromium are AUR-only, ruled out on
+#     TASK-43.
+#   - Arch's chromium has no Widevine either, and is larger at 416 MiB.
+#   - vivaldi (434 MiB) and librewolf (424 MiB) are both bigger than firefox,
+#     and librewolf is a firefox derivative that removes things in this
+#     direction rather than adding them.
+# That leaves firefox at 295 MiB, which enables DRM by default and fetches the
+# Widevine CDM itself on first use.
+firefox
 
 # Key remapping, at the evdev layer so the console, the greeter, sway and
 # XWayland all inherit one configuration rather than four being kept in step.

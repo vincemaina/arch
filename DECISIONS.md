@@ -973,6 +973,52 @@ Current configuration includes workspace information and useful system status wh
 
 ---
 
+## Two browsers: qutebrowser for everything, firefox for DRM and extensions
+
+**Decision:** qutebrowser as the everyday browser, firefox declared alongside it
+for the things qutebrowser cannot do.
+
+### Why
+
+qutebrowser is keyboard-driven and vim-styled, which is the reason it suits a
+desktop where everything else is. It is also not as light as it looks: 11 MiB of
+package over 282 MiB of qt6-webengine, so it is a Chromium engine in a very
+small coat rather than a small browser.
+
+What it genuinely cannot do is short and unavoidable. qt6-webengine ships **no
+Widevine at all**, so DRM video does not play — that is an absent codec, not a
+setting. And it has no WebExtension support, so anything that lives as a browser
+extension has nowhere to go.
+
+firefox rather than a Chromium, and the field narrows itself:
+
+| | |
+| --- | --- |
+| brave, google-chrome, ungoogled-chromium | AUR-only, ruled out on TASK-43 |
+| chromium | 416 MiB, and Arch's build has no Widevine either |
+| vivaldi 434 MiB, librewolf 424 MiB | both larger; librewolf is a firefox derivative that removes in this direction |
+| **firefox 295 MiB** | smallest of the full browsers, DRM enabled by default |
+
+### Trade-off
+
+295 MiB for a browser that will be opened rarely, and the Widevine CDM is
+fetched at runtime on first DRM playback rather than coming from the manifest —
+so that one component is not reproducible from this repository, only its
+retrieval is.
+
+### Alternatives considered
+
+**One browser only.** Rejected: qutebrowser cannot play DRM video at all, and
+discovering that on a machine with no alternative installed is a bad time to
+find out.
+
+**A lighter second browser** — falkon or GNOME Web are both small. Neither
+solves the problem: falkon is qt6-webengine again, so it inherits the same
+missing Widevine, and Epiphany's WebKit has its own DRM story rather than a
+better one. The second browser exists precisely to be the heavy one.
+
+---
+
 ## rofi, reversing an earlier decision
 
 **Decision:** Use rofi as the application launcher, and build the desktop's own

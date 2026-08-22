@@ -1,11 +1,11 @@
 ---
 id: TASK-91
 title: 'Decide the two browsers: one lightweight, one full-fledged'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-21 20:51'
-updated_date: '2026-08-21 23:56'
+updated_date: '2026-08-22 00:24'
 labels: []
 dependencies: []
 priority: low
@@ -27,8 +27,30 @@ Worth settling when picked up: whether the second browser is firefox, a chromium
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 What qutebrowser cannot do is named from actual use, not assumed
-- [ ] #2 The second browser is chosen and declared in a manifest, so a rebuilt machine has both
+- [x] #1 What qutebrowser cannot do is named from actual use, not assumed
+- [x] #2 The second browser is chosen and declared in a manifest, so a rebuilt machine has both
 - [ ] #3 xdg-mime and the default-browser handling name whichever is meant to open a link, and it is verified by opening one
-- [ ] #4 The outcome is recorded in DECISIONS.md, which currently has no entry about browsers at all
+- [x] #4 The outcome is recorded in DECISIONS.md, which currently has no entry about browsers at all
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Settled from web research plus the local package database, deliberately without an extensive measurement exercise - this was a low-priority spike and the first attempt at it was disproportionate.
+
+The decisive fact is local and took one command: qt6-webengine ships zero Widevine files, so qutebrowser cannot play DRM video at all. That is an absent codec rather than a configuration gap, and it is the whole reason a second browser exists. It has no WebExtension support either.
+
+The field narrowed itself. brave, google-chrome and ungoogled-chromium are not in the official repositories, so TASK-43 disqualifies them. Arch's chromium has no Widevine either and is 416 MiB. vivaldi (434 MiB) and librewolf (424 MiB) are both larger than firefox, and librewolf is a firefox derivative that strips features in this direction rather than adding them. firefox at 295 MiB is the smallest full browser available and enables DRM by default.
+
+A lighter second browser was considered and does not help: falkon is qt6-webengine again and inherits the same missing Widevine, and Epiphany's WebKit has a different DRM story rather than a better one. The point of the second browser is to be the heavy one.
+
+qutebrowser is not as light as its own package size suggests - 11 MiB over 282 MiB of qt6-webengine - which is worth knowing but changes nothing, since that engine is already installed and would be whichever way this went.
+
+AC1 is checked on the DRM and extension findings, which are concrete. AC3 is NOT checked: xdg-mime and default-browser handling were not touched or tested here, and firefox being declared does not by itself decide which browser opens a link. Worth its own small piece of work if it matters.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+qutebrowser stays as the everyday keyboard-driven browser and firefox is declared in desktop.txt for what it cannot do. The deciding fact is that qt6-webengine ships no Widevine, so qutebrowser cannot play DRM video at all; firefox is the smallest full browser in the official repositories at 295 MiB and enables DRM by default, with brave and chrome disqualified as AUR-only and chromium both larger and equally Widevine-less. Declaring firefox also takes package drift to zero - it had been installed by hand and declared nowhere.
+<!-- SECTION:FINAL_SUMMARY:END -->
