@@ -260,6 +260,66 @@ if [[ -n "$modes" ]]; then
 fi
 
 # ----------------------------------------------------------------------
+heading "Terminal — foot"
+
+# Read from the rendered config, not the template, for the same reason the sway
+# section asks sway rather than reading files: the template is what was written,
+# the rendered file is what foot was actually given. On a machine that has not
+# synced they are different, and the one under your fingers is this one.
+#
+# Only what this repository overrides appears here. foot's own defaults - copy
+# and paste among them - are foot's to document; repeating them would be a
+# second copy to go stale.
+foot_ini="$HOME/.config/foot/foot.ini"
+
+# What a foot action does, in words. Anything not named here still gets a row
+# under its raw action name: a binding this table describes badly is better than
+# one it leaves out.
+foot_describe() {
+    case "$1" in
+        pipe-scrollback) echo "Copy the whole terminal, scrollback included, to the clipboard" ;;
+        pipe-visible)    echo "Copy the visible screen to the clipboard" ;;
+        pipe-selected)   echo "Pipe the current selection to a command" ;;
+        *)               echo "$1" ;;
+    esac
+}
+
+# Control+Shift+a as foot spells it is Ctrl+Shift+A as everything else does.
+foot_pretty() {
+    sed -e 's/Control/Ctrl/g' -e 's/Mod1/Alt/g' -e 's/Mod4/Super/g' <<<"$1" |
+        sed -E 's/\+([a-z])$/+\U\1/'
+}
+
+if [[ ! -f "$foot_ini" ]]; then
+    para "foot has no rendered config on this machine, so its bindings cannot be read"
+else
+    table_start "Key" "What it does"
+    foot_found=0
+    while IFS= read -r line; do
+        foot_action="${line%%=*}"
+        foot_value="${line#*=}"
+        # `action=[command] Combo...` for the pipe actions, `action=Combo...`
+        # for the rest. Drop the bracketed command; what remains is one or more
+        # space-separated combinations.
+        foot_value="$(sed -E 's/^\[[^]]*\][[:space:]]*//' <<<"$foot_value")"
+        for combo in $foot_value; do
+            # `action=none` is how foot unmaps one of its defaults. Nothing is
+            # bound afterwards, so there is no row to print.
+            [[ "$combo" == "none" ]] && continue
+            row "$(foot_pretty "$combo")" "$(foot_describe "$foot_action")"
+            record "foot" "$combo" "$(foot_describe "$foot_action")"
+            foot_found=1
+        done
+    done < <(sed -n '/^\[key-bindings\]/,/^\[/p' "$foot_ini" | grep -E '^[a-z][a-z-]*=')
+    if [[ $foot_found -eq 0 ]]; then
+        para "foot's config overrides no key bindings, so its defaults apply"
+    else
+        note "Everything else in the terminal is a foot default, copy and paste on
+Ctrl+Shift+C and Ctrl+Shift+V included."
+    fi
+fi
+
+# ----------------------------------------------------------------------
 heading "Terminal — zsh"
 
 # Derived by difference: what an interactive shell binds, minus what a shell
@@ -330,5 +390,4 @@ covered_note() { row "$1" "$2"; }
 covered_note "qutebrowser" "no config in this repository, so it uses its own defaults"
 covered_note "neovim"      "its keymap lives in this repository but is not parsed here yet"
 covered_note "rofi"        "launcher keys are built in and not configurable here"
-covered_note "foot"        "no keybindings overridden; foot defaults apply"
 para "Each becomes coverable by parsing the config this repository already owns, or by giving it one."

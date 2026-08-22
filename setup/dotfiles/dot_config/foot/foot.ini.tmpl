@@ -68,3 +68,32 @@ bright7={{ $palette.term.bright_white }}
 # it, notify would silently do nothing.
 visual=yes
 notify=yes
+
+[key-bindings]
+# Select all - or the useful half of it. TASK-112.
+#
+# foot 1.27 has no select-all action: `man foot.ini` lists every key-bindings
+# action and there is nothing that selects the buffer, nor any IPC to script a
+# selection. What it does have is pipe-scrollback, which hands the whole
+# buffer to a command. Since selecting everything in a terminal is nearly
+# always the first half of copying everything, this does the copying and skips
+# the highlight nobody can act on anyway.
+#
+# ~/.local/bin/terminal-copy-all trims the trailing blank rows off the grid,
+# copies, and raises the notification that stands in for the missing
+# highlight. It carries the full reasoning.
+#
+# Ctrl+Shift+A because Ctrl+Shift+C and Ctrl+Shift+V are already foot's own
+# defaults for copy and paste, which is exactly the inference the task made.
+# foot rejects a duplicate binding at parse time rather than silently
+# preferring one - `foot --check-config` reports "already mapped to" and exits
+# non-zero - so this having been accepted is itself the proof that Ctrl+Shift+A
+# was free.
+#
+# ABSOLUTE PATH, AND WHY THIS FILE IS A .tmpl BEYOND THE COLOURS
+#
+# foot inherits the session's PATH, not an interactive shell's. ~/.local/bin is
+# put on PATH by .zshrc, which applies to interactive shells only - so a bare
+# `terminal-copy-all` here would resolve to nothing and the key would do
+# nothing, silently. This is the same trap waybar's click commands document.
+pipe-scrollback=[{{ .chezmoi.homeDir }}/.local/bin/terminal-copy-all] Control+Shift+a

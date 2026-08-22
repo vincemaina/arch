@@ -25,6 +25,18 @@ with a `fastfetch` system summary before dropping you into the shell. Every
 terminal after that opens straight into the shell; a summary you have already
 read once is not worth scrolling past again on every new window.
 
+Copying out of it is mostly foot's own doing: `Ctrl+Shift+C` copies the
+selection, `Ctrl+Shift+V` pastes. `Ctrl+Shift+A` is this setup's addition — it
+puts the **whole** terminal on the clipboard, scrollback included, and tells
+you how many lines it took.
+
+It is not really select-all, however much the key suggests it: foot has no
+select-all action and no way to script a selection, so nothing highlights
+when you press it, and the notification is the only sign it worked. Since
+selecting everything in a terminal is nearly always the first
+half of copying everything, `Ctrl+Shift+A` goes straight to the second half —
+there is nothing to follow it with.
+
 **Surprise:** foot cannot reload its colours. Switching the desktop theme
 (chapter 5) updates every other consumer live, but a terminal that is already
 open keeps the palette it started with — only a new one picks up the change.

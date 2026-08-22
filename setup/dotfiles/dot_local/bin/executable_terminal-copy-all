@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: wl-copy notify-send awk
+
+# Ctrl+Shift+A in foot: put the whole terminal on the clipboard.
+#
+# Reads the scrollback on stdin. foot's `pipe-scrollback` action, bound in
+# foot.ini.tmpl, is what feeds it.
+#
+# FOOT HAS NO SELECT-ALL, AND CANNOT BE GIVEN ONE
+#
+# TASK-112 asked for select-all on Ctrl+Shift+A, reasoning from copy and paste
+# being Ctrl+Shift+C/V. The reasoning is right and the action does not exist:
+# `man foot.ini` lists every key-bindings action in foot 1.27 and there is no
+# select-all among them. The select-* actions it does have - select-begin,
+# select-word, select-row, select-extend - are all *interactive*, driven by a
+# pointer, and none of them can be told "everything". There is no IPC to script
+# a selection either.
+#
+# So this shortcut delivers what select-all is for rather than what it is. In a
+# terminal, selecting everything is almost always the first half of copying
+# everything; the visible highlight is a means, not the point. Ctrl+Shift+A
+# therefore copies, and Ctrl+Shift+C after it is not needed.
+#
+# The consequence to keep in mind: nothing is highlighted afterwards, so
+# without a word from us the key would look broken. Hence the notification at
+# the bottom - it is the only feedback there is, and it is load-bearing.
+#
+# WHY A HELPER AND NOT A LINE IN foot.ini
+#
+# foot can run a command inline - `pipe-scrollback=[sh -c "..."] Control+Shift+a`
+# - and for a one-liner that would do. Three things argue against it here: the
+# bracket syntax nests quotes badly and the trimming below needs quoting, foot
+# does not run the command through a shell so every pipeline needs an `sh -c`
+# wrapper anyway, and `checks/sway-commands.sh` verifies that a helper's
+# external commands come from a declared package only for scripts carrying a
+# `# requires:` header. Inline, `wl-copy` and `notify-send` would be checked by
+# nothing.
+
+# Trim the grid back to the text.
+#
+# A terminal is a rectangle: below the last line of output sit however many
+# empty rows the window is tall, and short rows may be padded out to the full
+# width. Copying the rectangle verbatim means pasting a block of trailing
+# blank lines nobody asked for.
+#
+# Blank lines *between* output are kept - they are part of what was printed.
+# Only the run at the end is dropped, by holding blanks back until something
+# non-blank proves they were interior.
+text="$(awk '
+    /^[[:space:]]*$/ { blanks++; next }
+    {
+        while (blanks > 0) { print ""; blanks-- }
+        sub(/[[:space:]]+$/, "")
+        print
+    }
+')"
+
+if [[ -z "$text" ]]; then
+    notify-send -a terminal-copy-all -t 3000 \
+        "Nothing to copy" "The terminal is empty."
+    exit 0
+fi
+
+lines="$(printf '%s\n' "$text" | wc -l)"
+
+# printf rather than echo, and a trailing newline: the last line of output is a
+# line like any other, and a paste that runs into the next thing you type is
+# not what was copied.
+printf '%s\n' "$text" | wl-copy
+
+plural="s"
+(( lines == 1 )) && plural=""
+notify-send -a terminal-copy-all -t 3000 \
+    "Copied" "${lines} line${plural} on the clipboard."
