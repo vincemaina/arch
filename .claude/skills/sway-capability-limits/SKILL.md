@@ -109,13 +109,26 @@ anywhere inside a window and needs no aiming at all.
 
 ## Where the effects actually live
 
-**SwayFX** has the shadows, blur and rounded corners, and is AUR-only — so it
-depends on TASK-43. **niri** has a first-class overview but per-monitor
-workspaces, so it does not solve spanning. **COSMIC** is the only option found
-that offers spanning workspaces natively.
+**SwayFX** has the shadows, blur and rounded corners, and is AUR-only, so it
+depends on TASK-43 — which ruled the AUR out. `pacman -Si swayfx` confirms it is
+not packaged. That is closed.
 
-All three are compositor changes, which means TASK-31 — a ticket that is now
-load-bearing for several others.
+**niri** is the one to know about, and an earlier version of this section was
+wrong about it. It is in `extra` — 24.87 MiB, with `xwayland-satellite` beside it
+and waybar's `niri/*` modules already in the installed waybar — and it has
+shadows, rounded corners, blur *and* animations, along with a first-class
+overview and scrollable tiling. So **the effects were never AUR-only; they were
+only ever absent from sway.** What niri does not solve is spanning: its
+workspaces are per-monitor too.
+
+**COSMIC** is the only option found that offers spanning workspaces natively.
+
+All three are compositor changes, which means TASK-31 — which decided to stay on
+sway and revisit niri when this runs on real hardware, because niri's
+differentiator is a motion model and a VM cannot judge it. See DECISIONS.md,
+"Sway stays, and niri is the thing to try when there is hardware to try it on",
+which also counts what a move would cost: 609 lines of config, 69 bindings, nine
+IPC helpers and six pieces of repo tooling, none of which port.
 
 A request for blur, shadows, rounding, an overview or spanning workspaces is a
 TASK-31 conversation, not a configuration change.

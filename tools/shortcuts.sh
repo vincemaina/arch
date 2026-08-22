@@ -29,7 +29,26 @@ swap_note() {
     printf 'are the ones programs receive, not the keys where they used to be.\033[0m\n'
 }
 
+# The scroll layer, which nothing else here can see.
+#
+# This tool builds its table by parsing sway's config, so a binding that lives
+# below the compositor is invisible to it - and the repository's stated policy
+# is that a shortcut nobody knows about is a bug. That applies hardest to the
+# ones no config file mentions.
+scroll_note() {
+    command -v keyd &>/dev/null || return 0
+    systemctl is-active --quiet keyd 2>/dev/null || return 0
+    grep -qF "capslock = layer(scroll)" /etc/keyd/default.conf 2>/dev/null || return 0
+    printf '\n\033[2mHolding Caps Lock scrolls, underneath every program:\n'
+    printf '  j / k / h / l   scroll whatever is under the POINTER - a wheel event,\n'
+    printf '                  so it works inside text fields where Page Down would\n'
+    printf '                  only move the caret\n'
+    printf '  d / u           Page Down / Page Up, to whatever has KEYBOARD focus\n'
+    printf 'These come from keyd rather than sway, so they are not in the table below.\033[0m\n'
+}
+
 swap_note
+scroll_note
 
 heading() { printf '\n\033[1m%s\033[0m\n%s\n' "$1" "$(printf '%.0s─' $(seq 1 ${#1}))"; }
 

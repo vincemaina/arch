@@ -260,6 +260,34 @@ through sysfs, and tmpfiles is what systemd provides for writing sysfs at boot.
 `checks/session.sh` fails if zswap is ever enabled again, because the kernel
 default will re-enable it the moment that file stops being applied.
 
+### The size, revisited now that zram actually holds the pages
+
+`min(ram / 2, 8192)` was chosen before it was clear which layer held anything.
+With zswap off it is zram's question alone, so TASK-72 measured it rather than
+leaving it merely unchallenged.
+
+On the reference machine, 3.9 GiB of RAM: fifteen hours of ordinary use put
+769 MiB into the 1,951 MiB device at a 1.93x compression ratio. A bounded 1.2 GiB
+pressure test — tiling real file bytes rather than zeroes, which would have
+compressed unrealistically well — drove the device to 99.5% of its *logical*
+capacity while using 855 MiB of actual RAM to hold it, 22% of the machine, at
+2.11x. Available memory never fell below 30%, well clear of earlyoom's
+thresholds, and released cleanly with no OOM kills.
+
+**The size stays**, and the reason is the case the ratio does not cover rather
+than the ratio itself. Nothing here sets `mem-limit`, so zram's RAM ceiling is
+bounded only by its disksize: compression is what usually keeps it far under
+that ceiling, not what enforces it. Against incompressible data the device can
+approach its full size in real memory. `ram / 2` is therefore the thing capping
+the worst case at half the machine — raising the fraction toward the 100–200%
+some guides suggest would raise that ceiling without addressing what actually
+filled first here, which was the device's logical swap-slot capacity, not RAM.
+That is backstopped by page-cache reclaim, kswapd already reclaiming on the
+order of 11 GiB a day on this machine, rather than by a hard failure.
+
+(`mem_limit` cannot be read back to confirm this from the kernel — the sysfs
+attribute is write-only. The claim rests on the configuration not setting one.)
+
 ---
 
 ## earlyoom rather than systemd-oomd
@@ -1864,7 +1892,22 @@ Chezmoi should not interpret the other directories as files that belong in the u
 
 ---
 
-## The VM renders in software, and that is the hypervisor's doing
+## The VM rendered in software, and no longer does
+
+**This entry is now history, and is kept because the reasoning still applies to
+any machine that has not had the fix.** 3D acceleration was enabled on the
+hypervisor, and the running machine agrees: the kernel reports
+`[drm] features: +virgl +edid` with two capability sets, and this boot produced
+**zero** mentions of llvmpipe or swrast across the whole journal. Everything
+below describes the state before that, and remains the right diagnosis if the
+symptoms return.
+
+One consequence worth carrying forward: it is still not a fair machine to judge
+a compositor's *feel* on. virgl is virtualised GL - enough that sway is no
+longer drawn by the CPU, not enough to benchmark anything whose selling point is
+motion. TASK-31 leans on this.
+
+### The original entry
 
 **Decision:** Accept software rendering inside the virtual machine. Do not chase the `failed to create dri2 screen` warnings from inside the guest.
 
@@ -1905,6 +1948,124 @@ Memory pressure was ruled out - earlyoom reported 58% available a minute earlier
 **Nothing was changed in the guest, deliberately, and that is the conclusion rather than an omission.** sway has no crash recovery and cannot be given any from outside; a supervisor that restarted it would produce an empty desktop rather than the one that was lost. The fix is not in the guest at all: enabling 3D acceleration on the hypervisor - virtio video with 3D, SPICE display with OpenGL - takes llvmpipe out of the path entirely. That was already the recommendation here for performance; this raises it from "the desktop is CPU-rendered" to "the compositor can crash".
 
 Not reproduced since: one coredump total, across roughly twenty hours of session time over two subsequent boots, both ending in a clean shutdown. A fault seen once is not disproved by that, which is why this is written down instead of closed silently. TASK-48.
+
+---
+
+## Sway stays, and niri is the thing to try when there is hardware to try it on
+
+**Decision:** Remain on sway. Do not adopt SwayFX. Do not install niri yet —
+revisit when this setup runs on real hardware rather than in a VM.
+
+### Why
+
+SwayFX is not available: `pacman -Si swayfx` reports no such package, it is
+AUR-only, and TASK-43 ruled out the AUR. It is also not wanted — vanilla sway
+looks right after the theming work, so the effects it buys are not effects
+anyone is asking for. Either ground closes it alone.
+
+niri is a different proposition, and one earlier note here was wrong about it.
+It is in `extra` at 24.87 MiB, packaged by an Arch maintainer, with
+`xwayland-satellite` beside it and waybar's `niri/*` modules already present in
+the installed waybar. So unlike SwayFX it costs no packaging machinery. It also
+has shadows, rounded corners, blur and animations, all from official packages —
+**the effects were never AUR-only, they were only ever absent from sway.**
+
+The reason to wait is that what niri is actually wanted for is a *motion model*
+— scrollable tiling and an overview — and that cannot be judged from a config
+diff, nor on this machine. See the entry above: virgl-backed 3D is enough that
+sway is no longer CPU-drawn and not enough to be a fair bench for a compositor
+whose differentiator is how it moves.
+
+### Trade-off
+
+Staying keeps what sway cannot do: no overview, no effects, and windows that
+resize each other when one opens.
+
+### What it would cost, counted rather than estimated
+
+609 lines of compositor config, 69 keybindings and 19 window rules, none of
+which port — niri uses KDL and upstream offers no translator. Nine helper
+scripts speak sway IPC. Six pieces of repository tooling parse sway's config
+syntax or its IPC, the largest being the shortcuts panel at 678 lines, which
+reads the sway config directly and subscribes to sway window events.
+
+Four features have no niri equivalent at all: autotiling, whose concept
+disappears under scrollable tiling; binding modes; the scratchpad; and the
+workspace greeter, which assumes numbered static workspaces where niri's are
+dynamic.
+
+Everything below or beside the compositor survives untouched — keyd, greetd,
+uwsm, chezmoi, the palette and its non-sway consumers, the installer.
+
+### Trying it is not a `pacman -S`
+
+Worth writing down because it is the obvious move and it breaks something:
+`checks/session.sh` fails any greeter session entry whose `Exec` bypasses uwsm,
+and niri ships one. Installing it alongside sway needs a `Hidden=true` mask over
+the packaged entry, a `niri-uwsm.desktop` naming the binary rather than the
+desktop ID, an `apply-config.sh` entry and a `wayland-session@niri.target.wants/`
+set.
+
+### Alternatives considered
+
+**Hyprland** — in the official repositories with effects built in, but a full
+configuration rewrite for effects that are not the goal.
+
+**COSMIC** — the only option offering workspaces that span displays, kept in
+reserve for that question, which is TASK-34's rather than this one.
+
+### When to reopen
+
+When this runs on real hardware. A second display is deliberately *not* the
+trigger: niri's workspaces are per-monitor too, so it does not answer the
+spanning question either.
+
+---
+
+## Shells survive a sway crash, deliberately, and nothing else does
+
+**Decision:** Keep interactive shells alive across a sway crash or an in-session
+restart with `abduco`. Do not build tooling to capture and replay window layout,
+and add nothing for application content beyond what qutebrowser and neovim
+already do by default.
+
+### Why
+
+TASK-50 split "recover the session" into three problems with different answers.
+
+Window position is scriptable from `swaymsg -t get_tree` and not worth building:
+the tools that would help are AUR-only, declined on TASK-43, and a hand-rolled
+relaunch-and-place script is exactly the fragile machinery this repository
+avoids — for a fault seen once in roughly twenty hours of session time.
+
+What was *inside* a window is mostly handled already, checked rather than
+assumed: qutebrowser has no dotfile in this repository at all and runs stock,
+where `auto_save.session` defaults to true; neovim already sets `undofile` and
+has swapfile recovery on. Neither restores layout automatically, and scripting
+that on would be new machinery for the rare case rather than the common one.
+
+A terminal's live state is the one genuine gap, and it is cheap to close.
+`abduco` is 36.75 KiB and does only detach and reattach — no panes, tabs or
+prefix-key layer to reconcile against the Ctrl-heavy scheme TASK-40 built.
+`tmux` duplicates sway's own tiling; `zellij` adds that plus default bindings
+that collide with readline and fzf.
+
+**The design constraint came from the crash log, not from theory.**
+`systemd --user` survives a sway crash intact — the same PID stops and re-reaches
+the session target. A process launched the ordinary way does not: the log of the
+2026-08-20 crash shows systemd SIGKILLing a process sitting in
+`wayland-wm@sway.service`'s own cgroup ten seconds later, as routine unit-stop
+cleanup. So the daemon holding each shell's pty must be its own user unit with
+no `PartOf` or `BindsTo` on `wayland-session@sway.target` — the mirror image of
+how mako, waybar and swayidle are deliberately bound to it.
+
+### Trade-off
+
+This covers a sway crash and a deliberate in-session restart, not a reboot — no
+userspace process survives that. Window layout still has to be rebuilt by hand
+either way.
+
+Implementation is TASK-98.
 
 ---
 
@@ -1996,6 +2157,63 @@ A useful property of the swap specifically: `Ctrl+Alt+F2` still needs the same t
 A daemon running as root with an exclusive grab on every keyboard. A config it cannot parse means no usable keyboard on the machine you would need in order to fix it, so `apply-config.sh` runs `keyd check` and refuses to enable the unit rather than starting a daemon that would lock the machine out. keyd documents a panic sequence - `backspace+escape+enter` held together - which terminates it and hands the keyboard back.
 
 Bindings are written with `layer(alt)` rather than `leftcontrol = leftalt`. A bare key assignment emits the keycode without the modifier semantics, and keyd warns about exactly this; the direct form would have looked correct and composed wrongly.
+
+### A scroll layer on Caps Lock
+
+Holding Caps Lock makes `j`/`k`/`h`/`l` scroll and `d`/`u` page — everywhere:
+the terminal, a GTK dialog, a PDF viewer, and inside a text input field.
+
+**Why not a letter key.** This was first sketched as hold-`f`. keyd's
+letter-safe form is `lettermod(scroll, f, 150, 200)`, whose idle gate resolves
+any `f` struck soon after the previous key as a plain `f` — which covers mid-word
+`f` completely: "off", "affix", "of" are all safe. It does *not* cover an `f`
+that starts a word after a pause. That press falls through to `overloadt2`,
+which resolves as a hold on any intervening tap, so "For" typed with the normal
+rolled overlap can lose its `f` and emit "or". A silently dropped character in
+prose, indistinguishable from failing hardware, is this repository's named
+failure mode appearing in the user's own typing. Plain `overloadt` trades that
+for a visible stall on every sentence-initial `f` instead.
+
+nvim compounds it rather than helping: `f` is find-character, used in exactly
+that after-a-pause position, and nvim already has `C-d`, `C-u` and `j`/`k` — so
+the layer buys nothing there and costs a core motion. This file is also read by
+the console and the greeter, so an ambiguous letter would be ambiguous on the
+rescue VT, which the decision above already argues is the context that matters
+most.
+
+**Why two mechanisms.** Page Down inside a text field moves the caret, not the
+view — which is the case the feature exists for, so Page Down alone does not
+answer the request. A mouse wheel event does: it is delivered to the surface
+under the pointer and ignores keyboard focus entirely. keyd already runs a
+virtual pointer and `/proc/bus/input/devices` reports `B: REL=147` for it, so
+REL_WHEEL and REL_HWHEEL are already advertised and no new device is needed.
+
+The cost is the other side of the same coin: a wheel event goes where the
+*pointer* is, and sway's default `mouse_warping output` leaves the pointer
+behind on keyboard-driven focus changes within one output. So `d` and `u` emit
+Page Down and Page Up, which follow keyboard focus. Neither mechanism reaches
+everything; the layer carries both deliberately.
+
+**Why `macro2`.** A wheel event has no press and no release, and auto-repeat is
+generated by the compositor from a held *key*. A bare `j = scrolldown` emits one
+click however long `j` is held. `macro2(250, 40, ...)` makes keyd repeat it, at
+sway's own `repeat_delay` and `repeat_rate` from `10-input.conf`.
+
+### Trade-off
+
+**Caps Lock no longer locks caps.** Shift replaces it. Tapping it does nothing,
+rather than `overload(scroll, capslock)` keeping the old function — that form
+would silently latch caps whenever the layer was entered and left without using
+it, which is a worse failure than losing a key nobody presses deliberately.
+Keys unbound inside the layer fall through, so Caps Lock plus another letter
+still types that letter.
+
+### Alternatives considered
+
+**`f` and other letter keys** — above. **Space (SpaceFn)** has the same tap-hold
+problem on the most-struck key of all. **Right Alt** is AltGr, which a `gb`
+layout actually uses. **A sway `bindsym`** was never an option: it would not
+reach the console, the greeter, or a text field, which is most of the point.
 
 ### Alternatives considered
 
