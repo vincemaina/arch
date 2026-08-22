@@ -263,8 +263,35 @@ fi
 # Deliberately outside the "something changed" branch above: the recorded path
 # is wrong after the repository is moved or re-cloned, and that is exactly when
 # nothing else differs.
-if ! $DRY_RUN && [[ -x "$HOME/.local/bin/theme" ]]; then
-    "$HOME/.local/bin/theme" --record-source "$SETUP_SOURCE"
+#
+# What gets recorded is NOT always where this ran from. A git worktree is a
+# checkout with a deadline: work happens in .claude/worktrees/<task>/, and the
+# directory is deleted when the task is. Recording it writes that deadline into
+# machine-level state that outlives it, and the failure is silent - chezmoi
+# reads sourceDir from ~/.config/chezmoi/chezmoi.toml with no existence check,
+# so `chezmoi managed` then lists NOTHING and exits 0. That has already
+# happened once: it is what made checks/session.sh recommend deleting seven
+# live config files (TASK-121).
+#
+# So a run from a linked worktree records the main checkout, which is the thing
+# that persists. `git worktree list` puts the main working tree first, and sed
+# rather than awk because a path may contain spaces.
+RECORD_SOURCE="$SETUP_SOURCE"
+MAIN_TREE="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null |
+             sed -n '1{s/^worktree //p;}')"
+if [[ -n "$MAIN_TREE" && "$MAIN_TREE" != "$REPO_ROOT" && -d "$MAIN_TREE/setup" ]]; then
+    RECORD_SOURCE="$MAIN_TREE/setup"
+    echo "Recording $RECORD_SOURCE, not this worktree, which will not outlive the task."
+fi
+if [[ -x "$HOME/.local/bin/theme" ]]; then
+    if $DRY_RUN; then
+        # --dry-run said nothing about this before, which made the one piece of
+        # machine state sync.sh writes outside chezmoi the one piece you could
+        # not preview.
+        echo "Would record the setup source as: $RECORD_SOURCE"
+    else
+        "$HOME/.local/bin/theme" --record-source "$RECORD_SOURCE"
+    fi
 fi
 
 # ----------------------------------------------------------------------
