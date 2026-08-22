@@ -1,6 +1,6 @@
 # Software this setup installs
 
-Ninety-one packages are declared across [`setup/packages/`](../../setup/packages/).
+Ninety-eight packages are declared across [`setup/packages/`](../../setup/packages/).
 This document accounts for every one of them: what it is for, where its
 rationale lives, and what it costs on the machine.
 
@@ -45,8 +45,10 @@ outcome.
 
 ## How the figures were measured
 
-Every number below came from this machine on **2026-08-21**. Nothing is quoted
-from a benchmark elsewhere.
+Every number below came from this machine on **2026-08-21**, except the figures
+for packages declared after that date — `cliphist`, `cava`, `mpv`/`mpv-mpris`/
+`yt-dlp`, `firefox`, `lazygit` and `openssh` — which are dated **2026-08-22**
+where they appear. Nothing is quoted from a benchmark elsewhere.
 
 The reference machine is a **KVM guest: 4 vCPU of an Intel i7-10700, 3.8 GiB
 RAM, kernel 7.1.8, software rendering.** That matters. The repository targets a
@@ -98,7 +100,6 @@ understatements:
 | pipewire-pulse | 11.9 MiB | 0.028% |
 | wireplumber | 9.6 MiB | 0.004% |
 | polkit-agent (polkit-gnome) | 9.1 MiB | 0.001% |
-| nm-applet | 9.8 MiB | 0.001% |
 | greeting (fastfetch driver) | 7.4 MiB | 0.015% |
 | gvfs-daemon | 12.7 MiB | < 0.001% |
 | xdg-desktop-portal | 3.8 MiB | 0.001% |
@@ -107,6 +108,7 @@ understatements:
 | dbus-broker (user) | 1.5 MiB | 0.001% |
 | mako | 1.2 MiB | 0.000% |
 | swayidle | 0.4 MiB | < 0.001% |
+| cliphist@text + cliphist@image (2026-08-22) | 2.9 MiB | < 0.001% |
 
 | System unit | Memory | CPU, long-run average |
 | --- | ---: | ---: |
@@ -122,11 +124,19 @@ understatements:
 
 Two readings worth taking from that table.
 
-**The compositor is the cost.** sway is roughly as expensive as everything else
-in the session put together, and on this machine that is the hypervisor's
-doing: the virtio GPU is presented without 3D acceleration, so every frame goes
-through llvmpipe on the CPU. See `DECISIONS.md` → "The VM renders in software,
-and that is the hypervisor's doing". Nothing in the manifests changes that.
+**The compositor is the cost — or was.** The session-cost table above still
+reports the 2026-08-21 sway figure of 143.8 MiB RSS at 5.2% of a core, measured
+while the hypervisor presented the virtio GPU without 3D acceleration, so every
+frame went through llvmpipe on the CPU. **That is no longer this machine's
+state.** `DECISIONS.md` → "The VM rendered in software, and no longer does"
+records that 3D acceleration was enabled on the hypervisor on 2026-08-22: the
+kernel now reports `+virgl +edid` with two capability sets, and `ps` shows sway
+resident at roughly 68 MiB — well under half the figure above. The session-cost
+table is not corrected here, because doing that properly means re-measuring
+every row in it, not just sway's, and that is the general resource-cost pass
+covered by a separate ticket. Read the sway row above as **history of a
+software-rendered machine**, not as this machine's current cost, until that
+pass happens.
 
 **earlyoom is the cheapest insurance here.** 1.0 MiB and four thousandths of a
 percent of one core, for the thing that keeps the machine responsive when it
@@ -144,13 +154,16 @@ graphical.target reached after 2.061s in userspace
 
 ### What the whole declared set costs on disk
 
-**1.13 GiB** across the 90 declared packages currently installed, from
-`pacman -Qi`, excluding dependencies.
-
-Fonts and icons dominate it, which is not obvious from reading the manifests:
+**1.49 GiB** (1523.6 MiB) across all 98 declared packages, currently
+installed, from `pacman -Qi`, excluding dependencies. Re-derived on
+**2026-08-22** against every package name in `setup/packages/*.txt` — all 98
+found installed, 0 missing. That is up from the 1.13 GiB / 90-package figure
+recorded on 2026-08-21; the difference is almost entirely two packages added
+since: `firefox` (294.9 MiB) and `yt-dlp` (31.7 MiB).
 
 | Package | Installed |
 | --- | ---: |
+| firefox | 294.9 MiB |
 | ttf-jetbrains-mono-nerd | 228.4 MiB |
 | linux | 147.7 MiB |
 | papirus-icon-theme | 111.5 MiB |
@@ -158,14 +171,14 @@ Fonts and icons dominate it, which is not obvious from reading the manifests:
 | nodejs | 61.3 MiB |
 | mesa | 52.7 MiB |
 | chezmoi | 39.9 MiB |
-| intel-ucode | 31.5 MiB |
-| git | 31.3 MiB |
-| neovim | 30.5 MiB |
+| yt-dlp | 31.7 MiB |
+| intel-ucode | 31.4 MiB |
 
-The four font and icon packages together are 456 MiB — 39% of everything
-declared — and cost nothing at runtime beyond what is actually rendered. That
-is a fine trade to have made, but it should be a known one: shrinking the
-install means looking here first, not at the daemons.
+The five font and icon packages together are 466.7 MiB — 30.6% of everything
+declared, down from 39% a day earlier only because firefox and yt-dlp grew the
+denominator, not because fonts shrank — and cost nothing at runtime beyond what
+is actually rendered. That is a fine trade to have made, but it should be a
+known one: shrinking the install means looking here first, not at the daemons.
 
 ## Every declared package
 
@@ -186,6 +199,7 @@ the line, **↓** means an entry below in this document.
 | `sudo` | Privilege escalation for the `wheel` group | ↓ |
 | `vim` | Editor available before the desktop manifest exists | ↓ |
 | `git` | Cloning this repository, and daily use | D: Git |
+| `openssh` | The SSH client. Declared explicitly so it cannot be silently pulled out from under `git@github.com` | D: No SSH key or agent is provisioned by the build |
 | `intel-ucode` | Intel CPU microcode | D: Early microcode via the mkinitcpio hook |
 | `amd-ucode` | AMD CPU microcode. Both are installed so one image boots either | D: Early microcode via the mkinitcpio hook |
 | `zram-generator` | Creates `/dev/zram0` from `/etc/systemd/zram-generator.conf` | D: zram instead of a disk swapfile |
@@ -208,7 +222,7 @@ the line, **↓** means an entry below in this document.
 | `xorg-xwayland` | X11 compatibility. Not normally running | M — and read that comment before adding the first X11 app |
 | `polkit` | Privilege authorisation. Declared, not inherited | D: polkit |
 | `polkit-gnome` | The agent that draws the password prompt | D: polkit-gnome as the authentication agent |
-| `mesa` | GL/EGL. Declared for the same reason as `polkit` | M, D: The VM renders in software |
+| `mesa` | GL/EGL. Declared for the same reason as `polkit` | M, D: The VM rendered in software, and no longer does |
 | `keyd` | Key remapping at the evdev layer | D: Key remapping with keyd |
 | `autotiling` | Picks the split direction from the focused container's shape | M |
 
@@ -233,16 +247,21 @@ the line, **↓** means an entry below in this document.
 | `grim` | Screenshot capture | D: grim + slurp |
 | `slurp` | Region selection for grim | D: grim + slurp |
 | `wl-clipboard` | `wl-copy` / `wl-paste` | D: wl-clipboard |
+| `cliphist` | Clipboard **history** — `wl-clipboard` only holds one entry | M, D: Clipboard history: cliphist behind rofi, two watchers, no auto-paste |
 | `brightnessctl` | Backlight control, bound to the brightness keys | ↓ |
 | `playerctl` | MPRIS control, and `playerctld` behind waybar's media module | D: Helper scripts declare what they call, The bar reports and responds |
-| `network-manager-applet` | Tray applet and the Wi-Fi picker | ↓ |
+| `mpv` | Plays a URL and exposes MPRIS, so the bar and playback keys control it | ↓ |
+| `mpv-mpris` | The plugin that makes `mpv` visible over MPRIS. Without it mpv plays and nothing on the desktop can see it | ↓ |
+| `yt-dlp` | Resolves a pasted YouTube/SoundCloud link for mpv to play | ↓ |
+| `cava` | Terminal spectrum display, reading whatever is audible from the default output's monitor | ↓ |
 | `xdg-user-dirs` | Creates `~/Pictures` and friends | ↓ |
 | `gvfs` | Removable and network volumes for GIO, so a USB stick appears in a Save As dialog | M, D: GVFS |
 | `yazi` | The file manager, on `$mod+e`. It replaced Thunar rather than sitting beside it | M, D: No graphical file manager, reversing an earlier decision |
 | `imv` | Image viewer | M |
 | `btop` | System monitor | D: btop |
-| `qutebrowser` | Web browser | D: qutebrowser |
-| `rofi` | The launcher — one prompt, several sources via `combi` | M |
+| `qutebrowser` | Web browser, the everyday one | D: Two browsers: qutebrowser for everything, firefox for DRM and extensions |
+| `firefox` | The other browser, for WebExtensions and DRM that `qutebrowser`'s webengine cannot do at all | M, D: Two browsers: qutebrowser for everything, firefox for DRM and extensions |
+| `rofi` | The launcher — one prompt, several sources via `combi` | M, D: rofi, reversing an earlier decision |
 | `rofi-calc` | Calculator source for that prompt, via libqalculate | M |
 | `fastfetch` | The system summary shown by `greeting.service` | M |
 
@@ -271,6 +290,12 @@ the line, **↓** means an entry below in this document.
 | `eza` | `ls` replacement, ANSI-coloured | D: Tools take their colours from the terminal |
 | `bat` | `cat` replacement, ANSI-coloured | D: same |
 | `dust` | Ranks the biggest directories at any depth, where `du` needs the depth guessed first | M, D: dust rather than a `du` pipeline |
+
+### dev.txt — version control
+
+| Package | Role | Rationale |
+| --- | --- | --- |
+| `lazygit` | TUI for staging hunks, reading history and resolving conflicts — what the bare `git` CLI is poor at | M, D: lazygit as the git interface, and delta deliberately not yet |
 
 ### dev.txt — editor and language support
 
@@ -433,20 +458,19 @@ here and only means anything on a laptop — worth knowing before debugging it,
 since it is precisely the shape of failure this repository keeps hitting.
 **Cost.** 28.4 KiB installed. Nothing resident.
 
-### network-manager-applet
+### network-manager-applet — removed, kept as history
 
-**Problem.** Joining a Wi-Fi network without dropping to `nmcli`.
-**Choice.** The applet that ships with NetworkManager.
-**How it works.** Worth knowing, because nothing in this repository starts it:
-the package installs `/etc/xdg/autostart/nm-applet.desktop`, and uwsm turns XDG
-autostart entries into user units, so it runs as
-`app-nm\x2dapplet@autostart.service`. That is the only reason it is running, and
-it means the way to stop it is masking that unit, not editing a sway config that
-never mentioned it. Sway has no tray, so what is actually reached is
-`nm-connection-editor`, the applet's connection dialog.
-**Cost.** 606 KiB installed, 9.8 MiB resident, no measurable CPU. The most
+This document used to carry a full entry here, ending with "the most
 questionable resident cost in the session: a tray applet on a desktop with no
-tray. Whether it earns 9.8 MiB is a real question, not a settled one.
+tray. Whether it earns 9.8 MiB is a real question, not a settled one." That
+question was reopened and answered: **TASK-92 removed the package.** It is in
+no manifest and cost nothing as of 2026-08-22. The manifest comment at the spot
+it used to occupy in `desktop.txt` carries the full story, including the one
+thing that made the removal non-obvious — `openssh` was only declared, and only
+survived removing this, because TASK-38 had already pulled it out from behind
+`network-manager-applet`'s dependency chain in `base.txt` beforehand. See
+`DECISIONS.md` → "No SSH key or agent is provisioned by the build" for that
+half.
 
 ### xdg-user-dirs
 
@@ -473,10 +497,12 @@ resolve to a real theme. `papirus-icon-theme` was chosen over Adwaita's icons
 with no recorded comparison. `ttf-dejavu` is a fallback with no recorded
 comparison either.
 **Cost.** The reason to look at them together: 4.2 + 111.5 + 9.8 = **125.5 MiB**,
-11% of everything declared, for appearance alone — and with the two Noto
-packages and the Nerd Font, 456 MiB, 39% of the install. Zero at runtime beyond
-what is rendered. That is the trade this setup has made; it is defensible, and
-it should be made knowingly.
+8.2% of everything declared, for appearance alone — and with the two Noto
+packages and the Nerd Font, 466.7 MiB, 30.6% of the install (re-derived
+2026-08-22; it was 39% of a smaller total a day earlier — see "What the whole
+declared set costs on disk" above). Zero at runtime beyond what is rendered.
+That is the trade this setup has made; it is defensible, and it should be made
+knowingly.
 
 ### zoxide
 
@@ -507,23 +533,85 @@ and the same package brings `paccache` for trimming the package cache and
 this repository, which is worth knowing before assuming they are wired up.
 **Cost.** 129 KiB installed. Nothing resident.
 
+### mpv, mpv-mpris, yt-dlp
+
+**Problem.** Playing background music meant opening qutebrowser and finding a
+tab — a browser, a window and a set of keystrokes for something that should be
+one keypress and then invisible. See TASK-101.
+**Choice.** `mpv` playing a URL, made visible to the rest of the session by
+`mpv-mpris`, with `yt-dlp` resolving a pasted link. Not a music application —
+that is the design: no library, no daemon, no second window to manage, and the
+bar's media module and the playback keys drive it exactly as they would drive
+anything else over MPRIS. Alternatives were genuinely compared, in TASK-101
+rather than in `DECISIONS.md` or a manifest comment, which is why the pointer
+here is `↓` rather than `D`: **`spotify-player`/`ncspot`** (31 MiB / 16 MiB) —
+real playlists and native MPRIS, but both need a Premium account. **`cmus`**
+(852 KiB, by far the smallest) — local files only, so it does not answer the
+streaming case this was for. **`mpd` + `ncmpcpp`** — a daemon and a client for
+a local library, more machinery than the problem needs. A fifth option,
+`cliamp`, prompted the search and was rejected outright on packaging: it is
+Homebrew-only, no Arch package and no PKGBUILD, the same objection that already
+ruled out the AUR route in TASK-43.
+**How it works.** The line that makes the whole design work is
+`script=/usr/lib/mpv-mpris/mpris.so` in `~/.config/mpv/mpv.conf` — without it
+mpv plays perfectly and nothing on the desktop can see it. `mpv` is started
+with `systemd-run --user --scope` so it dies with whatever launched it rather
+than surviving in an orphaned cgroup. Stations are tracked data in
+`~/.config/focus-music/stations`, reached through `~/.local/bin/focus-music`;
+`yt-dlp` is not on that default path at all — SomaFM stations are played as
+direct HTTP streams that need no resolving step — it exists for pasting an
+arbitrary YouTube or SoundCloud link.
+**Cost.** `mpv` 6.34 MiB, `mpv-mpris` 35.18 KiB, `yt-dlp` 31.66 MiB installed
+(2026-08-22) — 31.66 MiB of that is a Python interpreter's worth of extractor
+code for a feature used only when pasting a link, not for the tracked
+stations. None of the three is resident until a station is actually playing,
+so there is no row in the session-cost table above.
+
+### cava
+
+**Problem.** No visual feedback for whatever audio is actually playing,
+independent of which player produced it. See TASK-103.
+**Choice.** `cava`. No alternative is recorded — it was the obvious terminal
+spectrum analyser for the job, and TASK-103 evaluated it directly (fetched to a
+scratch directory and run) rather than against competitors.
+**How it works.** Configured with `input method = pulse`, `source = auto`,
+which attaches to the default output's `MONITOR` — so it visualises whatever is
+audible (radio, a browser tab, a notification) without any MPRIS integration
+and without `mpv` or anything else knowing it exists. Colours are templated
+from `.chezmoidata/themes.toml` like every other consumer, rendering a
+quiet-to-loud gradient through the theme's own identity colours rather than a
+fixed green-amber-red.
+**Cost.** 195.37 KiB installed. Not resident by default — it runs only while
+its window is open. Measured while running, over 30s of wall clock on
+2026-08-22: cava itself 1.27% of one core / 8.0 MiB PSS, but the foot window
+showing it costs *more* than cava does — 2.00% of one core / 12.0 MiB PSS for
+the redraw, against 0.00%/11.5 MiB for an identical idle foot window. Total for
+the visualiser while open: **~3.27% of one core, ~20 MiB**, and that is a floor
+rather than a total — it does not include what sway itself pays to composite a
+window that repaints every frame.
+
 ## Gaps this document does not close
 
 Named rather than left silent, because a gap that is written down can be filled.
 
-- **`DECISIONS.md` still has a `## Wofi` section.** wofi is not declared in any
-  manifest; rofi replaced it, and `desktop.txt` says so. The stale section is
-  the one place a reader looking for the launcher rationale would go first.
-- **Resource figures are from one machine, a KVM guest with software
-  rendering.** The compositor row in particular will look very different on
-  hardware with a working GPU. Re-measuring on real hardware is the obvious next
-  step, and the commands above are all that is needed.
-- **`dust` is declared in `dev.txt` but was not installed on this machine** when
-  the figures were taken, so the 1.13 GiB total covers 90 of the 91 declared
-  packages. It is a recent addition; a `sync.sh` installs it. `thunar` is the
-  mirror image — dropped from the manifest, still installed here until removed
-  by hand.
-- **Several entries above say no alternative was recorded.** That is the honest
-  state, not a placeholder to be filled with a plausible-sounding reason later.
-- **`network-manager-applet` at 9.8 MiB for a desktop with no tray** is the one
-  cost here that looks worth re-opening.
+- **The session-cost table's sway row is now measuring a machine that no
+  longer exists.** It was taken on 2026-08-21 under software rendering; on
+  2026-08-22 the hypervisor's 3D acceleration was turned on (`DECISIONS.md` →
+  "The VM rendered in software, and no longer does"), and `ps` now shows sway
+  resident at roughly 68 MiB against the 143.8 MiB recorded there. The other
+  rows in that table were not re-measured — doing that properly is a full pass
+  over every unit, not a one-line fix, and that pass is the separate ticket
+  for a general resource-cost register. Until it happens, read the session-cost
+  table as a snapshot of a software-rendered machine, not this one.
+- **Several entries above say no alternative was recorded**, and it is worth
+  being explicit about which: `linux`, `btrfs-progs`, `sudo`,
+  `swaybg`/`swayidle`/`swaylock`, `brightnessctl`, `papirus-icon-theme`,
+  `ttf-dejavu`, and `cava`. `zoxide` compares against `autojump` and `z` but not
+  `fzf`'s own directory widgets, and `pavucontrol` names no alternative either.
+  That is the honest state, not a placeholder to be filled with a
+  plausible-sounding reason later — see "The entry format" above for why that
+  matters.
+- **Package cost is disk and, where resident, memory/CPU — nothing about
+  network egress.** `yt-dlp` and `firefox` are the two packages here that talk
+  to the internet on their own initiative (a video-info fetch, an update
+  check), and this document has no figure for that.

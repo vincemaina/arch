@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# Two things in this repository go stale silently, and both were asked for by
-# name: the manual, and the backlog.
+# Three things in this repository go stale silently, and all three were asked
+# for by name: the manual, the backlog, and the software record
+# (docs/software/README.md and DECISIONS.md, which track every declared
+# package - TASK-27).
 #
 # Neither can be enforced by a check that runs on demand, because the failure
 # is forgetting to run it. So this runs on its own, once per session, at the
@@ -115,6 +117,52 @@ if ! matches '^docs/manual/'; then
 fi
 
 # ----------------------------------------------------------------------
+# The software record. setup/packages/*.txt names every declared package;
+# docs/software/README.md is the roll call that accounts for each one, and
+# DECISIONS.md or a manifest comment is where the reasoning for it is
+# supposed to land - see docs/software/README.md's own "What lives where".
+# A manifest that moved without either moving is the exact shape of drift
+# TASK-27 was opened to close.
+if matches '^setup/packages/.*\.txt$' &&
+   ! matches '^docs/software/README\.md$' &&
+   ! matches '^DECISIONS\.md$'; then
+
+    # Name what actually moved, rather than just saying "something changed" -
+    # that is the difference between a reminder someone can act on and one
+    # they learn to skim past. Diffed against the session's own baseline, so
+    # a package added and removed again in the same session reports nothing.
+    pkg_lines=()
+    if [[ -r "$BASE" ]]; then
+        base_commit="$(cat "$BASE" 2>/dev/null)"
+        for f in setup/packages/base.txt setup/packages/desktop.txt setup/packages/dev.txt; do
+            [[ -n "$base_commit" && -f "$f" ]] || continue
+            old="$(git show "${base_commit}:$f" 2>/dev/null | grep -Ev '^[[:space:]]*(#|$)' | sort -u)"
+            new="$(grep -Ev '^[[:space:]]*(#|$)' "$f" 2>/dev/null | sort -u)"
+            added="$(comm -13 <(printf '%s\n' "$old") <(printf '%s\n' "$new") 2>/dev/null | grep -v '^[[:space:]]*$')"
+            removed="$(comm -23 <(printf '%s\n' "$old") <(printf '%s\n' "$new") 2>/dev/null | grep -v '^[[:space:]]*$')"
+            [[ -n "$added" ]] && pkg_lines+=("    + $(tr '\n' ' ' <<<"$added")(in $f)")
+            [[ -n "$removed" ]] && pkg_lines+=("    - $(tr '\n' ' ' <<<"$removed")(in $f)")
+        done
+    fi
+
+    if [[ ${#pkg_lines[@]} -gt 0 ]]; then
+        notes+=("A PACKAGE MANIFEST changed, but neither docs/software/README.md nor")
+        notes+=("  DECISIONS.md did:")
+        for l in "${pkg_lines[@]}"; do notes+=("$l"); done
+        notes+=("  Give each one a roll-call row in docs/software/README.md, plus either a")
+        notes+=("  DECISIONS.md section, a manifest comment, or - if neither exists yet - a")
+        notes+=("  new entry in that document itself. See its own 'The entry format' for")
+        notes+=("  what an entry needs. Or say why this one needs none.")
+    elif [[ -z "${base_commit:-}" ]]; then
+        # No usable baseline (fresh state dir, detached history, ...): still
+        # worth a nudge, just without names to point at.
+        notes+=("A PACKAGE MANIFEST changed, but neither docs/software/README.md nor")
+        notes+=("  DECISIONS.md did. (No session baseline was available to name which")
+        notes+=("  package - check setup/packages/*.txt against git diff by hand.)")
+    fi
+fi
+
+# ----------------------------------------------------------------------
 # The backlog. Not the whole board - just the ticket being worked on, which
 # is the one the user asked to be kept current.
 if command -v backlog >/dev/null 2>&1; then
@@ -153,7 +201,7 @@ fi
 echo "$fingerprint" >> "$SEEN"
 
 {
-    echo "Before finishing - two things this repository forgets:"
+    echo "Before finishing - things this repository forgets:"
     echo
     echo "$message"
     echo

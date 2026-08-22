@@ -1,10 +1,11 @@
 ---
 id: TASK-27
 title: Document every tool the setup chooses
-status: In Progress
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-08-19 19:17'
-updated_date: '2026-08-21 20:37'
+updated_date: '2026-08-22 12:13'
 labels:
   - repo
   - documentation
@@ -29,10 +30,10 @@ earlyoom is the worked example: what problem low-memory handling solves, how wat
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Every package in setup/packages/ is either documented or explicitly noted as a dependency needing no rationale of its own
-- [ ] #2 Each documented tool covers the problem it solves, why it was chosen, the alternatives rejected, and its resource cost
+- [x] #2 Each documented tool covers the problem it solves, why it was chosen, the alternatives rejected, and its resource cost
 - [x] #3 Resource figures are measured on this system rather than quoted from elsewhere
 - [x] #4 The documentation is structured so a future addition has an obvious place and format to follow
-- [ ] #5 Existing DECISIONS.md entries are brought up to the same standard rather than left as a second tier
+- [x] #5 Existing DECISIONS.md entries are brought up to the same standard rather than left as a second tier
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -60,4 +61,22 @@ Other findings recorded in the document: network-manager-applet and xdg-user-dir
 The manifests changed under this work mid-session (thunar removed, dust added, gvfs re-justified); the tables were re-derived against the current files afterwards and re-verified at 91/91.
 
 Verification: ./checks/session.sh — 75 passed, 0 failed, 0 skipped. Link check across all 13 markdown files — 0 broken.
+
+AC#2 and AC#5 closed.
+
+AC#2: re-derived the roll call against current manifests (script-verified, not assumed): 98 declared packages (up from 91 -- cava, cliphist, firefox, lazygit, mpv, mpv-mpris, openssh, yt-dlp added since; thunar, wofi, network-manager-applet gone). All 98 now appear exactly once in docs/software/README.md's tables, 0 missing, 0 invented (re-verified by the same comm-based script used originally). Added roll-call rows and, where no DECISIONS.md section or manifest comment existed, new five-heading entries for cava and the mpv/mpv-mpris/yt-dlp group -- the mpv group's Alternatives section transcribes the real comparison recorded in TASK-101 (spotify-player/ncspot, cmus, mpd+ncmpcpp, cliamp) rather than inventing one. Packages recorded as 'no alternative was considered', explicitly, because none is: linux, btrfs-progs, sudo, swaybg/swayidle/swaylock, brightnessctl, papirus-icon-theme, ttf-dejavu, cava (zoxide and pavucontrol partially). Listed by name in the document's own Gaps section so the honesty is visible, not just true.
+
+AC#5: found and fixed a second stale entry of the Wofi kind (already fixed by TASK-23 before this session) -- DECISIONS.md's '## Graphical login' one-liner still said Sway starts manually after TTY login and a display manager 'may be added later', flatly contradicted by the greetd/ReGreet/uwsm section earlier in the same file. Removed as pure duplicate: the display-manager section already quotes the pre-uwsm decision it superseded. Also corrected a stale DECISIONS.md pointer in the roll call (mesa pointed at a section by its old title) and added missing D/M pointers for rofi, cliphist and firefox, which had rationale in DECISIONS.md the roll call wasn't crediting.
+
+Verification-time finding, recorded rather than fixed: DECISIONS.md's own 'The VM rendered in software, and no longer does' entry shows the hypervisor's 3D acceleration was turned on 2026-08-22 -- confirmed live (kernel now reports +virgl +edid, sway RSS ~68 MiB vs the 143.8 MiB on record). docs/software/README.md's session-cost table still reflects the software-rendered machine; re-measuring the whole table is the separate resource-cost ticket's job, so this is flagged in the doc's Gaps section and left alone rather than partially redone.
+
+Hook extended in place (no second hook): .claude/hooks/keep-the-record.sh now also watches setup/packages/*.txt against docs/software/README.md and DECISIONS.md, naming added/removed packages by diffing the manifest against the session's SessionStart baseline. Tested in a throwaway repo under scratchpad: silent when nothing changed (exit 0), speaks with the actual package name when a manifest changed and neither record did (exit 2, message named the added package and file), silent when the manifest and docs/software/README.md changed together (exit 0), silent on an identical repeat within the same session (exit 0, fingerprint dedup). CLAUDE.md's 'The hook that keeps the record' section extended to describe the third check.
+
+Verified: ./checks/packages.sh (6 passed), ./checks/manual.sh (8 passed), ./checks/session.sh (92 passed, 0 failed) -- all clean. Roll-call re-derivation script: 98/98 matched, 0 missing, 0 invented. All internal links in docs/software/README.md resolve.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All 5 acceptance criteria closed. docs/software/README.md re-derived against current manifests: 98 declared packages, all accounted for (0 missing, 0 invented, script-verified). AC#2: added entries for 8 newly-declared packages (cava, cliphist, firefox, lazygit, mpv, mpv-mpris, openssh, yt-dlp); wrote honest 'no alternative considered' for ~10 tools where that is true rather than inventing comparisons, named explicitly in the doc's Gaps section; the mpv group's alternatives are transcribed from the real TASK-101 comparison. AC#5: found and removed a second stale entry of the Wofi kind -- DECISIONS.md's '## Graphical login' one-liner, contradicted by the greetd/uwsm section elsewhere in the same file since TASK-15 -- plus corrected a stale DECISIONS.md pointer and two missing D/M credits in the roll call (rofi, cliphist, firefox). Also surfaced, and left for the resource-cost ticket rather than fixing here: the reference VM's 3D acceleration was turned on since the cost figures were measured, so the session-cost table's sway row is now stale by more than half; flagged explicitly in the document. Hook: extended .claude/hooks/keep-the-record.sh in place with a third check -- package manifest changes without a docs/software/README.md or DECISIONS.md change, naming the actual added/removed packages via a baseline diff. Tested in a throwaway repo: silent-nothing-changed, speaks-with-package-names, silent-both-changed, silent-on-repeat -- all four passed. CLAUDE.md's hook section extended to match. Verified with ./checks/packages.sh, ./checks/manual.sh and ./checks/session.sh, all clean (6/8/92 passed, 0 failed).
+<!-- SECTION:FINAL_SUMMARY:END -->

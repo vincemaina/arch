@@ -2726,14 +2726,6 @@ is ever adopted, at which point it starts having something to do.
 
 ---
 
-## Graphical login
-
-Sway is currently started manually after TTY login.
-
-Automatic graphical login or a display manager may be added later, but it is not required for the core setup.
-
----
-
 ## Additional application configuration
 
 Applications such as Foot and Mako should only gain committed config files when there are meaningful customisations worth preserving.

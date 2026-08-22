@@ -388,13 +388,20 @@ built page so the `manual` command and the launcher entry can open it.
 ## The hook that keeps the record
 
 `.claude/hooks/keep-the-record.sh` runs at `SessionStart` (to note where the
-session began) and at `Stop`. It compares what changed against two things this
-repository is known to forget, and blocks the end of the turn once if either
+session began) and at `Stop`. It compares what changed against three things
+this repository is known to forget, and blocks the end of the turn once if any
 is unanswered:
 
 - **The manual.** If a keybinding, helper script, bar module, theme, package,
   session unit, install path or check changed and `docs/manual/` did not, it
   names the chapter that most likely covers it.
+- **The software record.** If a file under `setup/packages/` changed and
+  neither `docs/software/README.md` nor `DECISIONS.md` did, it says so — and
+  names the packages actually added or removed, by diffing the manifest
+  against the session's own baseline, rather than saying "something changed".
+  A package added and removed again in the same session, or a comment-only
+  edit that adds or drops no package line, produces nothing to name and stays
+  silent.
 - **The backlog.** If files changed and no task file was touched, it says so.
   It deliberately does **not** report on every In Progress task — several have
   been open for weeks, and nagging about those at the end of an unrelated turn
