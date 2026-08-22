@@ -42,20 +42,22 @@ setopt PUSHD_IGNORE_DUPS
 
 bindkey -e                    # emacs keys: Ctrl+A, Ctrl+E, Ctrl+R as expected
 
-# kill-line moved off Ctrl+K, which is now Escape.
+# kill-line is deliberately unbound, and that is a decision rather than a gap.
 #
-# keyd turns Ctrl+K into a real Escape key event below the compositor - see
-# setup/system/keyd/default.conf - so the shell never sees Ctrl+K again and
-# `bindkey '^K'` would be a line that reads as configuration and cannot fire.
-# Of everything Ctrl+K was bound to across this machine, kill-line was the only
-# one with no replacement already bound: Ctrl+U kills the whole line and Alt+D
-# kills a word forward, but nothing else killed to the end of it.
+# It was Ctrl+K until TASK-108 took that key for Escape, which moved it to
+# Alt+K. TASK-111 then took Alt+K for Up, because Alt+hjkl are now the arrow
+# keys - see setup/system/keyd/default.conf. Rather than move it a second time
+# it was dropped, on the judgement that it was not actually being used: Ctrl+U
+# kills the whole line, Ctrl+W and Alt+Backspace kill the word behind the
+# cursor, and Alt+D kills the word ahead. What is genuinely gone is truncating
+# a line from the middle to the end, which is the one case none of those cover.
 #
-# Alt+K rather than some other key because it is the same letter, and because
-# \ek is unbound in zsh's emacs keymap - checked with `bindkey`, not assumed.
-# Alt is physically the bottom-left corner key after the swap, which is a worse
-# place than Ctrl+K was; that is the honest cost of the trade.
-bindkey '\ek' kill-line
+# There is deliberately NO bindkey line here. zsh's own emacs keymap still
+# binds ^K to kill-line, and keyd turns Ctrl+K into Escape below the
+# compositor, so the shell never receives it - kill-line is unreachable on this
+# machine by any key at all. To bring it back, bind it somewhere neither
+# Alt+hjkl nor Ctrl+K claims; \e^K and \ex are both free. Do not put
+# `bindkey '^K'` back, which would read as configuration and could never fire.
 
 ### Plugins
 #
