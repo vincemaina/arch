@@ -1020,6 +1020,198 @@ else
     done
 fi
 
+section "XDG autostart (TASK-93)"
+
+# The other way a process joins this session. uwsm reaches
+# xdg-desktop-autostart.target through wayland-session-xdg-autostart@sway.target,
+# so a .desktop file in an autostart directory - shipped by a package, named
+# nowhere in setup/ - becomes a running process at login. A package update can
+# add one; a package added for one reason can bring one for another.
+#
+# setup/system/xdg-autostart.txt is the set this repository has acknowledged.
+# Anything that will actually start and is not in it is a failure here.
+#
+# The verdict comes from the real implementations rather than a second copy of
+# their rules: the generator itself is run into a temporary directory, and each
+# unit it emits is judged by running its own ExecCondition - which for
+# OnlyShowIn/NotShowIn is systemd-xdg-autostart-condition, the same binary
+# systemd would run. So Hidden, X-systemd-skip, TryExec, the GNOME phase key
+# and the show-in filters are all honoured by construction.
+AUTOSTART_SETUP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/setup"
+AUTOSTART_GENERATOR=/usr/lib/systemd/user-generators/systemd-xdg-autostart-generator
+
+if [[ ! -x "$AUTOSTART_GENERATOR" ]]; then
+    skip "systemd-xdg-autostart-generator is not installed, so no autostart entry can start"
+else
+    while IFS='|' read -r verdict message; do
+        case "$verdict" in
+            pass) pass "$message" ;;
+            fail) fail "$message" ;;
+            skip) skip "$message" ;;
+        esac
+    done < <(python3 - "$AUTOSTART_SETUP" "$AUTOSTART_GENERATOR" <<'PYEOF'
+import os, shlex, shutil, subprocess, sys, tempfile
+
+setup, generator = sys.argv[1], sys.argv[2]
+manifest = os.path.join(setup, "system", "xdg-autostart.txt")
+out = []
+
+def say(verdict, message):
+    out.append(f"{verdict}|{message}")
+
+def run(argv, **kw):
+    return subprocess.run(argv, capture_output=True, text=True, **kw)
+
+# The user manager's environment, not this shell's. Both the generator and the
+# show-in helper run there, and the two disagree on this machine:
+# XDG_CURRENT_DESKTOP is "sway:wlroots" in a terminal and "sway" in the manager,
+# which is exactly the value a NotShowIn= would be matched against.
+env = dict(os.environ)
+for line in run(["systemctl", "--user", "show-environment"]).stdout.splitlines():
+    if "=" not in line:
+        continue
+    key, value = line.split("=", 1)
+    if key in ("XDG_CONFIG_HOME", "XDG_CONFIG_DIRS", "XDG_CURRENT_DESKTOP"):
+        # show-environment shell-quotes a value that needs it; these three do
+        # not on any machine here, but stripping is cheaper than being wrong.
+        env[key] = value.strip('"\'')
+
+desktops = env.get("XDG_CURRENT_DESKTOP", "") or "(unset)"
+
+# The directories the generator scans, in its order: the user's first, then
+# the system ones, and the first file of a given name wins.
+config_home = env.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+config_dirs = [d for d in (env.get("XDG_CONFIG_DIRS") or "/etc/xdg").split(":") if d]
+present = {}
+for directory in [os.path.join(d, "autostart") for d in [config_home] + config_dirs]:
+    try:
+        names = sorted(os.listdir(directory))
+    except OSError:
+        continue
+    for name in names:
+        if name.endswith(".desktop"):
+            present.setdefault(name, os.path.join(directory, name))
+
+def keys_of(path):
+    keys = {}
+    try:
+        with open(path, errors="replace") as fh:
+            for line in fh:
+                line = line.strip()
+                if "=" in line and not line.startswith(("[", "#")):
+                    k, v = line.split("=", 1)
+                    keys.setdefault(k.strip(), v.strip())
+    except OSError:
+        pass
+    return keys
+
+# Why an entry produced no unit. The generator does not say in its exit status,
+# and the answer belongs in the report: "present but inert" is only reassuring
+# with the reason attached.
+def inert_because(keys):
+    if keys.get("Hidden", "").lower() == "true":
+        return "Hidden=true"
+    if keys.get("X-systemd-skip", "").lower() == "true":
+        return "X-systemd-skip=true"
+    if keys.get("X-GNOME-Autostart-Phase"):
+        return "X-GNOME-Autostart-Phase=" + keys["X-GNOME-Autostart-Phase"]
+    tryexec = keys.get("TryExec")
+    if tryexec and not (os.path.isabs(tryexec) and os.access(tryexec, os.X_OK)
+                        or shutil.which(tryexec)):
+        return f"TryExec={tryexec}, which does not resolve"
+    return "the generator emitted no unit for it"
+
+acknowledged = []
+if not os.path.isfile(manifest):
+    say("fail", f"{os.path.relpath(manifest, os.path.dirname(setup))} is missing, "
+                f"so nothing records which autostart entries this repository accepts")
+else:
+    with open(manifest) as fh:
+        for line in fh:
+            line = line.split("#", 1)[0].strip()
+            if line:
+                acknowledged.append(line)
+
+# Run the real generator into a scratch directory. It writes only there, and
+# nothing reads what it writes but this check.
+tmp = tempfile.mkdtemp(prefix="session-check-autostart.")
+starts = {}
+try:
+    result = run([generator, tmp, tmp, tmp], env=env)
+    if result.returncode != 0:
+        say("fail", f"systemd-xdg-autostart-generator exited {result.returncode}: "
+                    f"{result.stderr.strip().splitlines()[-1] if result.stderr.strip() else 'no output'}")
+    for unit in sorted(os.listdir(tmp)):
+        if not unit.endswith(".service"):
+            continue
+        source, conditions = "", []
+        with open(os.path.join(tmp, unit), errors="replace") as fh:
+            for line in fh:
+                if line.startswith("SourcePath="):
+                    source = line.split("=", 1)[1].strip()
+                elif line.startswith("ExecCondition="):
+                    conditions.append(line.split("=", 1)[1].strip())
+
+        blocked = ""
+        for condition in conditions:
+            argv = shlex.split(condition)
+            if not argv:
+                continue
+            argv[0] = argv[0].lstrip("-:+!@")
+            if not os.access(argv[0], os.X_OK):
+                # The helper is missing, so the unit would fail rather than be
+                # skipped. That is a different fault; treat the entry as
+                # starting, because the alternative is excusing it silently.
+                continue
+            code = run(argv, env=env).returncode
+            if code != 0:
+                keys = keys_of(source)
+                shown = keys.get("OnlyShowIn") or keys.get("NotShowIn") or condition
+                blocked = (f"{'OnlyShowIn' if keys.get('OnlyShowIn') else 'NotShowIn'}"
+                           f"={shown} does not match XDG_CURRENT_DESKTOP={desktops}")
+                break
+
+        name = os.path.basename(source) or unit
+        present.setdefault(name, source)
+        starts[name] = blocked
+finally:
+    shutil.rmtree(tmp, ignore_errors=True)
+
+if not present:
+    say("pass", "no XDG autostart entries are installed at all")
+
+for name in sorted(present):
+    path = present[name]
+    owner = ""
+    if shutil.which("pacman"):
+        owner = run(["pacman", "-Qoq", path]).stdout.strip().replace("\n", ", ")
+    owned = f" (from {owner})" if owner else ""
+
+    if name in starts and not starts[name]:
+        if name in acknowledged:
+            say("pass", f"{name}{owned} starts under {desktops}, and is acknowledged")
+        else:
+            keys = keys_of(path)
+            say("fail", f"{name}{owned} will start under {desktops} - running "
+                        f"'{keys.get('Exec', '?')}' - and setup/system/xdg-autostart.txt "
+                        f"does not acknowledge it; add it there once you know what it does, "
+                        f"or remove the package that ships it")
+    else:
+        reason = starts.get(name) or inert_because(keys_of(path))
+        seen = "acknowledged" if name in acknowledged else "not acknowledged, and does not need to be"
+        say("pass", f"{name}{owned} is present but does not start: {reason} ({seen})")
+
+for name in acknowledged:
+    if name not in present:
+        say("fail", f"{name} is acknowledged in setup/system/xdg-autostart.txt but no "
+                    f"autostart directory contains it any more - drop the line, so the "
+                    f"file keeps meaning what it says")
+
+print("\n".join(out))
+PYEOF
+    )
+fi
+
 section "Graphics (TASK-26)"
 
 # Whether the desktop is drawn by the GPU or by the CPU. The distinction is

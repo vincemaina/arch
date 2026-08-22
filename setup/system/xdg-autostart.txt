@@ -1,0 +1,34 @@
+# XDG autostart entries this repository has looked at and accepts.
+#
+# /etc/xdg/autostart is how a package starts a process in this session without
+# anything in setup/ asking for it: uwsm reaches xdg-desktop-autostart.target
+# through wayland-session-xdg-autostart@sway.target, so every entry that
+# survives systemd-xdg-autostart-generator becomes a running process at login.
+# A package update can add one, and a package added for one reason can bring an
+# entry for another.
+#
+# checks/session.sh reads this file and fails when an entry that will actually
+# start is not listed here - so a new one is a failure rather than a surprise.
+# An entry that is present but never starts (Hidden, X-systemd-skip, TryExec
+# missing, or an OnlyShowIn/NotShowIn that does not match sway) does not have
+# to be listed; the ones below are listed anyway, so that a package dropping
+# or changing them is visible too.
+#
+# This is a manifest, not a file that gets installed. It lives under
+# setup/system/ because it describes machine-wide session state, and because
+# setup/ is the only directory copied into a new machine - setup/packages/ was
+# not an option, as both install paths glob *.txt there as package lists.
+# apply-config.sh deliberately has no mapping for it.
+#
+# One .desktop basename per line. Comments and blank lines are ignored.
+
+# at-spi2-core. OnlyShowIn=GNOME;Unity and X-systemd-skip=true, so no unit is
+# generated and the condition would refuse it anyway. at-spi still ends up
+# running here, by D-Bus activation from GTK - a different route, and not
+# something this file governs.
+at-spi-dbus-bus.desktop
+
+# xdg-user-dirs, which is declared in packages/desktop.txt. X-systemd-skip=true,
+# so this entry generates nothing; xdg-user-dirs-update still runs, from the
+# xdg-user-dirs.service user unit the package ships and enables.
+xdg-user-dirs.desktop
