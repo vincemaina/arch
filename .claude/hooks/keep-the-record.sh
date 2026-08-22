@@ -51,7 +51,15 @@ SEEN="$STATE_DIR/$session.seen"
 # SessionStart: remember where the session began, so the Stop hook can see
 # work that was committed during it rather than only work left uncommitted.
 if [[ "$event" == "SessionStart" ]]; then
-    git rev-parse HEAD > "$BASE" 2>/dev/null
+    # ONLY IF ABSENT. SessionStart fires again when a session resumes or is
+    # compacted, and the first version overwrote the baseline every time -
+    # which silently shortened the window to "since the last resume". It then
+    # reported "no backlog task was updated" at the end of a session that had
+    # closed four tickets, because all of that was behind the new baseline.
+    #
+    # A hook that is wrong in the nagging direction is a hook that gets turned
+    # off, so the baseline is written once per session and never moved.
+    [[ -s "$BASE" ]] || git rev-parse HEAD > "$BASE" 2>/dev/null
     exit 0
 fi
 
