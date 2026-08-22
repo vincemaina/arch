@@ -4,7 +4,7 @@ title: Decide whether Escape lives on Ctrl+K or Ctrl+semicolon
 status: To Do
 assignee: []
 created_date: '2026-08-22 12:36'
-updated_date: '2026-08-22 12:45'
+updated_date: '2026-08-22 13:47'
 labels: []
 dependencies:
   - TASK-108
@@ -38,5 +38,19 @@ Whatever is decided, remove what is not kept. The trial ends when this ticket cl
 - [ ] #4 tools/shortcuts.sh and the manual describe what is actually bound afterwards
 - [ ] #5 Pressing each bound key emits a real Escape event below the compositor, proven by observing what keyd emits rather than by reading the config back
 - [ ] #6 Ordinary typing, the left Alt/left Control swap, the Caps Lock scroll layer and the Backspace+Escape+Enter panic sequence all still work with the trial applied
-- [ ] #7 setup/system/keyd/default.conf and the applied /etc/keyd/default.conf are identical
+- [x] #7 setup/system/keyd/default.conf and the applied /etc/keyd/default.conf are identical
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+TRIAL IS LIVE as of 22 Aug 13:56. Applied with pkexec (the sudo attempt failed only because the shell running it had no TTY to prompt on, not for want of permission), installing the repository file over /etc/keyd/default.conf and reloading rather than restarting keyd, so it kept its device grabs.
+
+AC#7 checked: diff reports setup/system/keyd/default.conf and /etc/keyd/default.conf byte-identical. The drift that had Ctrl+semicolon written but not applied is gone.
+
+AC#6 partly established, and deliberately left unchecked. keyd reloaded and re-matched the keyboard (DEVICE: match ... AT Translated Set 2 keyboard). The user confirmed Caps Lock + j still scrolls, which is the layer most at risk from a reload of this file, and ordinary typing is evidently fine since they are using the machine. NOT established: the Backspace+Escape+Enter panic sequence, which nobody should test casually because it kills keyd, and which therefore needs a deliberate moment with a way back (sudo systemctl start keyd).
+
+AC#5 still open. What exists is a user report that Escape works, not an observation of the event keyd emits. Those are not the same claim and the difference is the whole reason this criterion was written: a program can respond to something that is not a bare Escape. There is a prepared script that closes it by injecting on a uinput device and reading keyd own virtual keyboard back, at scratchpad/apply-and-verify.sh, though it currently injects Ctrl+K only and would want Ctrl+semicolon adding.
+
+Nothing else is blocked on any of this. The trial runs until the hand picks one.
+<!-- SECTION:NOTES:END -->
