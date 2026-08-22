@@ -19,6 +19,54 @@ are launched through `$mod+space` instead of being bound individually, so the
 small number of window-management letters never gets shadowed by whatever
 was installed most recently.
 
+## The layout
+
+The layout is **US (ANSI)**, set by `xkb_layout us` in
+`setup/dotfiles/dot_config/sway/config.d/10-input.conf`. It was `gb` until
+the hardware started moving to ANSI keyboards, and the layout was changed
+first on purpose: what is being retrained is muscle memory, and the only way
+to retrain it is to type on it.
+
+Coming from a UK keyboard, these are the differences that send you looking
+for a broken key. They were read out of the two compiled keymaps rather than
+remembered, with `xkbcli compile-keymap --layout gb` and `--layout us`:
+
+- `"` and `@` **swap**. `"` is now `Shift+'`, and `@` is `Shift+2`.
+- `£` is **gone**. `Shift+3` gives `#` instead.
+- `~` moves to `Shift` and the key left of `1`, where UK put `¬`.
+
+Two more only matter on **ISO hardware** - a UK-shaped board with the extra
+tall Return and the extra key beside the left Shift. Those two keys do not
+exist on the ANSI keyboards this layout is aimed at, so what they produce
+here is a transitional detail rather than something to learn:
+
+- The key labelled `#` and `~`, left of Return, now types `\` and `|`.
+- The key labelled `\` and `|`, left of `Z`, now types `<` and `>`.
+
+The `xkb_layout` line covers Sway and, through it, every application in the
+session. It does not cover everything on the machine, and the two contexts
+it misses are worth knowing about because they are the ones you meet when
+the session is not running:
+
+- The **text console** - what `Ctrl+Alt+F2` reaches - reads
+  `/etc/vconsole.conf`, which the installer writes once from `KEYMAP` in
+  `setup/install.conf`. That file says `us` too, but it is kept in agreement
+  by hand: `./sync.sh` has no path for it, so changing the layout on an
+  already-installed machine means editing `/etc/vconsole.conf` as root as
+  well.
+- The **login screen** declares no layout at all, and gets the same `us` by
+  falling through to the keyboard library's own default - `xkbcli
+  compile-keymap --test --verbose` with no arguments reports that default as
+  layout `us`. So while this said `gb`, the password prompt and the desktop
+  behind it disagreed about every symbol key, and had done since it was first
+  configured; the change closed that gap rather than opening one. It is also
+  why the layout is not a free choice here in the way a theme is: anything
+  other than `us` reopens it.
+
+Unlike the swap described next, none of this can move down into keyd. keyd
+remaps one physical key to another; a layout is the step above that, deciding
+which character a key produces.
+
 ## The left Alt / left Control swap
 
 Before Sway, or anything else, sees a keypress, **keyd** has already
