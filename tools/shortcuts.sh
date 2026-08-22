@@ -137,39 +137,71 @@ escape_note() {
     command -v keyd &>/dev/null || return 0
     systemctl is-active --quiet keyd 2>/dev/null || return 0
 
-    local key
-    key="$(awk '
+    # ALL of them, not the first. Two keys are bound to Escape at once while
+    # TASK-110 decides which to keep, and a reader who is told about one of
+    # them has been told something true and useless.
+    local keys
+    keys="$(awk '
         /^\[/     { in_control = ($0 ~ /^\[control(:[A-Z]*)?\]/) ; next }
         !in_control { next }
         /^[a-z0-9]+[[:space:]]*=[[:space:]]*esc(ape)?[[:space:]]*$/ {
-            sub(/[[:space:]]*=.*/, ""); print; exit
+            sub(/[[:space:]]*=.*/, ""); print
         }
     ' /etc/keyd/default.conf 2>/dev/null)"
-    [[ -n "$key" ]] || return 0
+    [[ -n "$keys" ]] || return 0
 
     # keyd spells keys the way the kernel does. Only the ones a human would not
     # recognise need translating; anything else is printed as keyd names it,
     # which is worse to read than a real name and better than a wrong guess.
-    local pretty
-    case "$key" in
-        semicolon)  pretty=';' ;;
-        apostrophe) pretty="'" ;;
-        comma)      pretty=',' ;;
-        dot)        pretty='.' ;;
-        slash)      pretty='/' ;;
-        *)          pretty="$(tr '[:lower:]' '[:upper:]' <<<"$key")" ;;
-    esac
+    pretty_key() {
+        case "$1" in
+            semicolon)  printf ';' ;;
+            apostrophe) printf "'" ;;
+            comma)      printf ',' ;;
+            dot)        printf '.' ;;
+            slash)      printf '/' ;;
+            *)          tr '[:lower:]' '[:upper:]' <<<"$1" | tr -d '\n' ;;
+        esac
+    }
 
-    note "Ctrl+${pretty} is another Escape, underneath every program:
+    local listed="" body="" k p
+    while read -r k; do
+        [[ -n "$k" ]] || continue
+        p="$(pretty_key "$k")"
+        listed="${listed:+$listed and }Ctrl+${p}"
+        # Align the description at column 21, where the continuation lines
+        # below sit. "    Ctrl+" is nine characters, so the pad is what is left
+        # after the key name itself.
+        body="${body}    Ctrl+${p}"
+        body="${body}$(printf '%*s' $((12 - ${#p})) '')a real Escape key event, emitted by keyd at the\n"
+        body="${body}                    evdev layer, so nvim, the backlog TUI, rofi, fzf and\n"
+        body="${body}                    a browser all see what the Escape key sends.\n"
+    done <<<"$keys"
 
-    Ctrl+${pretty}          a real Escape key event, emitted by keyd at the evdev
-                    layer - so nvim, the backlog TUI, rofi, fzf and a browser
-                    all see exactly what the Escape key sends.
+    local trailer=""
+    if grep -qx 'k' <<<"$keys"; then
+        trailer="
+Ctrl+K displaces what that chord meant elsewhere: kill-line in zsh (moved to
+Alt+K), the split-above mapping in nvim (removed - use Ctrl+W then k), and
+'move up' in fzf, where it now ABORTS instead (use Ctrl+P)."
+    fi
+    if grep -qx 'semicolon' <<<"$keys"; then
+        trailer="${trailer}
+Ctrl+; displaces nothing: there is no ASCII control code for semicolon, so no
+terminal program can bind it."
+    fi
+    if [[ "$(grep -c . <<<"$keys")" -gt 1 ]]; then
+        trailer="${trailer}
 
-It displaces whatever Ctrl+${pretty} meant in each program: kill-line in zsh (moved
-to Alt+K), the split-above mapping in nvim (removed - use Ctrl+W then k), and
-'move up' in fzf (use Ctrl+P). Like the layer above, this comes from keyd rather
-than sway, so it is not in the table below."
+Both are bound while TASK-110 decides which to keep. That is a trial, not the
+intended end state."
+    fi
+
+    note "$listed $( [[ "$(grep -c . <<<"$keys")" -gt 1 ]] && echo are || echo is ) another Escape, underneath every program:
+
+$(printf '%b' "$body")${trailer}
+Like the layer above, these come from keyd rather than sway, so they are not in
+the table below."
 }
 
 swap_note

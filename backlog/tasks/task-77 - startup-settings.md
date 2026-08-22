@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-21 12:29'
-updated_date: '2026-08-22 02:52'
+updated_date: '2026-08-22 12:38'
 labels: []
 dependencies: []
 priority: low
@@ -163,6 +163,8 @@ VERIFICATION
   are left on the machine.
 
 Closing: all five criteria were checked by the implementing work, and the two follow-ups it asked for have been applied. The regression it identified is fixed - sway-toggle-bar now starts waybar through the startup helper, because a false ConditionPathExists also skips a manual start and the key would otherwise have exited 0 doing nothing, breaking the promise in its own comment. The .chezmoiignore suggestion was not taken: the drop-in approach already works without it, and making chezmoi stop managing a symlink conditionally is more machinery than the wart it removes.
+
+Closed. All five criteria were checked by the implementing agent; the two things it asked for from files it could not edit are both done - sway-toggle-bar now starts waybar through the startup helper rather than systemctl, so a component turned off at login can still be brought back by its key, and that regression is fixed at source rather than filed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -178,5 +180,5 @@ Left In Progress rather than Done. The tool works and every acceptance criterion
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-A startup tool with two axes - at login and right now - built on systemd's own enabled/active distinction rather than inventing state. The chezmoi-reverts-disable problem is defeated with an unmanaged drop-in inside a managed directory carrying a false ConditionPathExists, after three plausible alternatives were each measured producing a confident wrong result. polkit-agent is deliberately not offered, its absence being invisible.
+A startup helper with two independent axes - autostart and now - over the session components judged safe to disable, refusing polkit-agent because its absence is invisible. The chezmoi-reverts-disable problem is solved with an unmanaged drop-in inside a managed directory carrying a false ConditionPathExists, chosen after measuring that systemctl disable, a Wants= reset and mask all fail in different ways. Belongs in TASK-64 as a row when that is built.
 <!-- SECTION:FINAL_SUMMARY:END -->

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-21 10:38'
-updated_date: '2026-08-22 02:52'
+updated_date: '2026-08-22 12:38'
 labels: []
 dependencies: []
 priority: medium
@@ -190,10 +190,12 @@ TWO THINGS FOR FILES THIS AGENT WAS NOT ALLOWED TO EDIT
 3. DECISIONS.md has no clipboard entry. Suggested text is in the agent's report.
 
 AC2 and AC8 confirmed after ./sync.sh installed cliphist. Both watchers report active; systemctl shows PartOf=wayland-session@sway.target, WantedBy the same, Restart=always - the supervision the criterion asked for, read from systemd rather than from the unit file. checks/sway-commands.sh and checks/sway-bindings.sh both pass now the package exists, and session.sh does not regress.
+
+Closed after the user's sync. Verified on the running machine rather than from the unit files: both watchers report Restart=always and PartOf=wayland-session@sway.target, both are active, the history has entries, and the rofi menu renders and returns entries to the clipboard. checks/sway-commands.sh, checks/sway-bindings.sh and checks/session.sh all pass.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-cliphist with two watcher instances - one watcher cannot capture both text and images - supervised as user units bound to wayland-session@sway.target, browsable from rofi on $mod+v and from the launcher, with images previewed by handing rofi a decoded file path. A wrapper drops anything carrying a password-manager hint, proven in both directions, and the residual risk is stated rather than hidden. Auto-paste was built with wtype and rejected: the paste chord differs per application and guessing wrong fails silently.
+cliphist behind rofi with two supervised watchers - one for text, one for images, because a single wl-paste watcher silently drops every screenshot. Privacy wrapper drops anything carrying a password-manager hint, with a key to forget one entry and a row to wipe the lot; what it cannot catch is stated. Auto-paste was built with wtype, watched working, and rejected because the paste chord differs per application. Confirmed working on the machine after sync.
 <!-- SECTION:FINAL_SUMMARY:END -->

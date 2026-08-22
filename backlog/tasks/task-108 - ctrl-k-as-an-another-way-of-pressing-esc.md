@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-22 12:03'
-updated_date: '2026-08-22 12:26'
+updated_date: '2026-08-22 12:38'
 labels: []
 dependencies: []
 priority: medium
@@ -35,7 +35,7 @@ What would some other logical options be for this shortcut
 - [ ] #4 Ordinary typing, the left Alt/left Control swap, the Caps Lock scroll layer and keyd's Backspace+Escape+Enter panic sequence all still work after the change
 - [ ] #5 setup/system/keyd/default.conf and the applied /etc/keyd/default.conf are identical, and the config passes keyd check
 - [x] #6 Nothing is left in this repository's configuration that Ctrl+K now shadows and that can therefore never fire; the zsh binding it displaces is either replaced or its loss is written down where the next reader will look
-- [ ] #7 ./tools/shortcuts.sh reports the new binding, guarded on something that will not silently stop matching if the binding is reworded
+- [x] #7 ./tools/shortcuts.sh reports the new binding, guarded on something that will not silently stop matching if the binding is reworded
 - [x] #8 docs/manual/03-the-keyboard.md describes it, and ./checks/manual.sh, ./checks/session.sh, ./checks/sway-bindings.sh and ./checks/sway-commands.sh all pass
 <!-- AC:END -->
 
@@ -102,6 +102,18 @@ sudo needs a password and there is no non-interactive path to it on this machine
 - `./checks/manual.sh` 8 passed / 0 failed; `./checks/sway-bindings.sh` exit 0; `./checks/sway-commands.sh` 'All referenced commands are accounted for'; `./checks/session.sh` 92 passed / 0 failed / 0 skipped.
 
 AC 3, 4, 5 and 7 are UNCHECKED because they can only be proven against a running keyd, and applying the config needs root.
+
+BOTH KEYS BOUND, at the user request, as a trial rather than a design.
+
+The user applied the config at 13:34 - /etc/keyd/default.conf now carries k = esc and keyd reloaded at 13:34:03 - and then asked for Ctrl+semicolon alongside it, to see which one the hand actually reaches for. TASK-110 ends the trial and removes whichever loses; the config comment says so beside the two lines, so a reader who finds both later knows it was on a clock.
+
+AC#7 checked and verified live: tools/shortcuts.sh reports the binding, read out of the [control] layer of /etc rather than asserted. It was rewritten to report ALL keys mapping to esc rather than the first - it stopped at the first match, which would have told a reader something true and useless while two are bound. Verified against the applied /etc: prints Ctrl+K, its per-program cost, and stays silent about semicolon until that reaches /etc. It also states, only when more than one key is bound, that this is a trial.
+
+STILL OPEN, and honestly so:
+  * AC#5 - setup/system/keyd/default.conf is ahead of /etc again by the semicolon = esc line. The repository leads the machine, which is the recoverable direction.
+  * AC#3 and AC#4 - the user ran the apply-and-verify script, but I have not seen what its probe printed, so I am not checking a criterion on the assumption that it said what it should. The probe now injects plain semicolon and leftalt+semicolon as well as the Ctrl+K cases, so one more run proves both keys at once.
+
+keyd check passes on the two-key config.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

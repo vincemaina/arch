@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-21 11:55'
-updated_date: '2026-08-22 12:31'
+updated_date: '2026-08-22 12:38'
 labels: []
 dependencies: []
 priority: low
@@ -234,6 +234,10 @@ sits elsewhere. Both need a keypress.
   here, by `mouse_warping container` in 10-input.conf, which was added FOR this
   feature. Corrected in the manual and noted in the keyd comment, so the two
   files and tools/shortcuts.sh now agree.
+
+AC7 done: tools/shortcuts.sh now prints the Caps Lock scroll layer, guarded on keyd actually carrying it, so a binding that lives below the compositor is not discoverable only by accident.
+
+AC1, AC2 and AC3 still need confirming by use, and are deliberately not ticked from a config file. The user has confirmed scrolling works and that it followed the pointer - which is what prompted mouse_warping container, so the pointer now follows focus. What has NOT been confirmed is the specific case the feature exists for: j/k inside a text input field where Page Down would move the caret, d/u paging by keyboard focus, and whether holding the key scrolls continuously rather than stepping once.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -153,12 +153,18 @@ ever running on physical hardware, so nobody has watched the light there. If
 you are the first to boot it on metal, look at the Caps Lock light and
 correct this paragraph either way.
 
-## Ctrl+K is another Escape
+## Two other ways to press Escape
 
 Escape is the key this desktop asks for most - leaving insert mode in Neovim,
 backing out of the Backlog TUI, closing the launcher, cancelling a fuzzy
 search - and it is the furthest key on the board from where the hands sit. So
-there is a second one on the home row: **Ctrl+K sends Escape**.
+there are two more within reach: **`Ctrl+K` and `Ctrl+;` both send Escape**.
+
+Two keys for one action is the thing this desktop otherwise argues against,
+and here it is deliberate and temporary. They are bound together so they can
+be compared by using them rather than by reasoning about them, and one will be
+removed. If you are reading this and only one is bound, that comparison
+finished.
 
 Like the scroll layer, this is keyd rather than Sway, in the same file
 (`setup/system/keyd/default.conf`), and for a reason Sway could not have
@@ -173,8 +179,12 @@ Remember that keyd has already swapped the modifiers, so the Control here is
 physically the key next to the space bar - left thumb, right middle finger,
 neither hand leaving the home row.
 
-**This is not free, and what it costs is worth knowing before it surprises
-you.** Ctrl+K meant something in most of these programs already:
+**`Ctrl+;` costs nothing at all.** There is no ASCII control code for
+semicolon, so no terminal program *can* bind it, and nothing on this machine
+does. keyd turns it into a real Escape before any terminal sees the chord.
+
+**`Ctrl+K` is not free, and what it costs is worth knowing before it surprises
+you.** It meant something in most of these programs already:
 
 | Where | What Ctrl+K was | What to use instead |
 | --- | --- | --- |
