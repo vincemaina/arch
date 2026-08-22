@@ -434,6 +434,7 @@ changes to how it looks.
 - **`DECISIONS.md` is the rationale record.** It documents *why* each technology and layout was chosen, with trade-offs and rejected alternatives. When making an architectural change, update it in the same style (`## Decision` → `### Why` → `### Trade-off` / `### Alternatives considered`). It is the first place to look before proposing a different tool.
 - The guiding principle from `DECISIONS.md`: minimal enough to stay fast and understandable, automated enough to be reproducible, practical enough to use daily. New tooling must earn its place.
 - Config for its own sake is avoided — a dotfile is only committed once there is a meaningful customisation worth preserving.
+- **Merging and pushing to `main` is reserved for the user by default in Claude Code's harness — that reservation is explicitly lifted in this repository.** An agent working here may merge a branch into `main` and push it without asking first, the same way it would for any other branch. This does not extend to force-pushing `main` or to any other repository; it is specific to this one, because the user said so once and would rather not repeat it every session.
 
 ## Known gaps
 
