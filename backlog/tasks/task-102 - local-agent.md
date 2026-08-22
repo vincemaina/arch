@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 02:23'
-updated_date: '2026-08-22 03:12'
+updated_date: '2026-08-22 03:16'
 labels: []
 dependencies: []
 priority: low
@@ -81,6 +81,43 @@ RECOMMENDATION: split this ticket rather than build 'a local agent'.
 The thing NOT to do is install ollama on this VM and conclude local models are
 useless. They would be, here, for reasons that say nothing about the machine
 this repository is actually for.
+
+HARDWARE NUMBERS, added after the spike because the obvious next question was 'what do I actually need to buy'.
+
+VRAM IS THE BINDING CONSTRAINT, NOT SYSTEM RAM. A model runs at usable speed only if it fits in VRAM; once it spills to system RAM it falls off a cliff. Current figures: CPU-only inference runs 5-30x slower than GPU - an i7-12700 manages about 12 tok/s where an RTX 3060 does 80+.
+
+Calibration that makes those numbers mean something: reading speed is roughly 7-10 tokens per second. So 20 tok/s feels immediate, 12 tok/s is usable, and below about 5 is unpleasant enough that the tool stops being reached for.
+
+BY USE CASE, since they differ by an order of magnitude:
+
+  Embeddings / semantic search (TASK-104) - embedding models are 100-600M
+  parameters. CPU is fine, needs 1-2 GiB, no GPU at all. This works on almost
+  anything and is why it was split out.
+
+  Calendar and system questions - a 4B model at Q4_K_M. Needs ~3 GiB VRAM, or
+  CPU-only at around 12 tok/s with Phi-4-mini. Usable without a GPU.
+
+  Anything resembling code reasoning - 14B and up. Qwen3 14B at Q4_K_M is about
+  9 GiB of VRAM, which is 30-40 tok/s on a 12 GiB card and unusable on CPU.
+
+THREE TIERS:
+
+  No GPU, 16 GiB system RAM - embeddings plus a 4B model for bounded questions.
+  Genuinely useful for TASK-104 and for 'what is this unit doing'. Not useful
+  for anything about code.
+
+  12 GiB VRAM (RTX 3060 12 GiB used, or 4070) with 32 GiB system RAM - Qwen3 14B
+  at 30-40 tok/s. This is the tier where a local model becomes a thing you
+  actually reach for rather than a demo.
+
+  16-24 GiB VRAM (4060 Ti 16 GiB, or a 3090) - bigger models and, more usefully,
+  long context, which is what a question about a large file actually needs.
+
+WORTH SAYING PLAINLY: none of these tiers beats Claude Code for questions about
+work in progress, and buying a GPU to approximate it would be spending money to
+get something worse. The case for local is privacy, offline operation, and
+questions about THIS machine that no hosted model has the context for. Those are
+real, and they are what the hardware should be justified against.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
