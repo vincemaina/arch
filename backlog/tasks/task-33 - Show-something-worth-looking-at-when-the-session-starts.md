@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-20 12:53'
-updated_date: '2026-08-21 00:40'
+updated_date: '2026-08-22 14:52'
 labels:
   - desktop
   - feel
@@ -76,10 +76,14 @@ AC #1 is left unchecked for now. The unit is enabled and its symlink is in place
 Mistake worth recording: the first attempt came up tiled rather than floating, because the window rules were applied with chezmoi and sway was never reloaded. The rule was correct; nothing had read it.
 
 AC #1 confirmed on 2026-08-21 after a reboot: greeting.service started on its own when the session began, logged as "Started Greet empty workspaces with a system summary". Every previous check had been on a session that predated the unit, with the greeting started by hand.
+
+AC #1 confirmed on a real login: greeting.service started itself when wayland-session@sway.target was reached - "Started Greet empty workspaces with a system summary" - rather than being started by hand as in every earlier test.
+
+The greeting also changed shape since this was first built. It is no longer a one-shot at login: every terminal now opens with the summary, and the only difference for the automatic ones is that they float and are sized to their contents. An empty workspace is greeted too, by the same daemon, so the login case and the empty-workspace case are one mechanism rather than two.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Every terminal opens with a fastfetch summary, and the automatic ones - at session start and on any empty workspace - float, sized to their contents, placed where there is room. fastfetch lives in the terminal command rather than .zshrc, so nested shells and ssh sessions are unaffected and shell startup is untouched at 128ms. Colours come from the palette by naming ANSI colours, which foot renders from palette.toml, so there is no second copy of the palette to drift. A small daemon on sway IPC handles empty workspaces and the session start, replacing a one-shot unit so nothing races to open the first window. Confirmed starting by itself at login.
+Every terminal opens with a fastfetch summary, and the automatic ones - at login and on any empty workspace - float, centred and sized to their contents in characters rather than pixels so the window fits the output. fastfetch lives in the terminal command rather than .zshrc, so nested shells and ssh sessions stay clean and shell startup is untouched at 128ms. Colours come from the palette without a second copy existing, by naming ANSI colours that foot renders from palette.toml. Modules are trimmed to what changes between logins, with GPU kept deliberately so the rendering situation stays visible. Confirmed starting on its own at a real login.
 <!-- SECTION:FINAL_SUMMARY:END -->

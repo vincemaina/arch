@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-20 22:36'
-updated_date: '2026-08-21 20:55'
+updated_date: '2026-08-22 14:52'
 labels:
   - foundation
   - performance
@@ -68,6 +68,10 @@ AC2 does not apply - there was no recurrence to compare against.
 AC3 is the substance, and the answer is that nothing proportionate can be done in the guest. sway has no crash recovery and cannot be given any from outside: a supervisor restarting it would produce an empty desktop, not the one that was lost, so it would convert a visible failure into a confusing one. The ticket says explicitly that concluding nothing counts as completing this.
 
 AC4 done - recorded under 'The VM renders in software', which is the same root cause rather than a separate finding.
+
+First data point after enabling 3D acceleration on the hypervisor: no coredumps at all since the reboot, and the session logged zero software-rendering messages. That is consistent with the diagnosis - llvmpipe is no longer in the path - but a few hours of not crashing is not yet evidence of a fix for something that happened once. Leaving open until it has survived normal use for a while.
+
+A consequence of the fix worth recording here as well as on TASK-26: enabling acceleration inverted the mouse cursor, because wlroots then used the virtio GPU cursor plane. WLR_NO_HARDWARE_CURSORS=1 in environment.d resolved it, confirmed by grim capturing exactly one correctly-oriented cursor - grim can only see cursors wlroots composites itself, so its appearing in the capture is proof the software path is in use.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
