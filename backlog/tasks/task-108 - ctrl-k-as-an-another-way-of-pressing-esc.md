@@ -1,11 +1,11 @@
 ---
 id: TASK-108
 title: ctrl + k as an another way of pressing esc
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 12:03'
-updated_date: '2026-08-22 12:38'
+updated_date: '2026-08-22 12:45'
 labels: []
 dependencies: []
 priority: medium
@@ -31,12 +31,9 @@ What would some other logical options be for this shortcut
 <!-- AC:BEGIN -->
 - [x] #1 What Ctrl+K currently does is recorded per program, gathered by asking each one on this machine (zsh, nvim, fzf, lazygit, qutebrowser, yazi, foot, rofi, sway, the backlog TUI) rather than from general knowledge, and each loss is marked trivial or daily
 - [x] #2 At least three alternatives to Ctrl+K are assessed with their trade-offs, including a dual-role key, a currently wasted key, and doing it per-application, and one is recommended
-- [ ] #3 Pressing Ctrl+K emits a real Escape key event below the compositor, so it works in vim, the backlog TUI, a browser and rofi alike, proven by observing the event keyd emits rather than by reading the config back
-- [ ] #4 Ordinary typing, the left Alt/left Control swap, the Caps Lock scroll layer and keyd's Backspace+Escape+Enter panic sequence all still work after the change
-- [ ] #5 setup/system/keyd/default.conf and the applied /etc/keyd/default.conf are identical, and the config passes keyd check
-- [x] #6 Nothing is left in this repository's configuration that Ctrl+K now shadows and that can therefore never fire; the zsh binding it displaces is either replaced or its loss is written down where the next reader will look
-- [x] #7 ./tools/shortcuts.sh reports the new binding, guarded on something that will not silently stop matching if the binding is reworded
-- [x] #8 docs/manual/03-the-keyboard.md describes it, and ./checks/manual.sh, ./checks/session.sh, ./checks/sway-bindings.sh and ./checks/sway-commands.sh all pass
+- [x] #3 Nothing is left in this repository's configuration that Ctrl+K now shadows and that can therefore never fire; the zsh binding it displaces is either replaced or its loss is written down where the next reader will look
+- [x] #4 ./tools/shortcuts.sh reports the new binding, guarded on something that will not silently stop matching if the binding is reworded
+- [x] #5 docs/manual/03-the-keyboard.md describes it, and ./checks/manual.sh, ./checks/session.sh, ./checks/sway-bindings.sh and ./checks/sway-commands.sh all pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -114,6 +111,16 @@ STILL OPEN, and honestly so:
   * AC#3 and AC#4 - the user ran the apply-and-verify script, but I have not seen what its probe printed, so I am not checking a criterion on the assumption that it said what it should. The probe now injects plain semicolon and leftalt+semicolon as well as the Ctrl+K cases, so one more run proves both keys at once.
 
 keyd check passes on the two-key config.
+
+CLOSED AS A SPIKE, with the behavioural criteria moved rather than ticked.
+
+The user judgement was that the research this ticket asked for is done, and it is: what Ctrl+K costs was established per program by asking each one on this machine, four alternatives were assessed, and a recommendation was made. Ctrl+K is implemented, applied and in daily use.
+
+Three criteria were REMOVED from here and added to TASK-110 rather than checked, because they were not met and ticking them would have been a lie: that pressing the key emits a real Escape below the compositor proven by observation rather than by reading the config back; that typing, the modifier swap, the scroll layer and the panic sequence all still work; and that the repository file and /etc are identical.
+
+They belong on TASK-110 anyway. That ticket ends the trial, and the trial cannot be judged until both keys are actually live and observed - /etc currently carries k = esc alone, so Ctrl+semicolon is written and not yet applied. Whoever closes TASK-110 has to apply and verify regardless, so the work is not lost, it is where it will actually be done.
+
+The outcome that mattered most here was not the binding but the finding that Ctrl+semicolon costs nothing: there is no ASCII control code for semicolon, so no terminal program CAN bind it, and none on this machine does. Ctrl+K costs three daily bindings, all now replaced - kill-line in zsh moved to Alt+K, the nvim split-above mapping removed, move-up in fzf where the same key now ABORTS instead. That comparison is what TASK-110 decides between, and cost is already settled; only which one the hand reaches for is open.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -133,3 +140,9 @@ It validates with `keyd check`, backs up the current /etc file (and prints the o
 Two things the script cannot press for you and asks you to: Caps Lock held + j still scrolls, and Backspace+Escape+Enter still panics keyd out.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Spike done. Ctrl+K costs three daily bindings, each measured by asking the program rather than assumed, and each replaced; Ctrl+semicolon was found to cost nothing at all, since no ASCII control code exists for semicolon. Ctrl+K is implemented and applied, both keys are now bound for a trial, and the criteria that require observing what keyd emits moved to TASK-110, which ends that trial.
+<!-- SECTION:FINAL_SUMMARY:END -->

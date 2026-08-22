@@ -1,11 +1,11 @@
 ---
 id: TASK-97
 title: focus timer
-status: Done
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-22 00:47'
-updated_date: '2026-08-22 03:04'
+updated_date: '2026-08-22 12:39'
 labels: []
 dependencies: []
 priority: low
@@ -47,6 +47,8 @@ The glyphs went in as pasted characters, which CLAUDE.md forbids - od showed the
 Then the escapes were written as $'\u{f252}', the form other languages use. bash's $'...' takes \uXXXX with BARE hex digits, so that produces the literal text \u{f252} and would have rendered in the bar as exactly that. And a middle dot written as \u{b7} inside a DOUBLE-quoted string is not an escape at all - six literal characters on hover. Both forms were tested before choosing.
 
 A third, in tools/shortcuts.sh and unrelated to this ticket, was found by checking TASK-74's criterion: its note about the scroll layer was guarded on the exact string 'capslock = layer(scroll)', which stopped matching when the binding changed, so the note silently vanished from the report.
+
+Reopened: it had been marked Done in a backlog tidy-up while still unimplemented, and is being built now.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

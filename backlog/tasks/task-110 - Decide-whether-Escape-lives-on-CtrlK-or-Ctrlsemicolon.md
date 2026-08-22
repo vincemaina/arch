@@ -4,6 +4,7 @@ title: Decide whether Escape lives on Ctrl+K or Ctrl+semicolon
 status: To Do
 assignee: []
 created_date: '2026-08-22 12:36'
+updated_date: '2026-08-22 12:45'
 labels: []
 dependencies:
   - TASK-108
@@ -35,4 +36,7 @@ Whatever is decided, remove what is not kept. The trial ends when this ticket cl
 - [ ] #2 Whatever is not kept is removed from setup/system/keyd/default.conf and from anything that documents it
 - [ ] #3 Any binding displaced for a key that is dropped is restored - notably kill-line in zsh and the nvim split mapping if Ctrl+K goes
 - [ ] #4 tools/shortcuts.sh and the manual describe what is actually bound afterwards
+- [ ] #5 Pressing each bound key emits a real Escape event below the compositor, proven by observing what keyd emits rather than by reading the config back
+- [ ] #6 Ordinary typing, the left Alt/left Control swap, the Caps Lock scroll layer and the Backspace+Escape+Enter panic sequence all still work with the trial applied
+- [ ] #7 setup/system/keyd/default.conf and the applied /etc/keyd/default.conf are identical
 <!-- AC:END -->
