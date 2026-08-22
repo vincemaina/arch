@@ -1,11 +1,11 @@
 ---
 id: TASK-119
 title: 'Ctrl+J is Enter, everywhere'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 15:26'
-updated_date: '2026-08-22 15:35'
+updated_date: '2026-08-22 16:02'
 labels: []
 dependencies: []
 priority: medium
@@ -28,14 +28,14 @@ Two things are already known to be in the way and are part of the work, not surp
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 What Ctrl+J currently does is recorded per program, gathered by asking each one on this machine rather than from general knowledge, and each loss is marked trivial, rare or daily
-- [ ] #2 Ctrl+J emits a real Enter key event below the compositor, proven by observing what keyd emits on its virtual keyboard rather than by reading the config back
-- [ ] #3 Pressing $mod+Ctrl+j no longer launches a terminal: that sway binding is either moved to a chord keyd does not rewrite, or deliberately dropped with the reason written down
-- [ ] #4 Nothing is left in this repository configuration that Ctrl+J now shadows and can therefore never fire; any displaced binding is either replaced or its loss is written down where the next reader will look
-- [ ] #5 Shift, Alt and Super still compose with it, so Ctrl+Shift+J is Shift+Enter, and the existing Ctrl+K, the Alt+hjkl arrows, the Caps Lock scroll layer, the modifier swap and keyd panic sequence are all unaffected
-- [ ] #6 ./tools/shortcuts.sh reports the binding, read out of the [control] layer rather than asserting a binding string
-- [ ] #7 docs/manual/03-the-keyboard.md describes it, and ./checks/manual.sh, ./checks/session.sh, ./checks/sway-bindings.sh and ./checks/sway-commands.sh all pass
-- [ ] #8 setup/system/keyd/default.conf and /etc/keyd/default.conf are identical, so the machine is not running something the repository does not describe
+- [x] #1 What Ctrl+J currently does is recorded per program, gathered by asking each one on this machine rather than from general knowledge, and each loss is marked trivial, rare or daily
+- [x] #2 Ctrl+J emits a real Enter key event below the compositor, proven by observing what keyd emits on its virtual keyboard rather than by reading the config back
+- [x] #3 Pressing $mod+Ctrl+j no longer launches a terminal: that sway binding is either moved to a chord keyd does not rewrite, or deliberately dropped with the reason written down
+- [x] #4 Nothing is left in this repository configuration that Ctrl+J now shadows and can therefore never fire; any displaced binding is either replaced or its loss is written down where the next reader will look
+- [x] #5 Shift, Alt and Super still compose with it, so Ctrl+Shift+J is Shift+Enter, and the existing Ctrl+K, the Alt+hjkl arrows, the Caps Lock scroll layer, the modifier swap and keyd panic sequence are all unaffected
+- [x] #6 ./tools/shortcuts.sh reports the binding, read out of the [control] layer rather than asserting a binding string
+- [x] #7 docs/manual/03-the-keyboard.md describes it, and ./checks/manual.sh, ./checks/session.sh, ./checks/sway-bindings.sh and ./checks/sway-commands.sh all pass
+- [x] #8 setup/system/keyd/default.conf and /etc/keyd/default.conf are identical, so the machine is not running something the repository does not describe
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -100,4 +100,56 @@ Same wall as TASK-108: `sudo -n` refuses, `/etc/sudoers.d` is unreadable, and `k
 An apply-and-verify script is prepared. It validates, backs up with the revert line printed, installs, reloads, diffs, then injects chords on a uinput keyboard and reads back what keyd emits on its own virtual keyboard. Per the scripting-traps skill it declares a whole keyboard (codes 1..248) and ABORTS if keyd logs `ignoring` for it, so it cannot report a confident negative while disconnected from what it claims to observe. Its first case is plain `j` - an unbound key, which must reappear - as the grab tell.
 
 The case that matters most is `Super+Ctrl+J`, which must emit `leftctrl+leftmeta+j` and not Enter.
+
+## APPLIED AND PROVEN
+
+Applied via pkexec (the polkit agent gives a graphical password dialog, which is the route past having no TTY - `sudo` from a non-interactive shell cannot prompt). keyd reloaded, and `diff -q` reports setup/system/keyd/default.conf and /etc/keyd/default.conf identical. This also brought TASK-111 Alt+hjkl to the machine, which /etc had been missing.
+
+### What keyd emits, read off its own virtual keyboard
+
+The probe declared a whole keyboard (codes 1..248) and confirmed no `ignoring` line before reporting. The grab tell passed: plain `j`, which is unbound, came back as `+j -j`.
+
+| chord injected | keyd emitted | verdict |
+| --- | --- | --- |
+| plain j | `+j -j` | device grabbed - results are real |
+| Ctrl+J | `+leftctrl -leftctrl +enter -enter +leftctrl -leftctrl` | Enter, control released around it |
+| Ctrl+Shift+J | `+leftctrl +leftshift -leftctrl +enter -enter +leftctrl -leftshift -leftctrl` | Shift+Enter - Shift composes |
+| Super+Ctrl+J | `+leftmeta +leftctrl +j -j -leftctrl -leftmeta` | the RAW chord, not Enter |
+| Ctrl+K | Escape | unaffected |
+| Ctrl+; | Escape | unaffected |
+| Alt+J | Down | the arrow layer unaffected |
+| Caps Lock + j | 11 wheel events, downward, on keyd virtual POINTER | scroll layer unaffected |
+
+The first probe run showed two stray events in the first two rows. That was the real keyboard sharing the same virtual device - the user was typing while it ran - not a fault. Fixed by draining pending events immediately BEFORE each injection rather than only after, and the re-run is clean. Worth remembering: keyd virtual keyboard carries everything, so a probe that only drains afterwards attributes the user keystrokes to whichever row happened to be reading.
+
+### The sway collision, proven end to end
+
+Emitting the right chord is only half of it - what sway then DOES with it is the half that mattered. `swaymsg -t subscribe [binding]` while the chord was injected:
+
+    { "change": "run", "binding": { "command": "workspace back_and_forth",
+      "event_state_mask": [ "Control", "Mod4" ], "symbol": "j" } }
+
+So sway ran its own binding. Window count was 4 before and 4 after, so no terminal was launched. The [control+meta] layer does what keyd(1) says it does.
+
+One thing that could have been misread: the focused workspace did not visibly change. That is `back_and_forth` having no previous workspace to return to, not a binding that failed - which is why the IPC event was consulted rather than the workspace list. A no-op with a real cause looks identical to a dead binding from the outside.
+
+### NOT pressed, and said plainly
+
+keyd panic sequence (Backspace+Escape+Enter held together). It terminates keyd and hands the keyboard back, so testing it would leave this machine unswapped until a restart, for a mechanism this change does not touch: it triggers on physical keys, none of which is rebound here, and `j = enter` emits Enter rather than consuming it. That is structural reasoning, not an observation, and it is recorded as such.
+
+### Checks after applying
+
+`checks/manual.sh` 8 passed / 0 failed. `checks/sway-bindings.sh` exit 0. `checks/sway-commands.sh` clean. `checks/session.sh` 84 passed / 4 failed / 1 skipped - the same four the MAIN checkout reports, so all four are pre-existing and unrelated. `tools/shortcuts.sh` now prints the Enter and Tab note, read out of /etc rather than asserted.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ctrl+J now emits a real Enter key event at the evdev layer, from the [control] layer of setup/system/keyd/default.conf, applied and reloaded on this machine.
+
+The finding worth keeping is that this was never a new convention: zsh, rofi, qutebrowser and less already treated Ctrl+J as Enter, because ASCII line feed is what the chord sends, while nvim, fzf, lazygit, GTK dialogs and the browser chrome did not. Binding it here removed an exception rather than adding a rule, which is why it cost one deleted nvim mapping and one changed fzf behaviour, against three daily losses for Ctrl+K.
+
+The real work was a collision that would not have looked like a keyboard problem: sway binds $mod+Ctrl+j, and keyd strips only its own modifier, so that chord would have reached sway as $mod+Return and opened a terminal every time while the sway config still read correctly. Rather than move a binding whose position was argued for at length, a [control+meta] composite layer now keeps the compositor chords out of the application rewrites, with all four [control] keys listed so a future $mod+Ctrl+k cannot spring the same trap.
+
+Verified by observation, not by reading the config back: a uinput probe that proves it was grabbed before reporting shows Ctrl+J emitting Enter with control released around it, Ctrl+Shift+J emitting Shift+Enter, and Super+Ctrl+J emitting the raw chord. sway IPC confirms the other half - it reports running "workspace back_and_forth", and no window was created. Ctrl+K, Ctrl+;, the Alt+hjkl arrows and the Caps Lock scroll layer were all re-checked and are unaffected. The keyd panic sequence was deliberately not pressed, and that is recorded rather than assumed.
+<!-- SECTION:FINAL_SUMMARY:END -->

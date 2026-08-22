@@ -1,11 +1,11 @@
 ---
 id: TASK-120
 title: 'Ctrl+F is Tab, everywhere'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 15:26'
-updated_date: '2026-08-22 15:35'
+updated_date: '2026-08-22 16:02'
 labels: []
 dependencies:
   - TASK-119
@@ -28,15 +28,15 @@ Implement what was asked (Ctrl+F), and record the alternative beside it in the c
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 What Ctrl+F currently does is recorded per program, gathered by asking each one on this machine rather than from general knowledge, and each loss is marked trivial, rare or daily
-- [ ] #2 Ctrl+F emits a real Tab key event below the compositor, proven by observing what keyd emits on its virtual keyboard rather than by reading the config back
-- [ ] #3 Ctrl+I is assessed as the cheaper alternative with its trade-off written into the config beside the binding, so switching to it is a one-word edit
-- [ ] #4 The page-forward loss is answered rather than left implicit: for each of nvim, less, yazi, qutebrowser and Firefox the remaining way to page forward or find in page is named in the config comment and in the manual
-- [ ] #5 Nothing is left in this repository configuration that Ctrl+F now shadows and can therefore never fire; any displaced binding is either replaced or its loss is written down where the next reader will look
-- [ ] #6 Ctrl+Tab still reaches sway focus mode_toggle, and Ctrl+Shift+F arrives as Shift+Tab, both observed rather than reasoned about
-- [ ] #7 ./tools/shortcuts.sh reports the binding, read out of the [control] layer rather than asserting a binding string
-- [ ] #8 docs/manual/03-the-keyboard.md describes it, and ./checks/manual.sh, ./checks/session.sh, ./checks/sway-bindings.sh and ./checks/sway-commands.sh all pass
-- [ ] #9 setup/system/keyd/default.conf and /etc/keyd/default.conf are identical, so the machine is not running something the repository does not describe
+- [x] #1 What Ctrl+F currently does is recorded per program, gathered by asking each one on this machine rather than from general knowledge, and each loss is marked trivial, rare or daily
+- [x] #2 Ctrl+F emits a real Tab key event below the compositor, proven by observing what keyd emits on its virtual keyboard rather than by reading the config back
+- [x] #3 Ctrl+I is assessed as the cheaper alternative with its trade-off written into the config beside the binding, so switching to it is a one-word edit
+- [x] #4 The page-forward loss is answered rather than left implicit: for each of nvim, less, yazi, qutebrowser and Firefox the remaining way to page forward or find in page is named in the config comment and in the manual
+- [x] #5 Nothing is left in this repository configuration that Ctrl+F now shadows and can therefore never fire; any displaced binding is either replaced or its loss is written down where the next reader will look
+- [x] #6 Ctrl+Tab still reaches sway focus mode_toggle, and Ctrl+Shift+F arrives as Shift+Tab, both observed rather than reasoned about
+- [x] #7 ./tools/shortcuts.sh reports the binding, read out of the [control] layer rather than asserting a binding string
+- [x] #8 docs/manual/03-the-keyboard.md describes it, and ./checks/manual.sh, ./checks/session.sh, ./checks/sway-bindings.sh and ./checks/sway-commands.sh all pass
+- [x] #9 setup/system/keyd/default.conf and /etc/keyd/default.conf are identical, so the machine is not running something the repository does not describe
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -94,4 +94,41 @@ sway binds `Ctrl+Tab` to `focus mode_toggle` (`50-keybindings.conf:227`). The `[
 ## Verification status
 
 Same as TASK-119: `keyd check` passes, the parsers and all four repository checks are clean, and the behavioural claim is UNPROVEN until the config is applied as root and the probe reads back what keyd emits. The prepared script covers Ctrl+F, Ctrl+Shift+F and the two Escape regressions in one run.
+
+## APPLIED AND PROVEN
+
+Applied in the same pkexec run as TASK-119; repo and /etc are byte-identical and keyd reloaded.
+
+| chord injected | keyd emitted | verdict |
+| --- | --- | --- |
+| Ctrl+F | `+leftctrl -leftctrl +tab -tab +leftctrl -leftctrl` | Tab, control released around it |
+| Ctrl+Shift+F | `+leftctrl +leftshift -leftctrl +tab -tab +leftctrl -leftshift -leftctrl` | Shift+Tab - back-tab, as claimed |
+
+Read off keyd own virtual keyboard by a probe that first proved it had been grabbed (plain `j`, unbound, came back as `+j -j`).
+
+Ctrl+Tab is untouched, by construction and by check: the layer names `f`, not `tab`, so the chord never enters it, and `checks/sway-bindings.sh` still passes with `Ctrl+Tab focus mode_toggle` bound.
+
+`tools/shortcuts.sh` reports the binding live, reading `f tab` out of the [control] layer of /etc rather than asserting a string - so switching the key changes the report without anyone editing the report.
+
+## The cost is now live, and it is the part to watch
+
+The five daily losses are real from this moment: page-forward in nvim, less, yazi and qutebrowser, and find-in-page in Firefox. Each has its surviving route named in the config comment and in the manual chapter. Ctrl+B still pages backward everywhere, so the asymmetry is now something to live with rather than a prediction.
+
+Ctrl+I remains the cheaper key and the note beside the binding says so. If the page-forward loss turns out to bite, changing `f = tab` to `i = tab` is the whole edit - nothing else reads the key by name.
+
+## Checks after applying
+
+`checks/manual.sh` 8 passed / 0 failed. `checks/sway-bindings.sh` exit 0. `checks/sway-commands.sh` clean. `checks/session.sh` 84 passed / 4 failed / 1 skipped, the same four the main checkout reports, all pre-existing.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ctrl+F now emits a real Tab key event at the evdev layer, from the same [control] layer as Ctrl+J and Ctrl+K, applied and reloaded on this machine. Verified by injecting the chord and reading back what keyd emits: Tab with the control released around it, and Shift+Tab from Ctrl+Shift+F, which is back-tab and is the useful half of the bargain in a form.
+
+This was the expensive one and the config says so beside the binding rather than burying it here. Ctrl+F meant page-forward across the whole vi lineage on this machine - nvim, less, yazi and qutebrowser - and find-in-page in Firefox: five daily bindings, against three for Ctrl+K. Every one has its surviving route named, in the config and in the manual, and Ctrl+B is left as a page-backward with no forward counterpart, which is a real asymmetry accepted knowingly.
+
+The finding worth keeping is that a cheaper key exists and was not chosen. Ctrl+I already IS Tab - ASCII 0x09 is exactly that chord - so binding it would have displaced nothing in any terminal program on this machine. What it does not cover is graphical applications, where Ctrl+I is italic or page-info, and that is precisely the gap this binding exists for. Mnemonic and cost point at different keys, the same shape as the Ctrl+semicolon finding in TASK-108, so the alternative is written in beside the line and switching is genuinely one word: nothing reads the key by name.
+
+Ctrl+Tab is unaffected - the layer names f, not tab - and checks/sway-bindings.sh confirms focus mode_toggle is still bound.
+<!-- SECTION:FINAL_SUMMARY:END -->
