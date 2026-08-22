@@ -191,7 +191,10 @@ reasoning about the file:
   looking: `chezmoi source-path` should name the `setup/` directory of your
   checkout, and `chezmoi managed` should list a hundred or so files — zero
   means it is pointed at nothing. Repair it with
-  `theme --record-source /path/to/checkout/setup`.
+  `theme --record-source /path/to/checkout/setup`. That check now asks about
+  the checkout it is checking rather than about whatever the machine last
+  recorded, and if chezmoi cannot answer it says so instead of reporting a
+  pass — an empty answer and a clean machine used to look identical.
 
 - **Media keys called a binary that was never installed.** The playback
   keys ran `playerctl`, which was not in any manifest. Pressing them did

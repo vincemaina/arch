@@ -1662,6 +1662,13 @@ section "Dotfiles this repository stopped shipping (TASK-94)"
 # becoming a .tmpl, or gaining an executable_ prefix - is still managed, just
 # from a different source. So this compares against `chezmoi managed`, which
 # knows the target paths, rather than against git alone.
+#
+# Only the two-commit form of that reaches here at all: renaming a file within
+# a single commit is recorded as a rename, and --diff-filter=D does not report
+# it. Both forms exist in this repository's history and both were exercised
+# against this check before it was trusted - a probe deleted and re-added as a
+# .tmpl, another re-added with an executable_ prefix, and a third deleted for
+# good, with all three present on disk. Only the third was reported.
 if ! command -v chezmoi &>/dev/null; then
     skip "chezmoi is not installed"
 elif ! git -C "$CHECKS_REPO" rev-parse --git-dir &>/dev/null; then
