@@ -46,6 +46,23 @@ ASSOCIATIONS=(
     # HTML is deliberately left alone. Opening one is far more often "look at
     # this page" than "edit this markup", and the browser is right for that.
     "nvim.desktop:text/x-shellscript application/json application/x-shellscript text/x-python text/x-lua text/markdown application/toml text/x-makefile"
+
+    # Links open in qutebrowser, which is the everyday browser - TASK-91 decided
+    # two, and this is the one meant to be reached for.
+    #
+    # It was firefox, and nothing here had asked for that. Installing firefox by
+    # hand registered it as the http handler, so every link clicked anywhere -
+    # from a notification, from the launcher, from another application - opened
+    # the heavy browser rather than the keyboard-driven one. Untracked, so a
+    # rebuilt machine would have done something different again.
+    #
+    # firefox stays installed and stays a keystroke away; it is for DRM video
+    # and extensions, which qutebrowser cannot do at all. It is not for links.
+    #
+    # text/html is included deliberately, and is the one case where the comment
+    # above about leaving HTML alone still holds: a .html file should open in a
+    # browser rather than the editor. This only decides WHICH browser.
+    "org.qutebrowser.qutebrowser.desktop:x-scheme-handler/http x-scheme-handler/https text/html"
 )
 
 for entry in "${ASSOCIATIONS[@]}"; do
