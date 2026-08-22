@@ -178,6 +178,21 @@ not prove anything applied — only the running system does. Real cases from
 this repository's history, each caught by asking the system rather than
 reasoning about the file:
 
+- **`chezmoi` pointed at a directory that no longer existed.** `sync.sh`
+  records the path of the checkout it ran from, so a machine with a git
+  clone uses that rather than the copy the installer leaves in `/opt`. Run
+  from inside a temporary git worktree, it records the *worktree* — and once
+  that worktree is deleted, every plain `chezmoi` command on the machine
+  silently operates on nothing. `chezmoi managed` lists no files and
+  `chezmoi status` prints nothing at all, without any error. Empty output
+  reads exactly like "everything is up to date", which is how it survived
+  unnoticed and how a check that trusted it came to recommend deleting seven
+  live config files. If chezmoi seems to do nothing, ask it where it is
+  looking: `chezmoi source-path` should name the `setup/` directory of your
+  checkout, and `chezmoi managed` should list a hundred or so files — zero
+  means it is pointed at nothing. Repair it with
+  `theme --record-source /path/to/checkout/setup`.
+
 - **Media keys called a binary that was never installed.** The playback
   keys ran `playerctl`, which was not in any manifest. Pressing them did
   nothing, and nothing anywhere said why — `playerctl` not existing produces
