@@ -1,11 +1,11 @@
 ---
 id: TASK-77
 title: startup settings
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-21 12:29'
-updated_date: '2026-08-22 01:11'
+updated_date: '2026-08-22 02:52'
 labels: []
 dependencies: []
 priority: low
@@ -161,6 +161,8 @@ VERIFICATION
   installed) belongs to another task in flight.
 * Everything was returned to autostart=on now=on; no drop-ins and no markers
   are left on the machine.
+
+Closing: all five criteria were checked by the implementing work, and the two follow-ups it asked for have been applied. The regression it identified is fixed - sway-toggle-bar now starts waybar through the startup helper, because a false ConditionPathExists also skips a manual start and the key would otherwise have exited 0 doing nothing, breaking the promise in its own comment. The .chezmoiignore suggestion was not taken: the drop-in approach already works without it, and making chezmoi stop managing a symlink conditionally is more machinery than the wart it removes.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -172,3 +174,9 @@ created: 2026-08-22 01:11
 Left In Progress rather than Done. The tool works and every acceptance criterion was verified on the running session, but this feature introduces one regression it cannot fix from inside its own file boundary: with waybar switched off at login, the $mod+b bar toggle exits 0 and does nothing, because sway-toggle-bar's 'start it if inactive' branch is blocked by the condition. Two lines in sway-toggle-bar fix it (route that branch through 'startup waybar --now on'), and the .chezmoiignore follow-up removes the is-enabled wart. Both are edits to existing tracked files and need whoever owns them.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A startup tool with two axes - at login and right now - built on systemd's own enabled/active distinction rather than inventing state. The chezmoi-reverts-disable problem is defeated with an unmanaged drop-in inside a managed directory carrying a false ConditionPathExists, after three plausible alternatives were each measured producing a confident wrong result. polkit-agent is deliberately not offered, its absence being invisible.
+<!-- SECTION:FINAL_SUMMARY:END -->

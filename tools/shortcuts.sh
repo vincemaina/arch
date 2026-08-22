@@ -38,13 +38,23 @@ swap_note() {
 scroll_note() {
     command -v keyd &>/dev/null || return 0
     systemctl is-active --quiet keyd 2>/dev/null || return 0
-    grep -qF "capslock = layer(scroll)" /etc/keyd/default.conf 2>/dev/null || return 0
+    # Match the layer name rather than the whole binding. The binding was
+    # `capslock = layer(scroll)` and became
+    # `capslock = overloadt2(scroll, capslock, 200)` when Caps Lock got its tap
+    # back - at which point this guard silently stopped matching and the note
+    # vanished from the report, with nothing to say it had. Exactly the coupling
+    # CLAUDE.md warns about, in a file whose job is to stop shortcuts being
+    # undiscoverable.
+    grep -qE '^capslock *=.*\(scroll' /etc/keyd/default.conf 2>/dev/null || return 0
     printf '\n\033[2mHolding Caps Lock scrolls, underneath every program:\n'
-    printf '  j / k / h / l   scroll whatever is under the POINTER - a wheel event,\n'
-    printf '                  so it works inside text fields where Page Down would\n'
-    printf '                  only move the caret\n'
-    printf '  d / u           Page Down / Page Up, to whatever has KEYBOARD focus\n'
-    printf 'These come from keyd rather than sway, so they are not in the table below.\033[0m\n'
+    printf '  j / k / h / l   scroll the focused window - these are real wheel\n'
+    printf '                  events, so they work inside a text field where Page\n'
+    printf '                  Down would only move the caret. They follow the\n'
+    printf '                  POINTER, which sway keeps on the focused window\n'
+    printf '                  (mouse_warping container in 10-input.conf).\n'
+    printf '  d / u           Page Down / Page Up, by keyboard focus regardless\n'
+    printf 'Tapping Caps Lock still toggles caps. These come from keyd rather than\n'
+    printf 'sway, so they are not in the table below.\033[0m\n'
 }
 
 swap_note

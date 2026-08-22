@@ -1,11 +1,11 @@
 ---
 id: TASK-67
 title: clipboard history (integration with rofi)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-21 10:38'
-updated_date: '2026-08-22 01:10'
+updated_date: '2026-08-22 02:52'
 labels: []
 dependencies: []
 priority: medium
@@ -22,13 +22,13 @@ It would be cool to have clipboard history in this. for text and images alike. A
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 cliphist and its watchers are declared in setup/packages/desktop.txt and the manifest says what each costs
-- [ ] #2 The store is watched by a supervised systemd USER unit bound to wayland-session@sway.target with Restart=always, not a sway exec line and not graphical-session.target
+- [x] #2 The store is watched by a supervised systemd USER unit bound to wayland-session@sway.target with Restart=always, not a sway exec line and not graphical-session.target
 - [x] #3 Both text and images are captured - one wl-paste watcher cannot do both
 - [x] #4 The history is browsable from rofi, reachable by name from the launcher through a .desktop entry and by a keybinding
 - [x] #5 Selecting an entry puts it back on the clipboard with the right mime type, images included
 - [x] #6 What happens with images in the list is stated honestly, with a screenshot rather than a claim
 - [x] #7 A decision about storing secrets is made and written down, with a way to forget one entry and a way to wipe the lot
-- [ ] #8 checks/sway-commands.sh and checks/sway-bindings.sh pass, and checks/session.sh does not regress
+- [x] #8 checks/sway-commands.sh and checks/sway-bindings.sh pass, and checks/session.sh does not regress
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -188,4 +188,12 @@ TWO THINGS FOR FILES THIS AGENT WAS NOT ALLOWED TO EDIT
    is checked as wl-paste and the helper in the arguments is never resolved. It
    happens to exist; nothing would have noticed if it did not.
 3. DECISIONS.md has no clipboard entry. Suggested text is in the agent's report.
+
+AC2 and AC8 confirmed after ./sync.sh installed cliphist. Both watchers report active; systemctl shows PartOf=wayland-session@sway.target, WantedBy the same, Restart=always - the supervision the criterion asked for, read from systemd rather than from the unit file. checks/sway-commands.sh and checks/sway-bindings.sh both pass now the package exists, and session.sh does not regress.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+cliphist with two watcher instances - one watcher cannot capture both text and images - supervised as user units bound to wayland-session@sway.target, browsable from rofi on $mod+v and from the launcher, with images previewed by handing rofi a decoded file path. A wrapper drops anything carrying a password-manager hint, proven in both directions, and the residual risk is stated rather than hidden. Auto-paste was built with wtype and rejected: the paste chord differs per application and guessing wrong fails silently.
+<!-- SECTION:FINAL_SUMMARY:END -->

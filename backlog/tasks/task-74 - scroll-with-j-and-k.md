@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-21 11:55'
-updated_date: '2026-08-22 00:58'
+updated_date: '2026-08-22 02:53'
 labels: []
 dependencies: []
 priority: low
@@ -29,7 +29,7 @@ for some reason im thinking we could start to make use of some more advanced key
 - [x] #4 The trigger key introduces no tap-hold ambiguity on any key used while typing, in a terminal, in nvim, or on the rescue console
 - [x] #5 setup/system/keyd/default.conf passes 'keyd check', and the gate is shown to fail on a deliberately broken copy
 - [x] #6 ./checks/session.sh still reports 0 failures
-- [ ] #7 The shortcuts are written down where a reader will find them, rather than being discoverable only by accident
+- [x] #7 The shortcuts are written down where a reader will find them, rather than being discoverable only by accident
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -152,6 +152,12 @@ same keyd check before enabling or restarting.
 
 ./checks/session.sh: 81 passed, 0 failed (the count is 81 rather than the 80
 baseline because a check was added in a parallel session; nothing regressed).
+
+AC7 done, and it caught a bug rather than merely being satisfied. tools/shortcuts.sh gained a note about the scroll layer, guarded on the exact string 'capslock = layer(scroll)' in the applied keyd config. When Caps Lock got its tap back the binding became 'capslock = overloadt2(scroll, capslock, 200)' and the guard silently stopped matching - so the note vanished from the report and nothing said so. In a file whose entire job is stopping shortcuts being undiscoverable. The guard now matches the layer name rather than the whole binding.
+
+Its wording was stale too: it described j/k as scrolling 'whatever is under the pointer', which was true when written and stopped being the useful description once mouse_warping container made the pointer follow focus.
+
+AC1, AC2 and AC3 are left unchecked deliberately. Caps Lock scrolling is confirmed working by the user, but the specific cases those criteria name - inside a text input field, d/u following keyboard focus while the pointer is elsewhere, and holding to repeat rather than stepping once - have not each been exercised. Ticking them from 'scrolling works' would be broader than the evidence.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
