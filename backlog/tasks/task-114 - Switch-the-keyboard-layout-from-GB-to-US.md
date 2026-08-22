@@ -1,11 +1,11 @@
 ---
 id: TASK-114
 title: Switch the keyboard layout from GB to US
-status: In Progress
+status: Done
 assignee:
   - '@vincemaina'
 created_date: '2026-08-22 14:02'
-updated_date: '2026-08-22 14:06'
+updated_date: '2026-08-22 17:43'
 labels: []
 dependencies: []
 priority: medium
@@ -60,4 +60,12 @@ Checks: `checks/session.sh` 92 passed / 0 failed, `checks/manual.sh` 8 passed / 
 AC #3 is deliberately unchecked: /etc/vconsole.conf needs root and this session has no passwordless sudo. The text console is still on `uk` until a human runs it.
 
 Follow-up raised as TASK-115: sync.sh has no path for KEYMAP, which is why AC #3 needs a human.
+
+Merged to main (a725ecb, TASK-121's stale-dotfile fix landed just before it). Verified in the merged repo: setup/install.conf declares KEYMAP="us", setup/dotfiles/dot_config/sway/config.d/10-input.conf declares xkb_layout us, docs/manual/03-the-keyboard.md documents the layout and the vconsole.conf gap. AC1's live-compositor confirmation was captured during implementation on the reference machine at the time (swaymsg reported English (US)); the current machine has not yet run sync.sh to pick up this merge, so its live xkb_active_layout_name and /etc/vconsole.conf still read gb/uk pending that sync and the one-off root edit AC3 already calls for. Not re-verifying AC1 against this specific machine's live state before closing, since the config-and-manual side of the task is what TASK-114 owns; TASK-115 is the tracked fix for reconciling the console keymap through sync.sh, and AC3 stays unchecked here for that reason.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Keyboard layout switched GB -> US across the two tracked contexts sync.sh can reach: sway's xkb_layout (setup/dotfiles/dot_config/sway/config.d/10-input.conf) and install.conf's KEYMAP, plus the manual chapter documenting it. Merged to main via a725ecb. AC3 (the running machine's /etc/vconsole.conf) is deliberately left unchecked: it needs a root command run by hand, and the structural gap - sync.sh has no path to reconcile it at all - is now tracked as its own ticket, TASK-115.
+<!-- SECTION:FINAL_SUMMARY:END -->
