@@ -120,6 +120,22 @@ repeating=0
 while IFS= read -r line; do
     # The key combo is the first field that is not a flag.
     combo="$(sed -E 's/^[[:space:]]*bindsym([[:space:]]+--[a-z-]+)*[[:space:]]+//; s/[[:space:]].*//' <<<"$line")"
+    # A pointer button cannot repeat, so --no-repeat on one is meaningless.
+    #
+    # sway(5): the command "will be run repeatedly when the key is held,
+    # according to the repeat settings specified in the input configuration" -
+    # that is keyboard repeat_delay and repeat_rate, which a pointer has no
+    # equivalent of. A scroll wheel emits discrete clicks and a button emits one
+    # press and one release; there is nothing to repeat and no rate to repeat at.
+    #
+    # Without this, $mod+scroll to resize a window fails the check, and the only
+    # ways to satisfy it are a meaningless flag or a whitelist entry claiming
+    # holding it is the gesture. Both would be lies written to make a check
+    # green, which is worse than the check not knowing.
+    if [[ "$combo" == *button[0-9]* ]]; then
+        continue
+    fi
+
     allowed=false
     for k in "${REPEATABLE[@]}"; do
         [[ "$combo" == "$k" ]] && allowed=true && break
