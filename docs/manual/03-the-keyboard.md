@@ -225,11 +225,11 @@ it. That note reads the key out of the keyd config rather than asserting it,
 so changing which key sends Escape changes the report without anyone editing
 the report.
 
-## Enter, Tab and Backspace, without leaving the home row
+## Enter and Backspace, without leaving the home row
 
-Three more keys are reachable the same way, from the same layer and for the
-same reason: **`Ctrl+J` sends Enter, `Ctrl+F` sends Tab and `Ctrl+H` sends
-Backspace**, in every program.
+Two more keys are reachable the same way, from the same layer and for the
+same reason: **`Ctrl+J` sends Enter and `Ctrl+H` sends Backspace**, in every
+program.
 
 `Ctrl+J` is not really a new convention. It was *already* Enter in about half
 of what runs here, because ASCII line feed is what that chord sends and every
@@ -250,33 +250,7 @@ rather than adding a rule, which is why it costs so little.
 The one to expect: in fzf, `Ctrl+J` now **accepts** the selection instead of
 moving down, in the same way `Ctrl+K` now cancels instead of moving up.
 
-**`Ctrl+F` is the expensive one**, and it is worth reading the table before it
-surprises you. That chord meant *page forward* across the whole vi lineage on
-this machine, and find-in-page in Firefox:
-
-| Where | What Ctrl+F was | What to use instead |
-| --- | --- | --- |
-| Neovim | page forward | `Ctrl+D` for half a page, `Page Down` for a whole one |
-| less | page forward | `Space`, or `f` |
-| yazi | page down | `Page Down` |
-| qutebrowser | page down | `Space`, or `Page Down` |
-| Firefox | find in page | `/` opens quick-find; `Ctrl+G` steps through matches |
-| zsh | forward a character | the arrow key, or `Alt+L` from the layer below |
-| fzf | forward a character | the arrow key - `Tab` selects in fzf, so `Ctrl+F` now selects |
-| rofi, foot, lazygit | forward a character, find-base-commit | the arrow key |
-
-`Ctrl+B` still pages *backward* in all of those, so the pair is now asymmetric.
-That is a real cost and it was accepted knowingly rather than missed.
-
-There is a cheaper key, recorded here because the decision is not closed:
-**`Ctrl+I` already is Tab.** ASCII horizontal tab is exactly what `Ctrl+I`
-sends, so every terminal program on this machine receives a Tab from it today
-and nothing would be displaced. What it does not cover is graphical
-applications, where `Ctrl+I` is italic or page-info - which is the gap this
-binding exists for in the first place. It wins on cost and loses on the
-mnemonic. Switching is one word in `setup/system/keyd/default.conf`.
-
-**`Ctrl+H` is the cheapest of the three**, and for the same reason as `Ctrl+J`:
+**`Ctrl+H` is the cheaper of the two**, and for the same reason as `Ctrl+J`:
 ASCII 0x08 *is* backspace, so zsh, rofi, fzf, yazi and qutebrowser's command
 and prompt modes already deleted backwards on it. What changes is everything
 graphical.
@@ -291,12 +265,20 @@ graphical.
 `Alt+H` is still the Left arrow and Caps Lock + `h` still scrolls sideways -
 a layer only takes the keys it names, in the modifier it owns.
 
-Shift composes with all three, because keyd strips only the Control it owns:
-`Ctrl+Shift+F` arrives as `Shift+Tab`, which is back-tab and is useful in a
-form. Sway's own chords are exempt, so `$mod+Ctrl+j` is still the workspace
+Shift composes with both, because keyd strips only the Control it owns:
+`Ctrl+Shift+J` arrives as `Shift+Enter`, which is a new line rather than a
+send in most things that distinguish them. Sway's own chords are exempt, so `$mod+Ctrl+j` is still the workspace
 toggle rather than a new terminal, and `$mod+Ctrl+h` is still the previous
 workspace rather than a Backspace - the keyd config has a small layer at the
 bottom whose only job is keeping the compositor's chords out of this.
+
+**Tab is deliberately not on this layer.** It was, on `Ctrl+F`, and it came
+back off: that chord means *page forward* across the whole vi lineage here -
+Neovim, `less`, yazi, qutebrowser - and find-in-page in Firefox, which is five
+things you do daily against one you do in a dialog. If you want Tab on the home
+row anyway, `Ctrl+I` is the key to spend, because ASCII horizontal tab *is*
+`Ctrl+I` and it therefore costs nothing in any terminal program. The reasoning
+is written out beside the binding in `setup/system/keyd/default.conf`.
 
 ## The arrow keys, on the home row
 

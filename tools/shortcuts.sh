@@ -265,7 +265,11 @@ control_note() {
     ' /etc/keyd/default.conf 2>/dev/null)"
     [[ -n "$pairs" ]] || return 0
 
-    local body="" trailer="" k v ku
+    # The Shift half is derived rather than named, for the reason every note
+    # here reads the layer: it used to say "Ctrl+Shift+F is Shift+Tab", and
+    # when f stopped being tab that sentence was the only thing left in this
+    # file still describing it.
+    local body="" trailer="" shift_example="" k v ku
     while read -r k v; do
         [[ -n "$k" ]] || continue
         ku="$(tr '[:lower:]' '[:upper:]' <<<"$k" | tr -d '\n')"
@@ -274,6 +278,8 @@ control_note() {
             tab)       body="${body}$(printf '    Ctrl+%-9s a real Tab key event' "$ku")\n" ;;
             backspace) body="${body}$(printf '    Ctrl+%-9s a real Backspace key event' "$ku")\n" ;;
         esac
+        [[ -n "$shift_example" ]] || shift_example="$(printf 'Ctrl+Shift+%s is Shift+%s' \
+            "$ku" "$(tr '[:lower:]' '[:upper:]' <<<"${v:0:1}")${v:1}")"
     done <<<"$pairs"
 
     # Each trailer is guarded on the binding actually being present, so a
@@ -294,7 +300,10 @@ same in nvim, GTK dialogs and the browser chrome. It costs Firefox's history
 sidebar (Ctrl+Shift+H opens the full history) and nvim's split-left mapping,
 which was removed - Ctrl+W then h still reaches it."
     fi
-    if grep -qE '^[a-z]+ tab$' <<<"$pairs"; then
+    # Guarded on f rather than on any key, because this paragraph prices
+    # Ctrl+F specifically. Ctrl+I - the alternative the keyd config names -
+    # costs none of it, so printing this for `i = tab` would be a lie.
+    if grep -qE '^f tab$' <<<"$pairs"; then
         trailer="${trailer}
 Tab costs the page-forward that this chord meant across the vi lineage - nvim,
 less, yazi and qutebrowser - and find-in-page in Firefox. Page Down pages in all
@@ -306,8 +315,8 @@ pages backward, so the pair is asymmetric on purpose."
 
 $(printf '%b' "$body")${trailer}
 
-Shift composes, because keyd strips only the Control: Ctrl+Shift+F is Shift+Tab,
-which is back-tab. Sway's own \$mod+Ctrl chords are exempt - see the
+Shift composes, because keyd strips only the Control: ${shift_example}. Sway's
+own \$mod+Ctrl chords are exempt - see the
 [control+meta] layer in the keyd config - so \$mod+Ctrl+j is still the workspace
 toggle and \$mod+Ctrl+h is still the previous workspace.
 

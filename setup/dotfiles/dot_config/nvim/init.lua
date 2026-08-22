@@ -213,9 +213,10 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>', { desc = 'Clear search highl
 -- repository has had. `<C-w>k`, `<C-w>j` and `<C-w>h` all still work, and are
 -- now the only way to reach those three splits.
 --
--- <C-f> is Tab from the same layer, so page-forward is gone here too. That is
--- a builtin rather than a mapping, so there was nothing to delete - use <C-d>
--- for a half page or Page Down for a whole one.
+-- <C-f> was Tab from that same layer for a while and page-forward went with
+-- it. TASK-124 took that one back out, so <C-f> pages forward here again and
+-- there is nothing to work around. The keyd config says why f was the wrong
+-- key to spend and what would be spent instead.
 vim.keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Split right' })
 
 -- Keep the cursor where it was when joining lines, and keep the search result

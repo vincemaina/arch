@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 15:26'
-updated_date: '2026-08-22 16:02'
+updated_date: '2026-08-22 16:53'
 labels: []
 dependencies:
   - TASK-119
@@ -119,6 +119,16 @@ Ctrl+I remains the cheaper key and the note beside the binding says so. If the p
 ## Checks after applying
 
 `checks/manual.sh` 8 passed / 0 failed. `checks/sway-bindings.sh` exit 0. `checks/sway-commands.sh` clean. `checks/session.sh` 84 passed / 4 failed / 1 skipped, the same four the main checkout reports, all pre-existing.
+
+## REVERTED BY TASK-124
+
+This binding is no longer in the repository. TASK-124 removed `f = tab` from the [control] layer after the binding had been used, and everything below it describes what WAS true rather than what is.
+
+The measurement stands - it is the reason for the reversal rather than something the reversal contradicts. Five daily losses against three for Ctrl+K was recorded here before the key was bound, each surviving route was named, and the Ctrl+B asymmetry was flagged as a cost that would be felt. All of that turned out to be an accurate price and simply too high a one.
+
+What is worth carrying forward is the Ctrl+I finding in the section above, which is unaffected by the reversal: Ctrl+I already IS Tab (ASCII 0x09), so it displaces nothing in any terminal program and adds only the graphical half, which is the half a home-row Tab was ever for. It was the cheaper key at the time and the reversal is the argument that cheap was the thing to optimise. It is deliberately NOT bound - that is a separate decision, not a consolation edit.
+
+The per-program table here is kept as the record so the key is not re-proposed from scratch a third time.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
