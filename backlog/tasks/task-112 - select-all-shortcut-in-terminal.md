@@ -1,11 +1,11 @@
 ---
 id: TASK-112
 title: select all shortcut in terminal
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 13:54'
-updated_date: '2026-08-22 14:12'
+updated_date: '2026-08-22 14:29'
 labels: []
 dependencies: []
 priority: medium
@@ -22,7 +22,7 @@ if copy and paste are ctrl + shift + c/v (respectively), then it follows that se
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Ctrl+Shift+A in foot places the terminal's entire scrollback on the clipboard
+- [x] #1 Ctrl+Shift+A in foot places the terminal's entire scrollback on the clipboard
 - [x] #2 The copy is confirmed visibly, since there is no selection to see
 - [x] #3 The binding lives in the repository's foot config and reaches a running machine through sync.sh
 - [x] #4 checks/sway-commands.sh, checks/session.sh and checks/manual.sh all pass
@@ -69,6 +69,8 @@ foot 1.27 has **no select-all action**. Every key-bindings action in `man foot.i
 **The keypress itself.** No script on this machine can generate one: /dev/uinput is root-only, wtype and ydotool are not installed, and sway has no key-injection IPC. The mouse route was tried too - foot's [mouse-bindings] accept the same actions, and sway can inject clicks - but foot ignores swaymsg's synthetic button events (proved by binding fullscreen to BTN_MIDDLE and watching fullscreen_mode stay 0, while sway's own binding on the same injected click did fire). So AC 1 stays unchecked until a human presses it. That is now step 5 of checks/session.sh rather than an unwritten gap.
 
 Also note the change is not live: `./sync.sh` has not been run, and foot reads its config only at startup, so the key works in terminals opened after a sync.
+
+AC 1 confirmed by the user on 2026-08-22: Ctrl+Shift+A in a terminal opened after sync copies the scrollback and raises the 'Copied - N lines' notification. That was the one link no script here could exercise (uinput root-only, no wtype/ydotool, no key-injection IPC in sway, and foot ignores synthetic clicks), so it needed a human by design - step 5 of checks/session.sh.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -80,3 +82,13 @@ created: 2026-08-22 14:12
 Implementation is complete, checks all pass, and the branch is pushed as worktree-task-112-select-all. AC 1 is deliberately left unchecked: nothing on this machine can generate the keypress (uinput is root-only, no wtype/ydotool, sway has no key-injection IPC, and foot ignores synthetic clicks). Run ./sync.sh, open a NEW terminal - foot reads its config only at startup - and press Ctrl+Shift+A. A 'Copied - N lines' notification closes it. It is also step 5 of checks/session.sh now.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+foot 1.27 has no select-all action - every key-bindings action in `man foot.ini` was checked, the select-* actions that exist are pointer-driven with no way to say 'everything', and there is no IPC to script a selection. So Ctrl+Shift+A does what select-all is for instead: `pipe-scrollback` hands the whole buffer to `~/.local/bin/terminal-copy-all`, which trims the trailing blank rows a terminal grid pads with, copies via wl-copy, and raises a notification with the line count - the notification standing in for the highlight that cannot exist.
+
+The logic is a helper rather than an inline `sh -c` because checks/sway-commands.sh only validates external commands behind a `# requires:` header; the path is absolute via chezmoi because foot inherits the session's PATH, not zsh's. tools/shortcuts.sh now parses foot's rendered config instead of claiming it overrides nothing, docs/manual/04-applications.md documents that the key copies rather than selects, and checks/session.sh gained human step 5.
+
+Verified: `foot --check-config` accepts the rendered config, with a negative control (same action on Control+Shift+c) rejected as 'already mapped to clipboard-copy' - so acceptance proves the key was free. The helper was exercised over seven inputs against stubs, then end-to-end against the real wl-copy and notify-send wrapped to write PRIMARY so the clipboard and cliphist history stayed untouched: 41 lines in, 'Copied - 41 lines on the clipboard' out of makoctl history. checks: session 92/0, sway-commands 0 failures, sway-bindings 76 with no duplicate, manual 8/8, packages 6/6. The keypress itself was confirmed by the user, being the one link no script on this machine can generate.
+<!-- SECTION:FINAL_SUMMARY:END -->
