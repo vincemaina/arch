@@ -434,7 +434,41 @@ changes to how it looks.
 - **`DECISIONS.md` is the rationale record.** It documents *why* each technology and layout was chosen, with trade-offs and rejected alternatives. When making an architectural change, update it in the same style (`## Decision` → `### Why` → `### Trade-off` / `### Alternatives considered`). It is the first place to look before proposing a different tool.
 - The guiding principle from `DECISIONS.md`: minimal enough to stay fast and understandable, automated enough to be reproducible, practical enough to use daily. New tooling must earn its place.
 - Config for its own sake is avoided — a dotfile is only committed once there is a meaningful customisation worth preserving.
-- **Merging and pushing to `main` is reserved for the user by default in Claude Code's harness — that reservation is explicitly lifted in this repository.** An agent working here may merge a branch into `main` and push it without asking first, the same way it would for any other branch. This does not extend to force-pushing `main` or to any other repository; it is specific to this one, because the user said so once and would rather not repeat it every session.
+- **Merging and pushing to `main` is reserved for the user by default in Claude Code's harness — that reservation is explicitly lifted in this repository.** See "Finishing work in a worktree" below for what that means in practice.
+
+## Finishing work in a worktree
+
+An agent that finishes a task in a worktree finishes the whole thing. Do not
+stop at "the branch is pushed" and ask whether to merge: the user said once
+that merging and pushing to `main` is allowed here and would rather not repeat
+it every session. This does not extend to force-pushing `main`, and it is
+specific to this repository.
+
+So, when the work is done and the task is closed in Backlog:
+
+1. **Merge into `main`** with `--no-ff` and a `Merge TASK-nn: <what changed>`
+   subject, matching the existing merge commits.
+2. **Re-run the checks on merged `main`,** not only on the branch. That is the
+   first moment the work and whatever landed while it was out exist together,
+   and it is the run that matters. If it fails, fix it before pushing.
+3. **Push `main`.**
+4. **Clean up:** `git worktree remove` the worktree, then delete its branch both
+   locally (`git branch -d`) and on the remote (`git push origin --delete`).
+5. **Say so plainly:** the work is merged and pushed, the worktree and branch
+   are gone locally and on the remote, and the conversation is ready to close.
+
+Two things to check around step 4, because a worktree here is rarely the only
+one. `git worktree list` may show worktrees belonging to *other* sessions,
+sometimes `locked` — remove only your own. And `main` may have moved while you
+worked: pull before pushing rather than assuming the merge is still a
+fast-forward. Both have already happened during a single task.
+
+Step 4 is not only tidiness. A worktree is a checkout with a deadline, and this
+repository has already been bitten once by one outliving the state that pointed
+at it — `sync.sh` recorded a worktree path as the machine's chezmoi source, the
+worktree was deleted, and `chezmoi managed` then returned nothing without ever
+erroring (TASK-121.1). That specific hole is closed, but the fewer stale
+worktrees linger, the less there is to point at nothing.
 
 ## Known gaps
 
