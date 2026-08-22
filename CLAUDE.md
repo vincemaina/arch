@@ -432,5 +432,4 @@ changes to how it looks.
 
 - `README.md` links to `FLOW.md`, which does not exist yet.
 - `backlog` is not installed on every machine this repository gets worked on, so the CRITICAL_INSTRUCTION at the top of this file can fail with `command not found`. Install it from [MrLesk/Backlog.md](https://github.com/MrLesk/Backlog.md) rather than falling back to editing `backlog/tasks/*.md` by hand — and never add it to `setup/packages/`.
-- `setup/packages/CHATGPT.md` is a raw pasted design conversation, superseded by `packages/README.md` and `DECISIONS.md`; treat it as historical, not authoritative.
 - `claude-best-practices.md` (untracked) holds the user's general working preferences, not project rules.
