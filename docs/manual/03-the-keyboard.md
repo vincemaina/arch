@@ -212,6 +212,62 @@ it. That note reads the key out of the keyd config rather than asserting it,
 so changing which key sends Escape changes the report without anyone editing
 the report.
 
+## Enter and Tab, without leaving the home row
+
+Two more keys are reachable the same way, from the same layer and for the same
+reason: **`Ctrl+J` sends Enter and `Ctrl+F` sends Tab**, in every program.
+
+`Ctrl+J` is not really a new convention. It was *already* Enter in about half
+of what runs here, because ASCII line feed is what that chord sends and every
+readline-shaped thing accepts on it - zsh, rofi, qutebrowser and `less` all
+treated it as Enter before any of this. What it was not, was Enter in Neovim,
+in fzf, in lazygit, in a GTK dialog or in the browser's own chrome. That split
+is the worst of both: the hand learns the chord in the shell, reaches for it in
+a save dialog, and nothing happens. Binding it in keyd removes the exception
+rather than adding a rule, which is why it costs so little.
+
+| Where | What Ctrl+J was | What to use instead |
+| --- | --- | --- |
+| zsh, rofi, qutebrowser, less | Enter already | - |
+| Neovim | move to the split below | `Ctrl+W` then `j` |
+| fzf | move the selection down | `Ctrl+N`, or the arrow key |
+| lazygit | move a commit down in a rebase | `Alt+Down` |
+
+The one to expect: in fzf, `Ctrl+J` now **accepts** the selection instead of
+moving down, in the same way `Ctrl+K` now cancels instead of moving up.
+
+**`Ctrl+F` is the expensive one**, and it is worth reading the table before it
+surprises you. That chord meant *page forward* across the whole vi lineage on
+this machine, and find-in-page in Firefox:
+
+| Where | What Ctrl+F was | What to use instead |
+| --- | --- | --- |
+| Neovim | page forward | `Ctrl+D` for half a page, `Page Down` for a whole one |
+| less | page forward | `Space`, or `f` |
+| yazi | page down | `Page Down` |
+| qutebrowser | page down | `Space`, or `Page Down` |
+| Firefox | find in page | `/` opens quick-find; `Ctrl+G` steps through matches |
+| zsh | forward a character | the arrow key, or `Alt+L` from the layer below |
+| fzf | forward a character | the arrow key - `Tab` selects in fzf, so `Ctrl+F` now selects |
+| rofi, foot, lazygit | forward a character, find-base-commit | the arrow key |
+
+`Ctrl+B` still pages *backward* in all of those, so the pair is now asymmetric.
+That is a real cost and it was accepted knowingly rather than missed.
+
+There is a cheaper key, recorded here because the decision is not closed:
+**`Ctrl+I` already is Tab.** ASCII horizontal tab is exactly what `Ctrl+I`
+sends, so every terminal program on this machine receives a Tab from it today
+and nothing would be displaced. What it does not cover is graphical
+applications, where `Ctrl+I` is italic or page-info - which is the gap this
+binding exists for in the first place. It wins on cost and loses on the
+mnemonic. Switching is one word in `setup/system/keyd/default.conf`.
+
+Shift composes with both, because keyd strips only the Control it owns:
+`Ctrl+Shift+F` arrives as `Shift+Tab`, which is back-tab and is useful in a
+form. Sway's own chords are exempt, so `$mod+Ctrl+j` is still the workspace
+toggle rather than a new terminal - the keyd config has a small layer at the
+bottom whose only job is keeping the compositor's chords out of this.
+
 ## The arrow keys, on the home row
 
 The arrow cluster is the one group of keys you cannot reach without lifting

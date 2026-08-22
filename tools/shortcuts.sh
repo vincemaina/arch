@@ -205,6 +205,79 @@ Like the layer above, these come from keyd rather than sway, so they are not in
 the table below."
 }
 
+# The other two rewrites in the same [control] layer: Enter and Tab.
+#
+# Separate from escape_note rather than folded into it because the two answer
+# different questions. Escape is a key this desktop ADDED a second route to;
+# Enter and Tab are keys that already exist and were moved within reach - and
+# Ctrl+J in particular is not a new convention at all, it is the removal of an
+# exception, since zsh, rofi, qutebrowser and less already treated it as Enter
+# and nvim, fzf and every GTK dialog did not.
+#
+# Reads the layer for the same reason every note here does: rebind Enter onto
+# some other key and this reports the other key; take the line out and the note
+# disappears, which is correct. It asserts no binding string, so it cannot go
+# quiet by being reworded.
+control_note() {
+    command -v keyd &>/dev/null || return 0
+    systemctl is-active --quiet keyd 2>/dev/null || return 0
+
+    # Only enter and tab. esc is escape_note's, and anything else added to the
+    # layer later is deliberately NOT reported here rather than described by a
+    # sentence written before it existed.
+    local pairs
+    pairs="$(awk '
+        /^\[/     { in_control = ($0 ~ /^\[control(:[A-Z]*)?\]/) ; next }
+        !in_control { next }
+        /^[a-z0-9]+[[:space:]]*=[[:space:]]*(enter|tab)[[:space:]]*$/ {
+            key = $0; sub(/[[:space:]]*=.*/, "", key)
+            val = $0; sub(/^[^=]*=[[:space:]]*/, "", val); sub(/[[:space:]]*$/, "", val)
+            printf "%s %s\n", key, val
+        }
+    ' /etc/keyd/default.conf 2>/dev/null)"
+    [[ -n "$pairs" ]] || return 0
+
+    local body="" trailer="" k v ku
+    while read -r k v; do
+        [[ -n "$k" ]] || continue
+        ku="$(tr '[:lower:]' '[:upper:]' <<<"$k" | tr -d '\n')"
+        case "$v" in
+            enter) body="${body}$(printf '    Ctrl+%-9s a real Enter key event' "$ku")\n" ;;
+            tab)   body="${body}$(printf '    Ctrl+%-9s a real Tab key event' "$ku")\n" ;;
+        esac
+    done <<<"$pairs"
+
+    # Each trailer is guarded on the binding actually being present, so a
+    # config that drops one does not leave this file describing it.
+    if grep -qE '^[a-z]+ enter$' <<<"$pairs"; then
+        trailer="${trailer}
+Enter was already what this chord meant in zsh, rofi, qutebrowser and less. It
+now means the same in nvim, fzf, lazygit, GTK dialogs and the browser, which is
+where it used to stop. In fzf it ACCEPTS the selection rather than moving down
+(use Ctrl+N); nvim's split-below mapping was removed, and Ctrl+W then j still
+reaches it."
+    fi
+    if grep -qE '^[a-z]+ tab$' <<<"$pairs"; then
+        trailer="${trailer}
+Tab costs the page-forward that this chord meant across the vi lineage - nvim,
+less, yazi and qutebrowser - and find-in-page in Firefox. Page Down pages in all
+four, Ctrl+D half-pages in nvim, and / opens quick-find in Firefox. Ctrl+B still
+pages backward, so the pair is asymmetric on purpose."
+    fi
+
+    note "Enter and Tab, without leaving the home row:
+
+$(printf '%b' "$body")${trailer}
+
+Shift composes, because keyd strips only the Control: Ctrl+Shift+F is Shift+Tab,
+which is back-tab. Sway's own \$mod+Ctrl chords are exempt - see the
+[control+meta] layer in the keyd config - so \$mod+Ctrl+j is still the workspace
+toggle and does not open a terminal.
+
+Like the layers above, these come from keyd rather than sway, so they are not in
+the table below."
+}
+
 # The arrow cluster on the home row, invisible for the same reason as the two
 # above.
 #
@@ -252,6 +325,7 @@ in the table below."
 swap_note
 scroll_note
 escape_note
+control_note
 arrows_note
 
 # Canonical form so a sway binding and a zsh binding can be compared at all:
