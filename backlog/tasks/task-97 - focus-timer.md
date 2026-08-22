@@ -1,7 +1,7 @@
 ---
 id: TASK-97
 title: focus timer
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 00:47'
