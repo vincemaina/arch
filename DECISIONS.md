@@ -414,6 +414,43 @@ adding a file.
 The boot menu lists two entries instead of one. `loader.conf` still defaults to the
 normal entry with a short timeout, so this costs nothing until it is needed.
 
+### The timeout that paid for it, and the ESP that holds it
+
+"A short timeout" was three seconds, and it was invisible. `systemd-analyze`
+reports 4.653s for this machine and does not include the menu at all: it
+accounts from the kernel onwards unless the bootloader exports
+`LoaderTimeInitUSec` into an EFI variable, and OVMF does not. So the real wait
+from power-on to a greeter was nearer 7.7s, roughly 39% of it a menu nobody
+reads, and every measurement anyone took said 4.653s. TASK-90.
+
+Now one second. **Not zero**, which was the obvious answer and is the wrong one
+here: systemd-boot(7) confirms the menu can still be reached with `timeout 0` by
+holding space, and then says the deciding part — "depending on the firmware
+implementation the time window where key presses are accepted before the boot
+loader initializes might be short. If the window is missed, reboot and try
+again, possibly repeatedly." This menu exists to reach the fallback entry, which
+is wanted on the boot where something has *already* gone wrong. A recovery path
+that takes several attempts to hit is the wrong thing to economise on.
+
+One second is a deterministic window and returns two of the three. For a planned
+fallback boot, `bootctl set-timeout-oneshot` arms the menu for the next boot
+only, from a working system.
+
+Two things on the ESP were examined at the same time and **deliberately left**:
+
+- `initramfs-linux-fallback.img` is 211.6 MiB of the 258 MiB used, because the
+  fallback preset drops `autodetect` and includes every module. That is the
+  entire point of it, it is an ESP cost rather than a boot cost, and the ESP is
+  1 GiB with 765 MiB free. Shrinking the recovery image to save space on a
+  partition that has space is the wrong trade.
+- `intel-ucode.img` (14.6 MiB) and `amd-ucode.img` (0.3 MiB) both sit there and
+  neither is loaded — the `microcode` hook embeds the right one into the image,
+  and no loader entry or `/proc/cmdline` names them. They are not deletable in
+  any meaningful sense: pacman owns both files and a package update writes them
+  back. Both packages are declared deliberately so one repository builds an
+  Intel or an AMD machine. 14.9 MiB to avoid fighting the package manager over
+  files that cost nothing at boot.
+
 ---
 
 # Networking
