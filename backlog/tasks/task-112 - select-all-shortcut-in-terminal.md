@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-22 13:54'
-updated_date: '2026-08-22 14:11'
+updated_date: '2026-08-22 14:12'
 labels: []
 dependencies: []
 priority: medium
@@ -70,3 +70,13 @@ foot 1.27 has **no select-all action**. Every key-bindings action in `man foot.i
 
 Also note the change is not live: `./sync.sh` has not been run, and foot reads its config only at startup, so the key works in terminals opened after a sync.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @claude
+created: 2026-08-22 14:12
+---
+Implementation is complete, checks all pass, and the branch is pushed as worktree-task-112-select-all. AC 1 is deliberately left unchecked: nothing on this machine can generate the keypress (uinput is root-only, no wtype/ydotool, sway has no key-injection IPC, and foot ignores synthetic clicks). Run ./sync.sh, open a NEW terminal - foot reads its config only at startup - and press Ctrl+Shift+A. A 'Copied - N lines' notification closes it. It is also step 5 of checks/session.sh now.
+---
+<!-- COMMENTS:END -->
