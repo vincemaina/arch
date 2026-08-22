@@ -16,6 +16,36 @@ if [[ "$confirm" != "ERASE" ]]; then
   exit 1
 fi
 
+# Clear what a previous run left behind, TASK-132.
+#
+# install.sh only unmounts /mnt on the success path, at the very end. Any
+# abort after this stage - a mistyped password in stage 3 was the one that
+# found this, but stages 2 to 5 all qualify - therefore leaves the target
+# filesystems mounted, and parted and mkfs both refuse a disk whose
+# partitions are in use. The second attempt then fails immediately after
+# ERASE with an error naming the disk, which reads like a bad device rather
+# than the residue of the last run. Rebooting the ISO cleared it and nothing
+# said so.
+#
+# Deliberately after the confirmation: a run stopped at that prompt must
+# leave the machine exactly as it found it.
+if findmnt -rno TARGET /mnt >/dev/null 2>&1; then
+  echo "==> /mnt is still mounted, from a previous run; unmounting"
+  umount -R /mnt
+fi
+
+# Anything still holding the disk open would produce the same confusing
+# error, so say what it is here rather than letting parted report it. Matched
+# on the device name, which covers both the vda1/vda2 and nvme0n1p1/p2 forms
+# without needing to know which this disk uses yet.
+if findmnt -rno TARGET,SOURCE | grep -q "[[:space:]]${DISK}"; then
+  echo "Something on $DISK is still mounted, so it cannot be partitioned:" >&2
+  findmnt -rno TARGET,SOURCE | grep "[[:space:]]${DISK}" | sed 's/^/    /' >&2
+  echo >&2
+  echo "Unmount it and run this again." >&2
+  exit 1
+fi
+
 # Create GPT:
 # 1 GiB EFI partition
 # remaining space Btrfs root partition
