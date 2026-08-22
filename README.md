@@ -73,6 +73,22 @@ A physical NVMe drive may instead look like:
 
 Replace `/dev/vda` with the disk you actually want to install Arch onto.
 
+The installer asks for this machine's identity first — username, hostname,
+timezone, locale, keymap, and the git name and email — defaulting to whatever
+`setup/install.conf` already says, so pressing Enter through every question
+changes nothing. Answers are validated against the live system rather than a
+pattern: a timezone must be a real zoneinfo file, a locale must exist in
+`/etc/locale.gen`, a keymap must exist under `/usr/share/kbd/keymaps`. Type `?`
+at any of those to list the valid answers, or `?text` to search them.
+
+```bash
+./install.sh --no-wizard /dev/vda    # use install.conf exactly as it is
+```
+
+A run whose stdin is not a terminal skips the wizard on its own, so a scripted
+build needs no new flag. Passwords are still asked for later by stage 03 and are
+never stored.
+
 The installer handles the rest, including:
 
 * GPT/UEFI partitioning

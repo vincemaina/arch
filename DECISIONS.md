@@ -2507,6 +2507,56 @@ size: 114 MiB, six times lazygit, for the reading half of the problem only.
 
 ---
 
+## The installer asks, rather than requiring a file to be edited first
+
+**Decision:** `install.sh` runs a wizard before the first destructive step,
+asking for the machine identity and writing it into `setup/install.conf`.
+
+### Why
+
+Editing a file before the first install is the one step a new machine cannot
+document to itself: you have to know it is required before you have anything to
+read. And the failure is delayed rather than loud — a wrong locale or keymap
+produces a working installer and a broken machine an hour later.
+
+It runs as step `[0/5]`, ahead of `01-disk.sh`, which is the last moment an
+answer can still be changed for free.
+
+Validation is against the live system rather than a regular expression: the
+timezone must be a real file under `/usr/share/zoneinfo`, the locale must have a
+matching line in `/etc/locale.gen` *and* carry a `.UTF-8` suffix — because
+`03-system.sh` uncomments that exact line and then writes `LANG=$LOCALE`
+verbatim, so a bare `aa_ER` would generate `aa_ER.utf8` and set an LANG nothing
+could resolve — and the keymap must exist under `/usr/share/kbd/keymaps`.
+
+### Trade-off
+
+`install.conf` is now machine-written as well as hand-written, so its
+`KEY="value"` quoting is load-bearing in a second way: it has to satisfy
+`source` *and* the regex `dot_gitconfig.tmpl` uses to read the same file. The
+wizard refuses values containing `"`, `\`, `` ` `` or `$`, renders to a temp
+file, sources it back in a clean environment and compares key by key before
+replacing anything.
+
+### Alternatives considered
+
+**`dialog` or `whiptail`.** Neither is on the Arch install medium. A wizard that
+must install a package before asking its first question is worse than the text
+editor it replaces.
+
+**A separate override file** rather than rewriting `install.conf`. Rejected
+because that file has two consumers with two different parsers — the stages
+`source` it, and `dot_gitconfig.tmpl` parses it — so an override would have
+needed changes in both places and would have stranded the git identity.
+
+### The non-interactive path is preserved deliberately
+
+`--no-wizard` skips it, and so does any run whose stdin is not a terminal — so
+an existing scripted build keeps working without learning a new flag.
+`--wizard` forces it on anyway, which is how answers can be piped in.
+
+---
+
 ## Git identity lives in `install.conf`, and is committed
 
 **Decision:** Put `GIT_NAME` and `GIT_EMAIL` in `setup/install.conf` alongside

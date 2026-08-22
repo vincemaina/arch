@@ -51,7 +51,12 @@ Two consequences worth holding onto:
 
 ```bash
 # Full install. Run as root from a booted Arch live ISO. ERASES the target disk.
+# Asks for this machine's identity first, defaulting to whatever install.conf
+# already says - so pressing Enter through it changes nothing.
 ./install.sh /dev/vda        # or /dev/nvme0n1 on real hardware
+./install.sh --no-wizard /dev/vda   # skip the questions entirely
+# A run whose stdin is not a terminal skips the wizard on its own, so an
+# existing scripted build needs no new flag.
 
 # Update a machine that is already running this setup. Safe and repeatable.
 # Run as the normal user, never root.
@@ -95,7 +100,7 @@ Individual stages under `setup/install/` can be run on their own for debugging, 
 
 | Stage | Runs where | Root path it uses |
 | --- | --- | --- |
-| `01-disk.sh`, `02-base.sh` | Live ISO, against the repo checkout | `setup/` inside the clone |
+| `00-wizard.sh`, `01-disk.sh`, `02-base.sh` | Live ISO, against the repo checkout | `setup/` inside the clone |
 | *(copy)* | `cp -a setup/. /mnt/opt/arch-setup/` | — |
 | `03-system.sh`, `04-desktop.sh`, `05-dotfiles.sh` | `arch-chroot /mnt` | hardcoded `SETUP_ROOT=/opt/arch-setup` |
 
@@ -142,7 +147,9 @@ sync.
 
 ### `setup/install.conf`
 
-Single source of machine identity (`USERNAME`, `HOSTNAME`, `TIMEZONE`, `LOCALE`, `KEYMAP`), `source`d by `03-system.sh` and `05-dotfiles.sh`. Add new machine-level variables here rather than hardcoding them in a stage. Passwords are intentionally interactive, never stored.
+Single source of machine identity (`USERNAME`, `HOSTNAME`, `TIMEZONE`, `LOCALE`, `KEYMAP`, `GIT_NAME`, `GIT_EMAIL`), `source`d by `03-system.sh` and `05-dotfiles.sh`, and read a second way by `dot_gitconfig.tmpl` through chezmoi's `include "../install.conf"`.
+
+**`setup/install/00-wizard.sh` is the only writer of this file other than a human.** It rewrites just the `KEY="value"` lines, leaves every comment in place, refuses values containing `"`, `\`, `` ` `` or `$`, and sources the result back in a clean environment before replacing the original. The quoting is load-bearing in two directions now: `source` has to accept it *and* the gitconfig template's regex has to match it. Add new machine-level variables here rather than hardcoding them in a stage. Passwords are intentionally interactive, never stored.
 
 ### Package manifests — two different parsers
 
