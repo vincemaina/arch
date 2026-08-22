@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 16:13'
-updated_date: '2026-08-22 16:40'
+updated_date: '2026-08-22 16:43'
 labels: []
 dependencies:
   - TASK-119
@@ -90,6 +90,33 @@ Both neighbours survive, which was the specific worry: three different layers no
 So sway ran its own binding rather than receiving a Backspace. As with $mod+Ctrl+j in TASK-119, the focused workspace did not visibly change - `prev_on_output` has nowhere to go with one workspace on this output - which is why the IPC event was consulted instead of the workspace list. A no-op with a real cause is indistinguishable from a dead binding from the outside.
 
 Other binding events in the same capture (Mod4+Shift+h, Mod4+Shift+space) were the user working on the machine while the probe ran, not the injection.
+
+## AC#3 WITHDRAWN - the evidence was invalid, and the reason is worth recording
+
+The sway binding-event confirmation above was taken at 17:39:56. `/etc/keyd/default.conf` had been overwritten at 17:39:26 and keyd restarted at 17:39:28 - a RESTART, not the reload this work uses, which is `apply-config.sh` signature and therefore `./sync.sh` run from the MAIN checkout, where these commits do not exist.
+
+So that test ran against a config with no `h = backspace` and no `[control+meta]` layer at all. Of course sway received `$mod+Ctrl+h` and ran `workspace prev_on_output` - h was not rebound, so there was nothing for the composite layer to protect against. It passed for the wrong reason and proves nothing.
+
+This is the scripting-traps lesson in a new shape: the apparatus was fine, but the SUBJECT was swapped out between the measurement and the confirmation. A passing result is only evidence if the thing under test was actually installed when it was taken. Worth checking the config mtime against the test timestamp, not just that the test passed.
+
+The combined probe at 17:37:43 is NOT affected - keyd log shows the probe device matching at 17:37:43, before the overwrite - so `Ctrl+H -> backspace` and `Super+Ctrl+H -> raw chord` remain proven. It is only the sway-side confirmation that has to be retaken.
+
+AC#8 is unchecked with it: repo and /etc are no longer identical.
+
+## The wider problem this exposes
+
+`sync.sh` from main will revert this work every time it runs, because `apply-config.sh` installs whatever `setup/system/keyd/default.conf` says in the checkout it is run from. The branch is committed and pushed, so nothing is lost, but the machine will keep losing it until the branch reaches main. That is a merge, and it is the users call rather than something to do unasked.
+
+## AC#3 RETAKEN, and this time the subject was verified as installed
+
+Re-applied at 17:42:33, then before injecting: `/etc/keyd/default.conf` mtime recorded, `grep -c control+meta` -> 4, `grep -c "^h = backspace"` -> 1. After injecting, mtime IDENTICAL (17:42:33.726 both sides), so the config could not have been swapped mid-measurement the way it was the first time.
+
+    { "change": "run", "binding": { "command": "workspace prev_on_output",
+      "event_state_mask": [ "Control", "Mod4" ], "symbol": "h" } }
+
+With `h = backspace` genuinely live, `$mod+Ctrl+h` still reaches sway as its own chord. AC#3 and AC#8 checked on that basis.
+
+Recording the mtime either side of a behavioural test is cheap and is now the thing that distinguishes this evidence from the invalid run. Worth doing whenever the test subject is a file some other process can rewrite.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
