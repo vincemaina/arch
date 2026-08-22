@@ -205,13 +205,18 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>', { desc = 'Clear search highl
 -- not sway windows - sway has $mod+h/j/k/l for that, and the two do not
 -- collide because sway takes its bindings before the terminal sees them.
 --
--- THREE, NOT FOUR, AND THE MISSING ONE IS DELIBERATE. <C-k> is Escape now:
--- keyd rewrites it below the compositor (setup/system/keyd/default.conf), so
--- nvim receives a real Escape and never sees Ctrl+K at all. A fourth line here
--- would look exactly like the other three and could never fire, which is the
--- shape of nearly every bug this repository has had. `<C-w>k` still goes up.
-vim.keymap.set('n', '<C-h>', '<C-w>h', { desc = 'Split left' })
-vim.keymap.set('n', '<C-j>', '<C-w>j', { desc = 'Split down' })
+-- ONE, NOT FOUR, AND THE THREE ABSENCES ARE DELIBERATE. <C-k> is Escape,
+-- <C-j> is Enter and <C-h> is Backspace now: keyd rewrites all three below the
+-- compositor (setup/system/keyd/default.conf), so nvim receives the real key
+-- and never sees the chord. Lines for them here would look exactly like the
+-- one below and could never fire, which is the shape of nearly every bug this
+-- repository has had. `<C-w>k`, `<C-w>j` and `<C-w>h` all still work, and are
+-- now the only way to reach those three splits.
+--
+-- <C-f> was Tab from that same layer for a while and page-forward went with
+-- it. TASK-124 took that one back out, so <C-f> pages forward here again and
+-- there is nothing to work around. The keyd config says why f was the wrong
+-- key to spend and what would be spent instead.
 vim.keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Split right' })
 
 -- Keep the cursor where it was when joining lines, and keep the search result

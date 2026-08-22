@@ -112,13 +112,41 @@ scroll_note() {
     # CLAUDE.md warns about, in a file whose job is to stop shortcuts being
     # undiscoverable.
     grep -qE '^capslock *=.*\(scroll' /etc/keyd/default.conf 2>/dev/null || return 0
+
+    # The page keys are READ, not named. This line used to say "d / u" in the
+    # prose, which is the same coupling the guard above learned about: the keys
+    # changed (u went from Page Up to Page Down and i arrived) and a hardcoded
+    # string would have gone on reporting the old pair, confidently and wrongly.
+    # A report that is wrong is worse than one that is missing.
+    local pages
+    pages="$(awk '
+        /^\[/    { in_scroll = ($0 ~ /^\[scroll(:[A-Z]*)?\]/) ; next }
+        !in_scroll { next }
+        /^[a-z0-9]+[[:space:]]*=[[:space:]]*page(up|down)[[:space:]]*$/ {
+            key = $0; sub(/[[:space:]]*=.*/, "", key)
+            val = $0; sub(/^[^=]*=[[:space:]]*/, "", val); sub(/[[:space:]]*$/, "", val)
+            printf "%s %s\n", key, val
+        }
+    ' /etc/keyd/default.conf 2>/dev/null)"
+
+    local page_body="" k v
+    while read -r k v; do
+        [[ -n "$k" ]] || continue
+        [[ "$v" == pagedown ]] && v="Page Down" || v="Page Up"
+        page_body="${page_body}$(printf '    %-15s %s, by keyboard focus regardless' \
+            "$(tr '[:lower:]' '[:upper:]' <<<"$k" | tr -d '\n')" "$v")\n"
+    done <<<"$pages"
+
     note "Holding Caps Lock scrolls, underneath every program:
 
     j / k / h / l   scroll the focused window - these are real wheel events, so
                     they work inside a text field where Page Down would only
                     move the caret. They follow the POINTER, which sway keeps on
                     the focused window (mouse_warping container in 10-input.conf).
-    d / u           Page Down / Page Up, by keyboard focus regardless
+$(printf '%b' "$page_body")
+The page keys cross a document; the wheel keys nudge it, being paced to feel
+like a held arrow key. U and I sit on the same two fingers as J and K, one row
+up - note that U is page DOWN, matching the finger rather than vim's Ctrl+U.
 
 Tapping Caps Lock still toggles caps. These come from keyd rather than sway, so
 they are not in the table below."
@@ -205,6 +233,97 @@ Like the layer above, these come from keyd rather than sway, so they are not in
 the table below."
 }
 
+# The other two rewrites in the same [control] layer: Enter and Tab.
+#
+# Separate from escape_note rather than folded into it because the two answer
+# different questions. Escape is a key this desktop ADDED a second route to;
+# Enter and Tab are keys that already exist and were moved within reach - and
+# Ctrl+J in particular is not a new convention at all, it is the removal of an
+# exception, since zsh, rofi, qutebrowser and less already treated it as Enter
+# and nvim, fzf and every GTK dialog did not.
+#
+# Reads the layer for the same reason every note here does: rebind Enter onto
+# some other key and this reports the other key; take the line out and the note
+# disappears, which is correct. It asserts no binding string, so it cannot go
+# quiet by being reworded.
+control_note() {
+    command -v keyd &>/dev/null || return 0
+    systemctl is-active --quiet keyd 2>/dev/null || return 0
+
+    # enter, tab and backspace. esc is escape_note's, and anything else added
+    # to the layer later is deliberately NOT reported here rather than
+    # described by a sentence written before it existed.
+    local pairs
+    pairs="$(awk '
+        /^\[/     { in_control = ($0 ~ /^\[control(:[A-Z]*)?\]/) ; next }
+        !in_control { next }
+        /^[a-z0-9]+[[:space:]]*=[[:space:]]*(enter|tab|backspace)[[:space:]]*$/ {
+            key = $0; sub(/[[:space:]]*=.*/, "", key)
+            val = $0; sub(/^[^=]*=[[:space:]]*/, "", val); sub(/[[:space:]]*$/, "", val)
+            printf "%s %s\n", key, val
+        }
+    ' /etc/keyd/default.conf 2>/dev/null)"
+    [[ -n "$pairs" ]] || return 0
+
+    # The Shift half is derived rather than named, for the reason every note
+    # here reads the layer: it used to say "Ctrl+Shift+F is Shift+Tab", and
+    # when f stopped being tab that sentence was the only thing left in this
+    # file still describing it.
+    local body="" trailer="" shift_example="" k v ku
+    while read -r k v; do
+        [[ -n "$k" ]] || continue
+        ku="$(tr '[:lower:]' '[:upper:]' <<<"$k" | tr -d '\n')"
+        case "$v" in
+            enter)     body="${body}$(printf '    Ctrl+%-9s a real Enter key event' "$ku")\n" ;;
+            tab)       body="${body}$(printf '    Ctrl+%-9s a real Tab key event' "$ku")\n" ;;
+            backspace) body="${body}$(printf '    Ctrl+%-9s a real Backspace key event' "$ku")\n" ;;
+        esac
+        [[ -n "$shift_example" ]] || shift_example="$(printf 'Ctrl+Shift+%s is Shift+%s' \
+            "$ku" "$(tr '[:lower:]' '[:upper:]' <<<"${v:0:1}")${v:1}")"
+    done <<<"$pairs"
+
+    # Each trailer is guarded on the binding actually being present, so a
+    # config that drops one does not leave this file describing it.
+    if grep -qE '^[a-z]+ enter$' <<<"$pairs"; then
+        trailer="${trailer}
+Enter was already what this chord meant in zsh, rofi, qutebrowser and less. It
+now means the same in nvim, fzf, lazygit, GTK dialogs and the browser, which is
+where it used to stop. In fzf it ACCEPTS the selection rather than moving down
+(use Ctrl+N); nvim's split-below mapping was removed, and Ctrl+W then j still
+reaches it."
+    fi
+    if grep -qE '^[a-z]+ backspace$' <<<"$pairs"; then
+        trailer="${trailer}
+Backspace was already what this chord meant in zsh, rofi, fzf, yazi and
+qutebrowser's input modes, because ASCII 0x08 IS backspace. It now means the
+same in nvim, GTK dialogs and the browser chrome. It costs Firefox's history
+sidebar (Ctrl+Shift+H opens the full history) and nvim's split-left mapping,
+which was removed - Ctrl+W then h still reaches it."
+    fi
+    # Guarded on f rather than on any key, because this paragraph prices
+    # Ctrl+F specifically. Ctrl+I - the alternative the keyd config names -
+    # costs none of it, so printing this for `i = tab` would be a lie.
+    if grep -qE '^f tab$' <<<"$pairs"; then
+        trailer="${trailer}
+Tab costs the page-forward that this chord meant across the vi lineage - nvim,
+less, yazi and qutebrowser - and find-in-page in Firefox. Page Down pages in all
+four, Ctrl+D half-pages in nvim, and / opens quick-find in Firefox. Ctrl+B still
+pages backward, so the pair is asymmetric on purpose."
+    fi
+
+    note "The keys off the home row, brought back onto it:
+
+$(printf '%b' "$body")${trailer}
+
+Shift composes, because keyd strips only the Control: ${shift_example}. Sway's
+own \$mod+Ctrl chords are exempt - see the
+[control+meta] layer in the keyd config - so \$mod+Ctrl+j is still the workspace
+toggle and \$mod+Ctrl+h is still the previous workspace.
+
+Like the layers above, these come from keyd rather than sway, so they are not in
+the table below."
+}
+
 # The arrow cluster on the home row, invisible for the same reason as the two
 # above.
 #
@@ -252,6 +371,7 @@ in the table below."
 swap_note
 scroll_note
 escape_note
+control_note
 arrows_note
 
 # Canonical form so a sway binding and a zsh binding can be compared at all:
