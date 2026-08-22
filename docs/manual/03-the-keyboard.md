@@ -74,8 +74,11 @@ happens with one hand posture held down, whereas the shorter chord would mean
 releasing Shift between every pair of actions. Cheaper to press once, more
 expensive to actually use.
 
-Holding `$mod` and turning the scroll wheel over a window does the same thing
-by hand. Both move in fixed **pixel** steps rather than percentage points, and
+Holding `$mod+Shift` and turning the scroll wheel over a window does exactly
+the same thing with the other hand. That is a deliberate duplicate, and one of
+very few here: rearranging and sizing windows is a *spatial* task and spatial
+tasks suit a pointer, while everything else in this scheme is discrete and
+suits a key. Both move in fixed **pixel** steps rather than percentage points, and
 the steps are 16:9, so a window keeps roughly its shape instead of creeping
 square over several presses. The unit is not a detail: a floating window
 ignores a percentage resize entirely, so a binding written in `ppt` would look
@@ -88,6 +91,10 @@ that is Sway's model, not a fault.
 
 `$mod+r` enters resize mode, described above, which is the one to use when you
 want one edge moved rather than the whole window scaled.
+
+Note that the wheel gesture is `$mod+Shift`, not bare `$mod`. Bare `$mod` and
+the wheel steps between workspaces instead — see
+[The desktop](02-the-desktop.md).
 
 ## Media keys
 

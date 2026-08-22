@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 10:38'
-updated_date: '2026-08-22 11:26'
+updated_date: '2026-08-22 11:48'
 labels: []
 dependencies: []
 priority: low
@@ -68,6 +68,23 @@ Verified against the running compositor rather than the file. swaymsg -t get_con
 The scratchpad did NOT take bare $mod+minus back, though it is free again. Half the pair would be prime and half would still be three keys down, and a pair learned as two unrelated chords is worse than a consistent one. Bare $mod+minus and $mod+equal are simply unclaimed.
 
 Also updated: the REPEATABLE whitelist in checks/sway-bindings.sh, and manual chapters 2 and 3. checks/manual.sh caught two stale references and one bug in itself during this - it was reading "$mod+Shift" in a sentence explaining WHY the modifier was chosen as if it were a binding that ought to exist.
+
+SECOND FOLLOW-UP. Correcting a misreading on my side first: the user asked not to remove the mouse gesture, but it had never been removed - the previous change moved only the keyboard pair, and $mod+button4/5 were still bound throughout.
+
+What the user actually established is a principle, and it is worth more than the binding change. "One way to do each thing" was being applied too literally. The real test a binding has to pass is whether it exists for a clear reason, not whether it is unique. Rearranging and sizing windows is a SPATIAL task and spatial tasks suit a pointer, while everything else in this scheme is discrete and suits a key - so both hands should be able to do it, and both now can.
+
+Changes:
+  * Mouse resize moved from $mod+scroll to $mod+Shift+scroll, matching the keyboard pair. One hand posture - $mod+Shift - now covers moving a window ($mod+Shift+h/j/k/l) and sizing it, whether you finish the gesture with a key or the wheel.
+  * Bare $mod+scroll became workspace stepping: prev_on_output on scroll up, next_on_output on scroll down, matching the h/l sense of the existing $mod+Ctrl pair so the two cannot disagree about direction.
+
+Verified in the running compositor, not the file, using unbindsym with a control: Mod4+Shift+button4 and Mod4+button5 both returned success:true, while Mod4+Shift+button9 returned "Could not find binding". Reloaded afterwards. 76 bindings, no duplicates.
+
+Two pieces of documentation were found to have already drifted, and both were fixed rather than left:
+  * DECISIONS.md claimed "prev/next workspace stepping duplicated the numbered bindings and is gone too". It was not gone - $mod+Ctrl+h/l has done exactly that for some time. That section is now titled "nothing exists just because" and states the real rule, with resizing as the worked example.
+  * DECISIONS.md said "Shift is reserved for the infrequent". Shift actually carries two unrelated meanings: "you probably meant this" in the session cluster, and "act on this window rather than move the focus" in the window cluster, which is the group resize joined. Retitled and both meanings named.
+  * The sway config comment claiming the one-binding-per-action rule "holds without needing an exception" was rewritten for the same reason, now that three routes reach the workspace next door and each has its own justification.
+
+Manual chapters 2 and 3 updated. checks/manual.sh 8/8, session 92/0, sway-commands clean.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

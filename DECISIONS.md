@@ -821,7 +821,7 @@ never be shadowed again and the scheme has no growth problem.
 The terminal on `$mod+Return` is the deliberate exception: on a tiling desktop it
 is less an application than the thing windows are usually made of.
 
-### The second half: one way to do each thing
+### The second half: nothing exists just because
 
 Upstream ships arrow keys alongside `h/j/k/l` so newcomers are not stuck before
 learning vim keys. Keeping both is exactly the kind of thing this setup argues
@@ -829,13 +829,33 @@ against elsewhere — the same reasoning applied to a bar module or a package
 would delete it. The arrow duplicates are gone, as is stacking, which does the
 same job as tabbed.
 
-Prev/next workspace stepping duplicated the numbered bindings and is gone too.
 `Alt+Tab`, which had been bound to workspaces, is now unbound: everywhere else in
 computing it means "switch window", and applications sometimes want it.
 `$mod+Tab` returns to the previous workspace, which was the useful part.
 
 This took 80 bindings to 64, but the count is not the point. Every remaining
 binding is there because someone decided it should be.
+
+**And that is the actual rule, which is not "one way to do each thing".** This
+section used to be titled that way, and taken literally it is wrong. The test a
+binding has to pass is whether it exists for a clear reason, not whether it is
+unique. Arrow keys failed that test because their only argument was familiarity
+to someone who has not learned the scheme yet. Two bindings that suit genuinely
+different hands both pass it.
+
+The worked case is resizing. `$mod+Shift+equal` / `$mod+Shift+minus` on the
+keyboard and `$mod+Shift`+wheel on the pointer do exactly the same thing, and
+both stay, because **rearranging and sizing windows is a spatial task and
+spatial tasks suit a pointer**, while everything else in this scheme is a
+discrete one and suits a key. Deleting the wheel gesture to satisfy a slogan
+would have made the desktop worse.
+
+The corollary is that stepping through workspaces now has three routes — the
+number row, `$mod+Ctrl+h/l`, and bare `$mod`+wheel — where an earlier version of
+this section claimed stepping had been removed altogether for duplicating the
+number row. It had not; it came back on the home row because the number row is a
+stretch, and the wheel was added because that too is a spatial motion you make
+without looking. Each has a reason. That is the whole requirement.
 
 ### How it is enforced
 
@@ -846,7 +866,7 @@ prints the full table, which is the practical documentation of the scheme: 64
 bindings across four fragments is more than can be held in mind while editing
 one of them.
 
-### Shift is reserved for the infrequent
+### What Shift means, which is two things
 
 Closing a window is `$mod+q`, not `$mod+Shift+q` as upstream ships it. It is one
 of the most frequent actions there is, and Shift is a real cost when repeated
@@ -854,8 +874,18 @@ all day.
 
 The session bindings keep Shift deliberately: reload on `$mod+Shift+c` and exit
 on `$mod+Shift+e` are rare, and being slightly awkward is a feature when the
-consequence of a mistake is losing the session. Shift here marks "you probably
+consequence of a mistake is losing the session. Shift there marks "you probably
 meant this", not "this is the second variant".
+
+Shift carries a second, unrelated meaning in the window cluster, and it is worth
+naming because the two look alike and are not: **`$mod+Shift` means "act on this
+window rather than move the focus"**. `$mod+h/j/k/l` moves focus and
+`$mod+Shift+h/j/k/l` moves the window; resizing joined that group for the same
+reason, on `$mod+Shift+equal` / `$mod+Shift+minus` and on `$mod+Shift`+wheel.
+Arranging a layout means moving and sizing in the same breath, so both live
+under one hand posture held down. A shorter chord would have been cheaper to
+press once and more expensive to actually use — "prime" has to mean cheap in the
+sequence you really perform, not cheap in isolation.
 
 The cost is that a window is now one easy chord from closing, with no
 confirmation. That is the same bargain every editor makes with its close

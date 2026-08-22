@@ -59,10 +59,12 @@ the bar.
 `$mod+Shift+space` toggles the focused window between floating and tiled.
 Drag a floating window with `$mod` and the left mouse button, resize it with
 `$mod` and the right button, from anywhere inside the window rather than
-having to aim at its edge. `$mod` and the scroll wheel resizes the focused
-window - floating or tiled - in fixed pixel steps at a 16:9 ratio, which is
-the coarse alternative to dragging a corner: a few clicks to make something
-bigger without aiming at anything. A single tiled window with no neighbour
+having to aim at its edge. `$mod+Shift` and the scroll wheel resizes the
+focused window - floating or tiled - in fixed pixel steps at a 16:9 ratio,
+which is the coarse alternative to dragging a corner: a few clicks to make
+something bigger without aiming at anything. `$mod+Shift+equal` and
+`$mod+Shift+minus` do the same from the keyboard, and both are documented in
+[The keyboard](03-the-keyboard.md). A single tiled window with no neighbour
 has nothing to shrink to make room, so the gesture correctly does nothing
 there.
 
@@ -96,6 +98,19 @@ previous or next workspace **on the current output**; `$mod+Ctrl+j` jumps
 back to whichever workspace you were on before the current one
 (`back_and_forth`), which is the fast way to bounce between two you are
 working across.
+
+Holding `$mod` and turning the scroll wheel steps the same way — up for the
+previous workspace, down for the next. Three routes to the workspace next
+door is more duplication than this desktop usually allows, and each earns it
+differently: the number row is exact but a stretch, the home-row pair is for
+stepping without looking, and the wheel is there because this is a spatial
+motion and your hand may already be on the mouse.
+
+One thing to expect from the wheel and the `$mod+Ctrl` pair alike: **they step
+through the workspaces that exist, not one to ten.** A workspace is created
+when you first use it and destroyed when its last window closes, so on a
+machine with three in use the wheel visits three. The number row is what
+reaches an empty one.
 
 Workspaces belong to one output each in Sway's model - this repository keeps
 that rather than scripting something that spans displays, and
