@@ -1407,6 +1407,31 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Console keymap (TASK-115)"
+
+# /etc/vconsole.conf is what Ctrl+Alt+F2 reaches if the graphical session will
+# not start, and nothing checked it against the repository's intent until
+# this: sync.sh could apply everything else and still leave the text console
+# on a stale layout with no visible sign of it.
+INSTALL_CONF="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/setup/install.conf"
+
+if [[ ! -f "$INSTALL_CONF" ]]; then
+    skip "setup/install.conf not found"
+elif [[ ! -f /etc/vconsole.conf ]]; then
+    fail "/etc/vconsole.conf does not exist; the text console has no configured keymap"
+else
+    WANT_KEYMAP="$(source "$INSTALL_CONF"; echo "$KEYMAP")"
+    GOT_KEYMAP="$(sed -n 's/^KEYMAP=//p' /etc/vconsole.conf | tr -d '"')"
+    if [[ -z "$WANT_KEYMAP" ]]; then
+        skip "install.conf has no KEYMAP"
+    elif [[ "$GOT_KEYMAP" == "$WANT_KEYMAP" ]]; then
+        pass "/etc/vconsole.conf KEYMAP is $GOT_KEYMAP"
+    else
+        fail "/etc/vconsole.conf KEYMAP is ${GOT_KEYMAP:-unset}, install.conf says $WANT_KEYMAP; run sync.sh"
+    fi
+fi
+
+# ----------------------------------------------------------------------
 section "Login screen (TASK-15)"
 
 # Replicates how ReGreet discovers sessions, so a greeter that would offer the

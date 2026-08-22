@@ -53,6 +53,32 @@ for mapping in "${CONFIG_FILES[@]}"; do
     install -Dm644 "$SYSTEM_ROOT/$src" "$dest"
 done
 
+# /etc/vconsole.conf, from KEYMAP in install.conf.
+#
+# TASK-115: this used to be written once, by 03-system.sh, and only there -
+# machine identity rather than system configuration, so it fell outside what
+# this script owned, and sync.sh had no path to correct it if the wizard
+# answer was wrong. It is exactly the kind of machine-wide file this script
+# exists to own, so it moves here rather than gaining a second writer:
+# 03-system.sh no longer touches it, and it is written once, during install,
+# when 04-desktop.sh calls this script.
+#
+# install.conf is machine identity, sourced rather than copied like the files
+# above, so a value substitution rather than a straight file install.
+INSTALL_CONF="$SYSTEM_ROOT/../install.conf"
+
+if [[ -f "$INSTALL_CONF" ]]; then
+    # shellcheck source=/dev/null
+    source "$INSTALL_CONF"
+fi
+
+if [[ -n "${KEYMAP:-}" ]]; then
+    echo "    /etc/vconsole.conf"
+    echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
+else
+    echo "    WARNING: KEYMAP not found in $INSTALL_CONF; leaving /etc/vconsole.conf alone" >&2
+fi
+
 # The greeter's stylesheet, RENDERED rather than copied.
 #
 # ReGreet reads /etc/greetd/regreet.css by default, so nothing on the cage
@@ -307,6 +333,14 @@ fi
 # rather than waiting for a reboot.
 if ! systemctl restart keyd; then
     echo "    WARNING: could not restart keyd; key remapping is unchanged" >&2
+fi
+
+# Also safe: systemd-vconsole-setup owns no session either, and the keymap it
+# loads is a single kernel-wide table shared by every virtual console, not
+# per-VT state. Restarting it re-reads /etc/vconsole.conf and reapplies now,
+# rather than leaving a corrected KEYMAP stranded until the next boot.
+if [[ -n "${KEYMAP:-}" ]] && ! systemctl restart systemd-vconsole-setup.service; then
+    echo "    WARNING: could not reapply the console keymap; it applies at next boot" >&2
 fi
 
 # Deliberately not restarted: greetd owns the active session, and restarting it
