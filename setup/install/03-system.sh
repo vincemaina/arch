@@ -18,8 +18,11 @@ echo "LANG=$LOCALE" > /etc/locale.conf
 echo "==> Configuring hostname"
 echo "$HOSTNAME" > /etc/hostname
 
-echo "==> Configuring console keyboard"
-echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
+# Console keymap (KEYMAP) is deliberately not written here. It used to be, and
+# only here, which was the bug TASK-115 closed: sync.sh had no path to correct
+# it afterwards. system/apply-config.sh now owns /etc/vconsole.conf, so it
+# reaches both a fresh install (04-desktop.sh calls it) and a running machine
+# (sync.sh calls it with --activate) from one place.
 
 echo "==> Creating user"
 
