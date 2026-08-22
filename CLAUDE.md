@@ -385,6 +385,31 @@ else here, the manual is repository tooling: nothing it needs may be added to
 `setup/packages/`, which is why there is no pandoc. `sync.sh` installs the
 built page so the `manual` command and the launcher entry can open it.
 
+## The hook that keeps the record
+
+`.claude/hooks/keep-the-record.sh` runs at `SessionStart` (to note where the
+session began) and at `Stop`. It compares what changed against two things this
+repository is known to forget, and blocks the end of the turn once if either
+is unanswered:
+
+- **The manual.** If a keybinding, helper script, bar module, theme, package,
+  session unit, install path or check changed and `docs/manual/` did not, it
+  names the chapter that most likely covers it.
+- **The backlog.** If files changed and no task file was touched, it says so.
+  It deliberately does **not** report on every In Progress task — several have
+  been open for weeks, and nagging about those at the end of an unrelated turn
+  is how a hook trains you to ignore it.
+
+It asks **once per session per reason**, keyed on a hash of the message, so a
+new reason still gets through and nothing can loop. Addressing it and saying
+why it does not apply are equally valid answers. Its state lives in
+`.claude/state/`, which is ignored; `<session>.ran` is appended on every Stop
+so that "never invoked" and "nothing to report" cannot be confused, which is
+the exact shape of silence that hides bugs here.
+
+Like everything in `.claude/`, it is repository tooling and never reaches the
+built machine.
+
 ## Reference material
 
 `docs/themes/` holds screenshots of other people's setups, collected as

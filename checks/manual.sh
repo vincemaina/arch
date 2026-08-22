@@ -206,6 +206,10 @@ for m in re.finditer(r"^\| `([^`]+)` \|", bindings_file.read_text(), re.M):
     bound.add(canon(m.group(1)))
 
 MOD = re.compile(r"^(?:\$mod|Mod4|Super)(?:\+[A-Za-z0-9_]+)+$")
+# "$mod+Shift" in a sentence names a modifier pair, not a binding, and there is
+# nothing for it to be bound to. Without this the check demanded that prose
+# explaining WHY a shortcut uses a modifier be itself a shortcut.
+MODIFIERS = {"shift", "ctrl", "control", "alt", "mod1", "mod4", "super", "meta"}
 unbound = []
 mentioned = set()
 # Chapters only. The index is about the manual rather than about the desktop,
@@ -216,6 +220,8 @@ for path in chapters:
     for m in re.finditer(r"`([^`\s]+)`", text):
         combo = m.group(1)
         if not MOD.match(combo):
+            continue
+        if combo.rsplit("+", 1)[-1].lower() in MODIFIERS:
             continue
         mentioned.add(combo)
         if canon(combo) not in bound:

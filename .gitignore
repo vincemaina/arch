@@ -12,3 +12,6 @@ __pycache__/
 # tracked; the rendered HTML and the generated keyboard reference are not, since
 # both are derived and one of them changes whenever a keybinding does.
 docs/manual/build/
+
+# Hook state is per session and means nothing to anyone else.
+.claude/state/

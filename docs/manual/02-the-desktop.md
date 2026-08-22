@@ -82,10 +82,10 @@ of the way - nothing else on this desktop shows what is in it, which is why
 the bar carries a count (see below).
 
 Those are three-key combinations because the scratchpad lost its shorter ones.
-`$mod+minus` and `$mod+equal` now shrink and grow the focused window, which
-is used far more often, and the principle applied here is that the shortest
-shortcuts belong to the most frequent actions rather than to whichever feature
-claimed them first. See [The keyboard](03-the-keyboard.md).
+`$mod+Shift+minus` and `$mod+Shift+equal` now shrink and grow the focused
+window, which is used far more often, and the principle applied here is that
+the shortest shortcuts belong to the most frequent actions rather than to
+whichever feature claimed them first. See [The keyboard](03-the-keyboard.md).
 
 ## Workspaces
 

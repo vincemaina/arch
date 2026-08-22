@@ -63,9 +63,16 @@ swaymsg -t get_binding_modes
 There are three ways to resize, and two of them are new enough to be worth
 naming explicitly.
 
-`$mod+equal` and `$mod+minus` grow and shrink the focused window in both
-dimensions at once. Read them as `+` and `-`. They repeat while held, so a
-window can be dragged to roughly the size you want without releasing.
+`$mod+Shift+equal` and `$mod+Shift+minus` grow and shrink the focused window
+in both dimensions at once. Read them as `+` and `-`. They repeat while held,
+so a window can be dragged to roughly the size you want without releasing.
+
+They share a modifier with `$mod+Shift+h/j/k/l`, which moves a window, and
+that is the reason they are not on bare `$mod`. Arranging a layout means
+moving and sizing in the same breath; on `$mod+Shift` the whole operation
+happens with one hand posture held down, whereas the shorter chord would mean
+releasing Shift between every pair of actions. Cheaper to press once, more
+expensive to actually use.
 
 Holding `$mod` and turning the scroll wheel over a window does the same thing
 by hand. Both move in fixed **pixel** steps rather than percentage points, and

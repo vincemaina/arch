@@ -65,12 +65,14 @@ rather than leaving you to work it out.
 `checks/manual.sh` is the odd one out: it checks a document rather than the
 machine. It is there because prose goes stale exactly the way configuration
 does, and a chapter describing a keybinding nobody bound reads precisely like
-one that is right. Know its limit, though — it can only tell you that the
-things the manual names exist, never that a sentence is true. When
-`$mod+minus` stopped opening the scratchpad and started shrinking a window,
-the check caught the chapter naming a companion binding that had become
-unbound, and said nothing at all about `$mod+minus`, which was still bound and
-now meant something else entirely.
+one that is right.
+
+Know its limit, though — it can only tell you that the things the manual names
+exist, never that a sentence about them is true. `$mod+Shift+minus` was Sway's
+own default for sending a window to the scratchpad, and now shrinks one
+instead. It was bound before and it is bound now, so the check has nothing to
+say about it in either state, and a chapter still describing it as the
+scratchpad key would pass. Existence is checkable. Meaning is not.
 
 **`checks/session.sh` can hang, and this is expected, not a bug in the
 check.** Its screenshot check calls `sway-screenshot`, and if the screen is

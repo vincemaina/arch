@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 10:38'
-updated_date: '2026-08-22 10:45'
+updated_date: '2026-08-22 11:26'
 labels: []
 dependencies: []
 priority: low
@@ -56,6 +56,18 @@ Verification against the RUNNING system, not just the file:
   resize grow width 64px, height 36px  -> width 942->1006 (+64, exact); height unchanged (already at full workspace height, no vertical sibling to take space from - same documented no-op as the mouse gesture)
   resize shrink width 64px, height 36px -> width back to 942 (-64, exact)
   Killed only con_id 9 and 11 (never used pkill or app_id matching), switched back to workspace 1.
+
+FOLLOW-UP, at the user request after living with it: the keyboard bindings moved from bare $mod to $mod+Shift. So $mod+Shift+equal grows and $mod+Shift+minus shrinks.
+
+The reason is what you are doing while you resize. Moving a window is $mod+Shift+h/j/k/l, and arranging a layout means moving and sizing in the same breath - on $mod+Shift the whole operation happens with one hand posture held down, where bare $mod meant releasing Shift between every pair of actions. Cheaper to press once, more expensive to actually use. That refines the ticket original principle rather than contradicting it: prime shortcuts go to frequent actions, but "prime" has to mean cheap in the sequence you actually perform, not cheap in isolation.
+
+The shifted keysym was the risk worth checking rather than assuming, since Shift+equal produces `plus` and a binding written against `equal` could plausibly never fire - the classic looks-correct-does-nothing shape. Settled from evidence, not reasoning: `bindsym $mod+Shift+minus move scratchpad` is sway own shipped default in /etc/sway/config, so plain bindsym matches these and no --to-code is needed.
+
+Verified against the running compositor rather than the file. swaymsg -t get_config returns only the top-level config and not the config.d includes, so it cannot answer this. Used unbindsym as a probe with a control: `unbindsym Mod4+Shift+F13` returned success:false, "Could not find binding", while `unbindsym Mod4+Shift+equal` returned success:true - the binding is registered in the running sway. Reloaded afterwards to restore it.
+
+The scratchpad did NOT take bare $mod+minus back, though it is free again. Half the pair would be prime and half would still be three keys down, and a pair learned as two unrelated chords is worse than a consistent one. Bare $mod+minus and $mod+equal are simply unclaimed.
+
+Also updated: the REPEATABLE whitelist in checks/sway-bindings.sh, and manual chapters 2 and 3. checks/manual.sh caught two stale references and one bug in itself during this - it was reading "$mod+Shift" in a sentence explaining WHY the modifier was chosen as if it were a binding that ought to exist.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

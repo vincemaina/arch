@@ -112,7 +112,7 @@ echo "No binding is defined twice."
 REPEATABLE=(
     '$mod+Shift+$left' '$mod+Shift+$down' '$mod+Shift+$up' '$mod+Shift+$right'
     '$left' '$down' '$up' '$right'
-    '$mod+equal' '$mod+minus'
+    '$mod+Shift+equal' '$mod+Shift+minus'
     'XF86AudioLowerVolume' 'XF86AudioRaiseVolume'
     'XF86MonBrightnessDown' 'XF86MonBrightnessUp'
 )
