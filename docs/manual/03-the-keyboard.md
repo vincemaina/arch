@@ -142,6 +142,55 @@ is a KVM guest with an emulated keyboard, and the LED belongs to the
 guest's. On real hardware, the device Sway updates is the physical
 keyboard, so the light works as expected and this does not apply.
 
+## Ctrl+K is another Escape
+
+Escape is the key this desktop asks for most - leaving insert mode in Neovim,
+backing out of the Backlog TUI, closing the launcher, cancelling a fuzzy
+search - and it is the furthest key on the board from where the hands sit. So
+there is a second one on the home row: **Ctrl+K sends Escape**.
+
+Like the scroll layer, this is keyd rather than Sway, in the same file
+(`setup/system/keyd/default.conf`), and for a reason Sway could not have
+solved. Sway can only bind a key *away* from an application; it cannot change
+what a key means *inside* one. Escape is wanted inside Neovim, inside the
+Backlog TUI, inside a browser and inside rofi - and two of those have no
+configuration in this repository to change. keyd emits a real Escape key event
+at the evdev layer, so every one of them receives exactly what the Escape key
+itself sends, with nothing to configure per program.
+
+Remember that keyd has already swapped the modifiers, so the Control here is
+physically the key next to the space bar - left thumb, right middle finger,
+neither hand leaving the home row.
+
+**This is not free, and what it costs is worth knowing before it surprises
+you.** Ctrl+K meant something in most of these programs already:
+
+| Where | What Ctrl+K was | What to use instead |
+| --- | --- | --- |
+| zsh | `kill-line` | `Alt+K`, rebound in `~/.zshrc` for exactly this reason |
+| Neovim | move to the split above | `Ctrl+W` then `k` |
+| fzf | move the selection up | `Ctrl+P`, or the arrow key |
+| lazygit | move a commit up in a rebase | `Alt+Up` |
+| qutebrowser | kill to end of line, in command and prompt modes | - |
+| rofi, yazi, foot | kill to end of the input line | - |
+| Firefox | focus the search bar | `Ctrl+L`, which searches too |
+
+The last four traded a kill-to-end-of-line for an Escape that leaves the thing
+altogether, which is usually closer to what the key was reached for. The first
+three are real losses with real replacements. Sway itself binds no Ctrl+K at
+all, and the Backlog TUI binds only Ctrl+S, so the two places this was asked
+for cost nothing at all.
+
+One consequence to expect: in fzf, Ctrl+K now **cancels** the search rather
+than moving the selection up. That is Escape doing its job, and it is the one
+that takes the longest to unlearn.
+
+`tools/shortcuts.sh` reports this the same way it reports the scroll layer -
+as a note above the table, because no configuration the tool parses mentions
+it. That note reads the key out of the keyd config rather than asserting it,
+so changing which key sends Escape changes the report without anyone editing
+the report.
+
 ## The generated reference
 
 Everything below is produced by `tools/shortcuts.sh` from the live

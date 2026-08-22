@@ -42,6 +42,21 @@ setopt PUSHD_IGNORE_DUPS
 
 bindkey -e                    # emacs keys: Ctrl+A, Ctrl+E, Ctrl+R as expected
 
+# kill-line moved off Ctrl+K, which is now Escape.
+#
+# keyd turns Ctrl+K into a real Escape key event below the compositor - see
+# setup/system/keyd/default.conf - so the shell never sees Ctrl+K again and
+# `bindkey '^K'` would be a line that reads as configuration and cannot fire.
+# Of everything Ctrl+K was bound to across this machine, kill-line was the only
+# one with no replacement already bound: Ctrl+U kills the whole line and Alt+D
+# kills a word forward, but nothing else killed to the end of it.
+#
+# Alt+K rather than some other key because it is the same letter, and because
+# \ek is unbound in zsh's emacs keymap - checked with `bindkey`, not assumed.
+# Alt is physically the bottom-left corner key after the swap, which is a worse
+# place than Ctrl+K was; that is the honest cost of the trade.
+bindkey '\ek' kill-line
+
 ### Plugins
 #
 # Not guarded with a file test. These come from declared packages, so if one is

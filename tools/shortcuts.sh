@@ -124,8 +124,57 @@ Tapping Caps Lock still toggles caps. These come from keyd rather than sway, so
 they are not in the table below."
 }
 
+# The second Escape key, which is invisible for the same reason.
+#
+# The guard above learned the hard way that asserting a binding string couples
+# this file to a config it does not own, and goes quiet when that config is
+# reworded. So this one asserts nothing: it READS the key out of the [control]
+# layer and reports whichever key is mapped to Escape there. Change the config
+# to `semicolon = esc` and this note follows without being touched; take the
+# binding out and the note disappears, which is correct. The only way it can
+# lie is if it finds no key at all, in which case it says nothing.
+escape_note() {
+    command -v keyd &>/dev/null || return 0
+    systemctl is-active --quiet keyd 2>/dev/null || return 0
+
+    local key
+    key="$(awk '
+        /^\[/     { in_control = ($0 ~ /^\[control(:[A-Z]*)?\]/) ; next }
+        !in_control { next }
+        /^[a-z0-9]+[[:space:]]*=[[:space:]]*esc(ape)?[[:space:]]*$/ {
+            sub(/[[:space:]]*=.*/, ""); print; exit
+        }
+    ' /etc/keyd/default.conf 2>/dev/null)"
+    [[ -n "$key" ]] || return 0
+
+    # keyd spells keys the way the kernel does. Only the ones a human would not
+    # recognise need translating; anything else is printed as keyd names it,
+    # which is worse to read than a real name and better than a wrong guess.
+    local pretty
+    case "$key" in
+        semicolon)  pretty=';' ;;
+        apostrophe) pretty="'" ;;
+        comma)      pretty=',' ;;
+        dot)        pretty='.' ;;
+        slash)      pretty='/' ;;
+        *)          pretty="$(tr '[:lower:]' '[:upper:]' <<<"$key")" ;;
+    esac
+
+    note "Ctrl+${pretty} is another Escape, underneath every program:
+
+    Ctrl+${pretty}          a real Escape key event, emitted by keyd at the evdev
+                    layer - so nvim, the backlog TUI, rofi, fzf and a browser
+                    all see exactly what the Escape key sends.
+
+It displaces whatever Ctrl+${pretty} meant in each program: kill-line in zsh (moved
+to Alt+K), the split-above mapping in nvim (removed - use Ctrl+W then k), and
+'move up' in fzf (use Ctrl+P). Like the layer above, this comes from keyd rather
+than sway, so it is not in the table below."
+}
+
 swap_note
 scroll_note
+escape_note
 
 # Canonical form so a sway binding and a zsh binding can be compared at all:
 # lower case, modifiers sorted, Mod4 spelled Super.
