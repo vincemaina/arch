@@ -134,6 +134,7 @@ window#waybar > box {
 #clock,
 #mpris,
 #scratchpad,
+#custom-notifications,
 #network {
     background: transparent;
     /* Enough to keep the hover pill off its own text, and no more. The gap
@@ -174,6 +175,13 @@ window#waybar > box {
  * a text colour. */
 #scratchpad     { color: @warning;   text-shadow: 0 0 5px @warning; }
 
+/* Same reasoning as the scratchpad just above: hidden almost always, so it
+ * can afford the warning colour on the rare occasions it is not - "something
+ * is waiting, nothing is wrong". notification-count leaves text empty at
+ * zero, and waybar hides a custom module outright when its text is empty, so
+ * there is no bare bell glyph sitting in the bar the rest of the time. */
+#custom-notifications { color: @warning; text-shadow: 0 0 5px @warning; }
+
 /* The centre. The clock took the space the focused window's title used to
  * have, and with it the job of being the one bright thing in the middle of the
  * bar - so it keeps the emphasis treatment rather than the quieter one it had
@@ -212,6 +220,7 @@ window#waybar > box {
 #clock:hover,
 #mpris:hover,
 #scratchpad:hover,
+#custom-notifications:hover,
 #network:hover {
     color: @bg;
     /* The glow goes on hover. Dark text on a bright pill does not want a halo
@@ -227,6 +236,7 @@ window#waybar > box {
 #battery:hover        { background: @ok; }
 #clock:hover          { background: @accent; }
 #scratchpad:hover     { background: @warning; }
+#custom-notifications:hover { background: @warning; }
 #mpris:hover          { background: @secondary; }
 #network:hover        { background: @surface_alt; color: @text; }
 

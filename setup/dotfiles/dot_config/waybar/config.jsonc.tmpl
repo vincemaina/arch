@@ -17,6 +17,7 @@
 // worth glancing at. What each one does:
 //
 //   workspaces    switch to it
+//   notifications open the notification centre (dismiss / restore / DND)
 //   clock         a calendar, three months, toggled
 //   mpris         play/pause; middle goes back, right skips forward
 //   idle_inhibitor  stop the screen locking, or let it again
@@ -45,7 +46,7 @@
     "position": "top",
     "spacing": 4,
 
-    "modules-left": ["sway/workspaces", "sway/mode", "sway/scratchpad"],
+    "modules-left": ["sway/workspaces", "sway/mode", "sway/scratchpad", "custom/notifications"],
     "modules-center": ["clock", "mpris"],
     "modules-right": ["idle_inhibitor", "network", "cpu", "memory", "pulseaudio", "battery"],
 
@@ -77,6 +78,41 @@
         "format": "\uf2d2 {count}",
         "tooltip-format": "{app}: {title}",
         "on-click": "swaymsg scratchpad show"
+    },
+
+    // The notification bell. TASK-78: an easy place to see how many
+    // undismissed notifications you have, in case you missed the popup - and
+    // clicking it opens the notification history that already exists at
+    // notification-centre (rofi, dismiss/restore/DND), rather than building a
+    // second tool.
+    //
+    // "Undismissed" turned out not to mean `makoctl list` (what mako is
+    // currently showing). mako's default-timeout is 5 seconds, so by the time
+    // anyone looks at the bar a normal notification has almost always already
+    // expired out of `list` and into `history` - a badge driven by `list`
+    // alone would read 0 for exactly the case this exists to catch. So
+    // notification-count instead tracks unseen notifications: everything in
+    // `list` or `history` newer than the last time the bell was opened. See
+    // that script for the detail - it is the one place the logic lives.
+    //
+    // Hidden entirely at zero, the same idiom sway/scratchpad uses just above:
+    // invisible until there is something to say, which is what lets it afford
+    // the loud colour below when it does appear.
+    //
+    // interval 5 matches mako's own default-timeout - no point polling faster
+    // than notifications can actually change state - and the exec itself is
+    // two local makoctl IPC calls plus grep/awk, no python3 startup, so this
+    // is cheap even on that schedule.
+    //
+    // on-click is a second new script, not notification-centre directly:
+    // opening the centre needs to also advance the seen-marker, and that step
+    // belongs next to the script that owns the marker rather than folded into
+    // an on-click one-liner.
+    "custom/notifications": {
+        "exec": "{{ .chezmoi.homeDir }}/.local/bin/notification-count",
+        "return-type": "json",
+        "interval": 5,
+        "on-click": "{{ .chezmoi.homeDir }}/.local/bin/notification-bell-open"
     },
 
     // Caffeine: keep the screen awake. Click to stop it locking or sleeping -

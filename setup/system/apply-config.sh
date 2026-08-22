@@ -53,6 +53,59 @@ for mapping in "${CONFIG_FILES[@]}"; do
     install -Dm644 "$SYSTEM_ROOT/$src" "$dest"
 done
 
+# The greeter's stylesheet, RENDERED rather than copied.
+#
+# ReGreet reads /etc/greetd/regreet.css by default, so nothing on the cage
+# command line has to name it. The colours come from .chezmoidata/themes.toml -
+# the same single source sway, the bar, foot, rofi, mako, swaylock, the prompt
+# and the editor all read - instead of being copied into this file by hand.
+#
+# WHICH THEME, AND WHY IT IS RENDERED AS THE INVOKING USER.
+#
+# The selected theme is machine-local, in the user's own chezmoi config, so
+# rendering as root would always produce the tracked default no matter what the
+# machine is actually wearing. SUDO_USER is who ran ./sync.sh, so rendering as
+# them follows the theme they picked. A fresh install has no SUDO_USER and no
+# user config, and correctly gets the tracked default - which is right for a
+# machine nobody has logged into yet.
+#
+# The greeter therefore lags a theme switch until the next sync. Deliberate:
+# ~/.local/bin/theme has no root, and prompting for a password on every theme
+# switch to repaint a screen seen once a day is the worse trade.
+#
+# Failing to render is a warning, not fatal. A greeter with last sync's colours
+# still logs you in; a sync that aborts here leaves the rest of the machine
+# unconfigured.
+GREETER_CSS_SRC="$SYSTEM_ROOT/greetd/regreet.css.tmpl"
+GREETER_DOTFILES="$(cd "$SYSTEM_ROOT/.." && pwd)/dotfiles"
+
+if [[ -f "$GREETER_CSS_SRC" ]] && command -v chezmoi >/dev/null; then
+    echo "    /etc/greetd/regreet.css"
+    greeter_css_tmp="$(mktemp)"
+    if [[ -n "${SUDO_USER:-}" ]] && id "$SUDO_USER" &>/dev/null; then
+        render_ok=false
+        runuser -u "$SUDO_USER" -- chezmoi --source "$GREETER_DOTFILES" \
+            execute-template < "$GREETER_CSS_SRC" > "$greeter_css_tmp" &&
+            render_ok=true
+    else
+        render_ok=false
+        chezmoi --source "$GREETER_DOTFILES" \
+            execute-template < "$GREETER_CSS_SRC" > "$greeter_css_tmp" &&
+            render_ok=true
+    fi
+
+    # A truncated stylesheet is worse than an old one - GTK stops at the first
+    # parse error and leaves everything after it unstyled, which looks like a
+    # half-themed greeter rather than a failure.
+    if $render_ok && [[ -s "$greeter_css_tmp" ]] &&
+       ! grep -q '{{' "$greeter_css_tmp"; then
+        install -Dm644 "$greeter_css_tmp" /etc/greetd/regreet.css
+    else
+        echo "    WARNING: could not render the greeter stylesheet; leaving the existing one" >&2
+    fi
+    rm -f "$greeter_css_tmp"
+fi
+
 # Executables, which need a different mode from the config files above.
 #
 # xdg-terminal-exec is here rather than in the dotfiles for one reason: glib

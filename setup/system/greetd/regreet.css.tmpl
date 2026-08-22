@@ -1,0 +1,124 @@
+{{- $palette := index .themes .theme -}}
+/*
+ * Custom stylesheet for ReGreet, installed to /etc/greetd/regreet.css - the
+ * default --style path, so nothing on the greetd/cage command line has to
+ * name it.
+ *
+ * RENDERED, NOT HAND-COPIED. The colours below come from
+ * setup/dotfiles/.chezmoidata/themes.toml, the same single source every other
+ * consumer reads, resolved by apply-config.sh at install and at sync. An
+ * earlier version copied the default theme's values in by hand with a note
+ * saying to update them if the default changed - which is the arrangement this
+ * repository keeps finding at the bottom of a bug.
+ *
+ * WHICH THEME IT GETS, AND THE LAG.
+ *
+ * apply-config.sh renders this as the user running sync, so it follows the
+ * theme that machine has selected. A fresh install has no user config yet and
+ * renders the tracked default from themes.toml, which is the right answer for
+ * a machine nobody has logged into.
+ *
+ * The greeter therefore lags a theme switch until the next ./sync.sh. That is
+ * deliberate rather than an oversight: ~/.local/bin/theme writes user config
+ * and has no root, and prompting for a password on every theme switch to
+ * repaint a screen you see once a day is the worse trade.
+ *
+ * Selector names below come from ReGreet's own widget names
+ * (src/gui/templates.rs upstream), not from anything guessable - they were
+ * looked up rather than assumed, and are the whole reason this file can style
+ * individual controls (the entries, the login button, the clock) rather than
+ * only the window as a whole.
+ */
+
+@define-color bg {{ $palette.bg }};
+@define-color surface {{ $palette.surface }};
+@define-color surface_alt {{ $palette.surface_alt }};
+@define-color fg {{ $palette.text }};
+@define-color fg_dim {{ $palette.text_dim }};
+@define-color accent {{ $palette.accent }};
+@define-color urgent {{ $palette.urgent }};
+
+/* Derived rather than named, so no theme has to define a colour that exists
+ * only for this file. GTK resolves both at load time. */
+@define-color accent_hover shade(@accent, 1.15);
+@define-color urgent_bg alpha(@urgent, 0.18);
+
+window {
+    background-color: @bg;
+    color: @fg;
+}
+
+/* The greeter's background picture (the `#background` id). No image is
+ * configured (see regreet.toml), so this is what actually paints the screen. */
+#background {
+    background-color: @bg;
+}
+
+#clock_frame {
+    background-color: @surface;
+    border: 1px solid @surface_alt;
+    border-radius: 8px;
+    color: @fg;
+    padding: 6px 14px;
+}
+
+#message_label {
+    color: @fg;
+    font-weight: bold;
+}
+
+#session_label,
+#input_label,
+#notif_label {
+    color: @fg_dim;
+}
+
+entry,
+#username_entry,
+#session_entry,
+#secret_entry,
+#visible_entry {
+    background-color: @surface;
+    color: @fg;
+    border: 1px solid @surface_alt;
+    border-radius: 6px;
+    caret-color: @accent;
+}
+
+entry:focus-within {
+    border-color: @accent;
+}
+
+button {
+    background-color: @surface;
+    color: @fg;
+    border: 1px solid @surface_alt;
+    border-radius: 6px;
+}
+
+button:hover {
+    background-color: @surface_alt;
+}
+
+#login_button {
+    background-color: @accent;
+    color: @bg;
+    border-color: @accent;
+}
+
+#login_button:hover {
+    background-color: @accent_hover;
+}
+
+#cancel_button:hover,
+#reboot_button:hover,
+#poweroff_button:hover {
+    background-color: @urgent_bg;
+    color: @urgent;
+    border-color: @urgent;
+}
+
+#notif_info {
+    background-color: @urgent_bg;
+    color: @urgent;
+}

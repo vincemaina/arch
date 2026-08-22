@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: makoctl
+
+# Waybar's on-click for the notification bell (custom/notifications in
+# config.jsonc.tmpl). Opens the existing notification centre, then marks
+# everything mako is currently holding as seen so the bell's badge
+# (notification-count) goes back to hidden.
+#
+# The badge is a high-water mark over notification ids, stored in
+# ~/.cache/notification-bell/last-seen - not the live `makoctl list` count, see
+# notification-count for why. Dismissing an item in the centre alone would not
+# move that mark, so this is the one place it advances: opening the centre is
+# the acknowledgement.
+#
+# Resolved relative to this script rather than called by bare name -
+# ~/.local/bin is on PATH for interactive shells only, not for waybar's
+# systemd session, and that applies transitively to a helper calling a sibling
+# helper too.
+script_dir="$(dirname "$(readlink -f "$0")")"
+
+"$script_dir/notification-centre"
+
+state_dir="$HOME/.cache/notification-bell"
+mkdir -p "$state_dir"
+
+max_id="$( { makoctl list -j; makoctl history -j; } 2>/dev/null \
+    | grep -oE '"id": [0-9]+' | grep -oE '[0-9]+' | sort -rn | head -1 || true)"
+[[ -n "$max_id" ]] || max_id=0
+
+printf '%s\n' "$max_id" > "$state_dir/last-seen"

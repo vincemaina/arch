@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: makoctl
+
+# Waybar's exec for the notification bell (custom/notifications in
+# config.jsonc.tmpl). Runs on an interval, so it has to stay cheap: two local
+# makoctl IPC calls and some grep/awk, no python3 startup.
+#
+# WHAT IT COUNTS, AND WHY NOT SOMETHING SIMPLER
+#
+# "How many undismissed notifications do I have" sounds like `makoctl list`
+# (what mako is currently showing) minus nothing else. It is the wrong
+# measurement for the stated purpose - "in case you missed the popup" - because
+# mako's default-timeout is 5 seconds: by the time anyone looks at the bar, a
+# normal-urgency notification has almost always already timed out of `list`
+# and into `history`. A badge driven by `list` alone would read 0 for exactly
+# the case the bell exists to catch, and would only ever show something during
+# the same few seconds the popup itself is still on screen.
+#
+# So this counts unseen notifications instead: everything in `list` (still
+# showing) plus `history` (already expired or dismissed) whose id is greater
+# than the highest id this script has recorded as seen. mako ids increment
+# monotonically for the life of the daemon - confirmed by watching
+# `makoctl list -j` across two notify-send calls - and `makoctl reload` (what
+# the theme switcher runs) keeps that counter, so a theme change does not
+# reset the badge. The marker only advances when notification-bell-open runs,
+# i.e. when the bell is actually clicked and the centre opened.
+#
+# A genuine mako restart (not a reload) does reset ids to 1, which would make
+# the stored marker look like it is from the future. Detected below by
+# comparing against the current maximum and treating a smaller maximum as "a
+# new daemon, nothing confirmed seen yet" rather than silently under-counting
+# forever.
+
+state_dir="$HOME/.cache/notification-bell"
+state_file="$state_dir/last-seen"
+mkdir -p "$state_dir"
+
+ids="$( { makoctl list -j; makoctl history -j; } 2>/dev/null \
+    | grep -oE '"id": [0-9]+' | grep -oE '[0-9]+' || true)"
+
+max_id=0
+if [[ -n "$ids" ]]; then
+    max_id="$(printf '%s\n' "$ids" | sort -rn | head -1)"
+fi
+
+last_seen=0
+if [[ -f "$state_file" ]]; then
+    last_seen="$(<"$state_file")"
+    [[ "$last_seen" =~ ^[0-9]+$ ]] || last_seen=0
+fi
+
+# Stale marker from a since-restarted daemon: nothing is confirmed seen.
+if (( max_id < last_seen )); then
+    last_seen=0
+fi
+
+count=0
+if [[ -n "$ids" ]]; then
+    count="$(printf '%s\n' "$ids" | awk -v last="$last_seen" '$1 > last' | wc -l)"
+fi
+
+# U+F0F3 is the bell glyph, checked by rendering it against the installed
+# font rather than assumed present.
+#
+# Hidden entirely at zero, the same idiom sway/scratchpad already uses: a
+# reading that is invisible almost all the time can afford to be loud the rest
+# of it, and there is nothing useful to click through to when there is nothing
+# unseen.
+if (( count > 0 )); then
+    plural="s"; (( count == 1 )) && plural=""
+    printf '{"text":"\\uf0f3 %d","tooltip":"%d unseen notification%s - click to view","class":"unseen"}\n' \
+        "$count" "$count" "$plural"
+else
+    printf '{"text":"","tooltip":"No unseen notifications","class":"none"}\n'
+fi

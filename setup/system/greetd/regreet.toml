@@ -3,11 +3,52 @@
 # ReGreet reads session entries from the wayland-sessions directories, which is
 # what gives a session picker without maintaining a list of commands by hand.
 # That is also what will make a second desktop selectable if one is ever added.
-
-[background]
-path = "/usr/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png"
-fit = "Cover"
+#
+# THE THEME BOUNDARY
+#
+# The desktop's colours live in setup/dotfiles/.chezmoidata/themes.toml, which
+# is chezmoi source state - a USER-level mechanism, selected per machine in
+# that user's own ~/.config/chezmoi/chezmoi.toml. ReGreet runs as the
+# "greeter" system user, before any user has logged in and installed by
+# setup/system/apply-config.sh (a machine-wide, root-run script) - so there is
+# no per-user theme selection here even in principle, and this script has no
+# business reading a user's chezmoi source tree; that would cross the exact
+# system/user boundary CLAUDE.md keeps deliberately.
+#
+# So the bridge is a render step rather than a live lookup. regreet.css.tmpl
+# reads themes.toml exactly as every other consumer does, and apply-config.sh
+# renders it to /etc/greetd/regreet.css at install and at sync - as SUDO_USER,
+# so it follows the theme that machine has actually selected rather than always
+# the tracked default. A fresh install has no such user and correctly gets the
+# default, which is the right answer for a machine nobody has logged into.
+#
+# The cost is a lag: the greeter keeps last sync's colours until the next
+# ./sync.sh. That is deliberate. ~/.local/bin/theme writes user config and has
+# no root, so following a theme switch live would mean a password prompt every
+# time somebody changed colours, to repaint a screen they see once a day.
+#
+# An earlier version of this file copied the default theme's colours into
+# regreet.css by hand with a note saying to update them if the default ever
+# changed. That is the arrangement this repository keeps finding at the bottom
+# of a bug, so it did not survive.
+#
+# No background image is configured, for the same reason no wallpaper is
+# tracked anywhere else in this repository: every other wallpaper is generated
+# on the machine, per theme, by ~/.local/bin/wallpaper - a user-level tool
+# that has no meaning for a system user that runs before login. Shipping a
+# static image here would mean committing one, which checks/session.sh already
+# refuses for setup/dotfiles/ and this repository avoids everywhere else.
+# regreet.css instead paints a flat colour from the selected theme,
+# so the greeter still reads as dark and deliberate rather than default-grey.
 
 [GTK]
 application_prefer_dark_theme = true
+theme_name = "Adwaita-dark"
+icon_theme_name = "Adwaita"
+cursor_theme_name = "Adwaita"
 font_name = "JetBrainsMono Nerd Font 12"
+
+[widget.clock]
+# Matches the bar's clock format (waybar/config.jsonc.tmpl), so the one piece
+# of chrome that appears on both screens reads the same.
+format = "%a %d %b   %H:%M"
