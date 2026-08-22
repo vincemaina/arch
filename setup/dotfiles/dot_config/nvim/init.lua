@@ -205,17 +205,17 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>', { desc = 'Clear search highl
 -- not sway windows - sway has $mod+h/j/k/l for that, and the two do not
 -- collide because sway takes its bindings before the terminal sees them.
 --
--- TWO, NOT FOUR, AND BOTH ABSENCES ARE DELIBERATE. <C-k> is Escape and <C-j>
--- is Enter now: keyd rewrites both below the compositor
--- (setup/system/keyd/default.conf), so nvim receives a real Escape and a real
--- Enter and never sees either chord. Lines for them here would look exactly
--- like the two below and could never fire, which is the shape of nearly every
--- bug this repository has had. `<C-w>k` and `<C-w>j` still work.
+-- ONE, NOT FOUR, AND THE THREE ABSENCES ARE DELIBERATE. <C-k> is Escape,
+-- <C-j> is Enter and <C-h> is Backspace now: keyd rewrites all three below the
+-- compositor (setup/system/keyd/default.conf), so nvim receives the real key
+-- and never sees the chord. Lines for them here would look exactly like the
+-- one below and could never fire, which is the shape of nearly every bug this
+-- repository has had. `<C-w>k`, `<C-w>j` and `<C-w>h` all still work, and are
+-- now the only way to reach those three splits.
 --
 -- <C-f> is Tab from the same layer, so page-forward is gone here too. That is
 -- a builtin rather than a mapping, so there was nothing to delete - use <C-d>
 -- for a half page or Page Down for a whole one.
-vim.keymap.set('n', '<C-h>', '<C-w>h', { desc = 'Split left' })
 vim.keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Split right' })
 
 -- Keep the cursor where it was when joining lines, and keep the search result

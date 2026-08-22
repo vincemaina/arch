@@ -121,10 +121,23 @@ compositor, in `setup/system/keyd/default.conf`:
   pointer on whichever window gains focus. That setting exists for this
   feature: with it, scrolling goes where typing goes, unless the pointer has
   since been moved by hand.
-- **Hold Caps Lock**, and `d`/`u` send Page Down / Page Up instead. These are
-  ordinary key events, so they go to whichever window has **keyboard** focus,
-  wherever the pointer happens to be - the answer when the pointer has been
-  left over some other window, or over a window on another output.
+- **Hold Caps Lock**, and `u`/`i` send Page Down / Page Up instead - with `d`
+  as a second Page Down. These are ordinary key events, so they go to whichever
+  window has **keyboard** focus, wherever the pointer happens to be - the
+  answer when the pointer has been left over some other window, or over a
+  window on another output.
+
+  `u` and `i` sit directly above `j` and `k` and are struck by the same two
+  fingers, index down and middle up, so the fast pair is one row up from the
+  slow one and the hand does not change grip to choose between them. The wheel
+  keys are paced to feel like a held arrow key, which is right for nudging a
+  page and slow for crossing a long one.
+
+  **Note that `u` is page *down*.** It used to be Page Up, following vim, where
+  `Ctrl+U` is half a page up. It follows its finger now instead, because `j`
+  beneath it means down and one key meaning up above a key meaning down is
+  felt long before it is understood. If a vim reflex pages you the wrong way,
+  that is this change and not a fault.
 - **Tapping** Caps Lock on its own still toggles caps lock normally. The
   layer only engages on a hold, or when another key is struck while it is
   held down.
@@ -212,10 +225,11 @@ it. That note reads the key out of the keyd config rather than asserting it,
 so changing which key sends Escape changes the report without anyone editing
 the report.
 
-## Enter and Tab, without leaving the home row
+## Enter, Tab and Backspace, without leaving the home row
 
-Two more keys are reachable the same way, from the same layer and for the same
-reason: **`Ctrl+J` sends Enter and `Ctrl+F` sends Tab**, in every program.
+Three more keys are reachable the same way, from the same layer and for the
+same reason: **`Ctrl+J` sends Enter, `Ctrl+F` sends Tab and `Ctrl+H` sends
+Backspace**, in every program.
 
 `Ctrl+J` is not really a new convention. It was *already* Enter in about half
 of what runs here, because ASCII line feed is what that chord sends and every
@@ -262,10 +276,26 @@ applications, where `Ctrl+I` is italic or page-info - which is the gap this
 binding exists for in the first place. It wins on cost and loses on the
 mnemonic. Switching is one word in `setup/system/keyd/default.conf`.
 
-Shift composes with both, because keyd strips only the Control it owns:
+**`Ctrl+H` is the cheapest of the three**, and for the same reason as `Ctrl+J`:
+ASCII 0x08 *is* backspace, so zsh, rofi, fzf, yazi and qutebrowser's command
+and prompt modes already deleted backwards on it. What changes is everything
+graphical.
+
+| Where | What Ctrl+H was | What to use instead |
+| --- | --- | --- |
+| zsh, rofi, fzf, yazi | Backspace already | - |
+| Neovim | move to the split left | `Ctrl+W` then `h` |
+| qutebrowser (normal mode) | go to the homepage | the address bar |
+| Firefox | the History sidebar | `Ctrl+Shift+H` for the full history |
+
+`Alt+H` is still the Left arrow and Caps Lock + `h` still scrolls sideways -
+a layer only takes the keys it names, in the modifier it owns.
+
+Shift composes with all three, because keyd strips only the Control it owns:
 `Ctrl+Shift+F` arrives as `Shift+Tab`, which is back-tab and is useful in a
 form. Sway's own chords are exempt, so `$mod+Ctrl+j` is still the workspace
-toggle rather than a new terminal - the keyd config has a small layer at the
+toggle rather than a new terminal, and `$mod+Ctrl+h` is still the previous
+workspace rather than a Backspace - the keyd config has a small layer at the
 bottom whose only job is keeping the compositor's chords out of this.
 
 ## The arrow keys, on the home row
