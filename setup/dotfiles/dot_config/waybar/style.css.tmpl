@@ -135,6 +135,7 @@ window#waybar > box {
 #mpris,
 #scratchpad,
 #custom-notifications,
+#custom-focus-timer,
 #network {
     background: transparent;
     /* Enough to keep the hover pill off its own text, and no more. The gap
@@ -182,6 +183,14 @@ window#waybar > box {
  * there is no bare bell glyph sitting in the bar the rest of the time. */
 #custom-notifications { color: @warning; text-shadow: 0 0 5px @warning; }
 
+/* The focus timer, coloured by phase rather than by one fixed colour: working
+ * is the accent, a break is the calmer ok green, and the moment a break is due
+ * but unanswered is urgent - that state is the one worth noticing, and it is
+ * the only one the timer cannot advance out of on its own. */
+#custom-focus-timer.work    { color: @accent;  text-shadow: 0 0 5px @accent; }
+#custom-focus-timer.break   { color: @ok;      text-shadow: 0 0 5px @ok; }
+#custom-focus-timer.pending { color: @urgent;  text-shadow: 0 0 6px @urgent; }
+
 /* The centre. The clock took the space the focused window's title used to
  * have, and with it the job of being the one bright thing in the middle of the
  * bar - so it keeps the emphasis treatment rather than the quieter one it had
@@ -221,6 +230,7 @@ window#waybar > box {
 #mpris:hover,
 #scratchpad:hover,
 #custom-notifications:hover,
+#custom-focus-timer:hover,
 #network:hover {
     color: @bg;
     /* The glow goes on hover. Dark text on a bright pill does not want a halo

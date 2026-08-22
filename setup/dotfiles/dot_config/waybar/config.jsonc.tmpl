@@ -18,6 +18,7 @@
 //
 //   workspaces    switch to it
 //   notifications open the notification centre (dismiss / restore / DND)
+//   focus-timer   the timer menu: stop it, or skip to the next phase
 //   clock         a calendar, three months, toggled
 //   mpris         play/pause; middle goes back, right skips forward
 //   idle_inhibitor  stop the screen locking, or let it again
@@ -46,7 +47,7 @@
     "position": "top",
     "spacing": 4,
 
-    "modules-left": ["sway/workspaces", "sway/mode", "sway/scratchpad", "custom/notifications"],
+    "modules-left": ["sway/workspaces", "sway/mode", "sway/scratchpad", "custom/notifications", "custom/focus-timer"],
     "modules-center": ["clock", "mpris"],
     "modules-right": ["idle_inhibitor", "network", "cpu", "memory", "pulseaudio", "battery"],
 
@@ -113,6 +114,29 @@
         "return-type": "json",
         "interval": 5,
         "on-click": "{{ .chezmoi.homeDir }}/.local/bin/notification-bell-open"
+    },
+
+    // The focus timer's countdown.
+    //
+    // restart-interval, NOT interval, and that is the whole design. interval
+    // would re-run the script every second - 86,400 processes a day to print a
+    // clock. This script loops internally and prints a line a second, so it is
+    // one process for the session; restart-interval only says how long to wait
+    // before starting it again if it exits.
+    //
+    // It is also what advances the timer: it is already awake at the second a
+    // work period ends, so a separate timer daemon would be a second
+    // always-running process doing what this one cannot avoid doing anyway.
+    // With waybar stopped the timer does not advance, which is the right
+    // failure - a countdown nobody can see should not be pausing music.
+    //
+    // Prints empty text when idle, so waybar hides it and the bar does not
+    // carry a dead clock - the same idiom as the scratchpad indicator.
+    "custom/focus-timer": {
+        "exec": "{{ .chezmoi.homeDir }}/.local/bin/focus-timer-bar",
+        "return-type": "json",
+        "restart-interval": 5,
+        "on-click": "{{ .chezmoi.homeDir }}/.local/bin/focus-timer"
     },
 
     // Caffeine: keep the screen awake. Click to stop it locking or sleeping -

@@ -1,0 +1,14 @@
+# Exec is absolute for the same reason the other helpers' are: ~/.local/bin is
+# not on the PATH sway and rofi hand to what they spawn.
+
+[Desktop Entry]
+Type=Application
+Name=Focus Timer
+GenericName=Pomodoro timer
+Comment=Work in timed periods and be told when to take a break
+Icon=alarm-symbolic
+Exec={{ .chezmoi.homeDir }}/.local/bin/focus-timer
+Terminal=false
+Categories=Utility;
+Keywords=focus;timer;pomodoro;break;work;session;
+NoDisplay=false

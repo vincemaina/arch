@@ -1,0 +1,21 @@
+# Focus timer durations, in minutes. KEY=VALUE, comments and blank lines ignored.
+#
+# In a config file rather than as constants in the script for the same reason
+# the radio stations are: changing how long you work should not mean editing a
+# program, and a rebuilt machine should have the same numbers.
+#
+# The defaults are the pomodoro ones. They are a starting point, not a claim -
+# adjust them and run ./sync.sh.
+
+# A work period.
+WORK=25
+
+# The short break after each work period.
+BREAK=5
+
+# The longer break, taken after every LONG_EVERY work periods.
+LONG_BREAK=15
+LONG_EVERY=4
+
+# How long "postpone" adds when a break is due and you are mid-thought.
+POSTPONE=5

@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# requires:
+#
+# Nothing external. `focus-timer` is deliberately not listed, on the same
+# grounds sway-workspace-greeter gives for `terminal`: the requires header is
+# for commands that must come from a declared package, and that one is our own
+# helper alongside this script, resolved by absolute path rather than found on
+# PATH.
+
+# The focus timer's readout, and the only part of it that is ever awake.
+#
+# WHY THIS LOOPS RATHER THAN BEING POLLED
+#
+# waybar can re-run a script every N seconds, which for a countdown means N=1
+# and a process per second - 86,400 a day to print a clock. A continuous script
+# is one process for the whole session: it sleeps a second, prints a line, and
+# waybar reads it. The module sets restart-interval rather than interval, which
+# is how waybar is told to expect that.
+#
+# It also OWNS THE TRANSITIONS, which is not obvious and is deliberate. Something
+# has to notice the second a work period ends; this is already awake at that
+# second, so a separate timer daemon would be a second always-running process
+# doing what this one cannot avoid doing anyway. It calls focus-timer, which
+# holds all the state and all the decisions - this file only notices.
+#
+# The consequence, and it is the right one: with waybar stopped the timer does
+# not advance. A countdown nobody can see has no business pausing your music.
+
+STATE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/focus-timer/state"
+SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+
+# Nerd Font by codepoint, never pasted - pasting has silently lost glyphs in
+# this repository before, leaving an empty string that looks configured.
+# bash's $'...' takes \uXXXX with BARE hex digits - the $'\u{f252}' form other
+# languages use produces the literal text instead. And these must be escapes,
+# not pasted characters: CLAUDE.md says so because pasting has silently lost
+# glyphs here before, leaving an empty string that looks configured.
+GLYPH_WORK=$'\uf252'      # nf-fa-hourglass
+GLYPH_BREAK=$'\uf0f4'     # nf-fa-coffee
+DOT=$'\u00b7'             # middle dot, for the tooltips
+
+emit() { printf '{"text":"%s","tooltip":"%s","class":"%s"}\n' "$1" "$2" "$3"; }
+
+while :; do
+    if [[ ! -r "$STATE" ]]; then
+        # Nothing running: print nothing at all. waybar hides a module whose
+        # text is empty, so the bar does not carry a dead clock around - the
+        # same idiom as the scratchpad and notification indicators.
+        emit "" "" "idle"
+        sleep 1
+        continue
+    fi
+
+    PHASE=idle; ENDS=0
+    while IFS='=' read -r k v; do
+        case "$k" in PHASE|ENDS) printf -v "$k" '%s' "$v" ;; esac
+    done < "$STATE"
+
+    left=$(( ENDS - $(date +%s) ))
+
+    if (( left <= 0 )); then
+        case "$PHASE" in
+            work)  "$SELF_DIR/focus-timer" work-ended  >/dev/null 2>&1 & ;;
+            break) "$SELF_DIR/focus-timer" break-ended >/dev/null 2>&1 & ;;
+        esac
+        # break_pending is the window between a work period ending and the
+        # prompt being answered. Deliberately no action: focus-timer is showing
+        # a menu, and firing again every second would stack a menu per second.
+        sleep 1
+        continue
+    fi
+
+    printf -v clock '%d:%02d' $(( left / 60 )) $(( left % 60 ))
+    case "$PHASE" in
+        work)          emit "$GLYPH_WORK $clock"  "Focus $DOT $clock left"      "work" ;;
+        break)         emit "$GLYPH_BREAK $clock" "Break $DOT $clock left"      "break" ;;
+        break_pending) emit "$GLYPH_BREAK --:--"  "Break due"                "pending" ;;
+        *)             emit "" "" "idle" ;;
+    esac
+    sleep 1
+done

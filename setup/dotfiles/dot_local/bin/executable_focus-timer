@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: rofi playerctl notify-send
+
+# A pomodoro timer: work, then a break you are actually told about.
+#
+# HOW THE PIECES FIT
+#
+# This script owns the STATE and the COMMANDS. It never sleeps and never runs in
+# the background. ~/.local/bin/focus-timer-bar is the waybar module, and because
+# it is already awake every second to draw the countdown it is also the thing
+# that notices a phase ending and calls back in here. One always-running loop,
+# and it is one the desktop needs anyway.
+#
+# The consequence, stated because it is not obvious: with waybar stopped the
+# timer does not advance. That is the right failure - the timer is a thing you
+# watch, and a countdown nobody can see has no business pausing your music.
+#
+# State is a few KEY=VALUE lines under $XDG_RUNTIME_DIR, so it is per-boot and
+# per-session by construction, and no stale timer survives a reboot.
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/focus-timer/config"
+STATE_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/focus-timer"
+STATE="$STATE_DIR/state"
+
+WORK=25; BREAK=5; LONG_BREAK=15; LONG_EVERY=4; POSTPONE=5
+if [[ -r "$CONFIG" ]]; then
+    # Only KEY=NUMBER lines, so a stray line in the config cannot execute.
+    while IFS='=' read -r k v; do
+        case "$k" in
+            WORK|BREAK|LONG_BREAK|LONG_EVERY|POSTPONE)
+                [[ "$v" =~ ^[0-9]+$ ]] && printf -v "$k" '%s' "$v" ;;
+        esac
+    done < <(grep -E '^[A-Z_]+=[0-9]+$' "$CONFIG" || true)
+fi
+
+mkdir -p "$STATE_DIR"
+
+read_state() {
+    PHASE=idle; ENDS=0; CYCLE=0; PAUSED=""
+    [[ -r "$STATE" ]] || return 0
+    while IFS='=' read -r k v; do
+        case "$k" in PHASE|ENDS|CYCLE|PAUSED) printf -v "$k" '%s' "$v" ;; esac
+    done < "$STATE"
+}
+
+write_state() {
+    printf 'PHASE=%s\nENDS=%s\nCYCLE=%s\nPAUSED=%s\n' \
+        "$1" "$2" "$3" "${4:-}" > "$STATE"
+}
+
+# Pause every player that is currently playing, and remember which they were.
+#
+# Only what was playing, so the break never starts something the user had
+# already stopped - and so resuming afterwards restores exactly what it
+# interrupted rather than everything MPRIS knows about.
+pause_players() {
+    local playing=() p
+    while read -r p; do
+        [[ -n "$p" ]] || continue
+        [[ "$(playerctl --player="$p" status 2>/dev/null)" == "Playing" ]] || continue
+        playerctl --player="$p" pause 2>/dev/null || continue
+        playing+=("$p")
+    done < <(playerctl --list-all 2>/dev/null || true)
+    (IFS=,; printf '%s' "${playing[*]:-}")
+}
+
+resume_players() {
+    local list="$1" p
+    [[ -n "$list" ]] || return 0
+    IFS=, read -ra players <<<"$list"
+    for p in "${players[@]}"; do
+        [[ -n "$p" ]] && playerctl --player="$p" play 2>/dev/null || true
+    done
+}
+
+now() { printf '%s' "$(date +%s)"; }
+
+start_phase() {
+    local phase="$1" minutes="$2" cycle="$3" paused="${4:-}"
+    write_state "$phase" "$(( $(now) + minutes * 60 ))" "$cycle" "$paused"
+}
+
+# ---------------------------------------------------------------------------
+
+case "${1:-menu}" in
+
+start)
+    read_state
+    start_phase work "$WORK" "${CYCLE:-0}"
+    notify-send -a focus-timer -t 3000 "Focus" "${WORK} minutes"
+    ;;
+
+stop)
+    read_state
+    resume_players "${PAUSED:-}"
+    rm -f "$STATE"
+    ;;
+
+# Called by the bar the moment a work period ends. Pauses first and asks second,
+# so the music stops when the break starts rather than when the prompt is
+# answered - the prompt can sit unanswered for a while, which is exactly when it
+# is most annoying to still be hearing something.
+work-ended)
+    read_state
+    paused="$(pause_players)"
+    write_state break_pending "$(now)" "$CYCLE" "$paused"
+
+    cycle=$(( CYCLE + 1 ))
+    if (( LONG_EVERY > 0 && cycle % LONG_EVERY == 0 )); then
+        len="$LONG_BREAK"; label="Long break"
+    else
+        len="$BREAK"; label="Break"
+    fi
+
+    choice="$(printf '%s\n' "Take the ${label,,} — ${len} min" \
+                             "Postpone ${POSTPONE} min" \
+                             "Stop the timer" |
+        rofi -dmenu -i -p "$label" -no-custom \
+             -theme-str 'listview { lines: 3; }' 2>/dev/null || true)"
+
+    case "$choice" in
+        Postpone*)
+            resume_players "$paused"
+            start_phase work "$POSTPONE" "$CYCLE"
+            ;;
+        Stop*)
+            resume_players "$paused"
+            rm -f "$STATE"
+            ;;
+        *)
+            # Taking the break, including dismissing the prompt: the break is
+            # the default because it is the thing the timer exists to enforce.
+            start_phase break "$len" "$cycle" "$paused"
+            notify-send -a focus-timer -t 5000 "$label" "${len} minutes. Audio paused."
+            ;;
+    esac
+    ;;
+
+break-ended)
+    read_state
+    resume_players "${PAUSED:-}"
+    start_phase work "$WORK" "$CYCLE"
+    notify-send -a focus-timer -t 3000 "Back to it" "${WORK} minutes"
+    ;;
+
+menu|"")
+    read_state
+    if [[ "$PHASE" == "idle" ]]; then
+        pick="$(printf 'Start a focus session\n' |
+            rofi -dmenu -i -p 'focus timer' -no-custom \
+                 -theme-str 'listview { lines: 1; }' 2>/dev/null || true)"
+        [[ -n "$pick" ]] && exec "$0" start
+    else
+        left=$(( (ENDS - $(now) + 59) / 60 ))
+        pick="$(printf 'Stop the timer\nSkip to the next phase\n' |
+            rofi -dmenu -i -p "${PHASE} · ${left}m left" -no-custom \
+                 -theme-str 'listview { lines: 2; }' 2>/dev/null || true)"
+        case "$pick" in
+            Stop*) exec "$0" stop ;;
+            Skip*) write_state "$PHASE" "$(now)" "$CYCLE" "${PAUSED:-}" ;;
+        esac
+    fi
+    ;;
+
+*)
+    echo "usage: focus-timer [start|stop|menu]" >&2
+    exit 2
+    ;;
+esac
