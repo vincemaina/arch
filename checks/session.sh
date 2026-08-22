@@ -1670,18 +1670,37 @@ else
     orphans="$(
         git -C "$CHECKS_REPO" log --diff-filter=D --name-only --format= -- setup/dotfiles/ 2>/dev/null |
         sort -u |
-        CHEZMOI_SOURCE_DIR="$CHECKS_REPO/setup/dotfiles" python3 -c '
+        CHEZMOI_SOURCE_DIR="$CHECKS_REPO/setup/dotfiles" \
+        CHEZMOI_ROOT="$CHECKS_REPO/setup" python3 -c '
 import os, subprocess, sys
 
 home = os.path.expanduser("~")
 source_dir = os.environ.get("CHEZMOI_SOURCE_DIR", "")
+chezmoi_root = os.environ.get("CHEZMOI_ROOT", "")
 
+# --source is not optional here, and leaving it off is how this check produced
+# a destructive false positive. chezmoi reads sourceDir from the local
+# ~/.config/chezmoi/chezmoi.toml, which sync.sh records - and a sync run from
+# inside a git worktree records that worktree path. Once the worktree is
+# removed, bare `chezmoi managed` returns NOTHING, every file reads as
+# unmanaged, and this check tells you to add half the dotfiles to
+# .chezmoiremove. It has to ask about the checkout being checked, not about
+# whatever the machine last happened to record.
+#
+# Pointed at setup/ rather than setup/dotfiles/, because .chezmoiroot redirects
+# it the rest of the way - the same way sync.sh calls it.
 managed = set()
 try:
-    managed = set(subprocess.run(["chezmoi", "managed"], capture_output=True,
-                                 text=True, timeout=30).stdout.split())
+    result = subprocess.run(["chezmoi", "--source", chezmoi_root, "managed"],
+                            capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        # Never fall through to an empty set. An empty managed list makes every
+        # deleted-then-readded file look like an orphan, which is the failure
+        # this comment exists to describe.
+        sys.exit(3)
+    managed = set(result.stdout.split())
 except Exception:
-    sys.exit(0)
+    sys.exit(3)
 # `chezmoi managed` INCLUDES everything listed in .chezmoiremove, because
 # managing a file removal is a kind of managing it. Reasonable of chezmoi and
 # fatal here: without this, a file queued for removal counts as still managed,

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-22 16:07'
-updated_date: '2026-08-22 16:08'
+updated_date: '2026-08-22 16:20'
 labels:
   - repo
 dependencies:
@@ -47,3 +47,21 @@ Also worth deciding what the check should do about the genuine case it was writt
 - [ ] #3 The genuine case TASK-94 was written for still fails: a file the repository has actually stopped shipping and is still on disk
 - [ ] #4 The check is exercised against both cases before being trusted, since it currently passes for prefixed files only because none have been removed
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Root cause found, and it is not the .tmpl suffix this ticket first guessed at. The check already handles source-name changes correctly - its own comment says so and the code strips prefixes and suffixes.
+
+The fault is that it calls bare `chezmoi managed` with no --source. chezmoi then reads sourceDir from ~/.config/chezmoi/chezmoi.toml, which sync.sh records through `theme --record-source` so that a machine with a checkout uses the checkout. A previous session ran sync.sh from inside a git worktree, so the recorded path was .claude/worktrees/task-112-select-all/setup. That worktree has since been removed.
+
+With sourceDir pointing at a directory that no longer exists, `chezmoi managed` returns nothing at all. The check reads that empty set as "nothing is managed", so every file ever deleted from setup/dotfiles/ and later re-added under another source name reads as an orphan - which is precisely the false positive it was written to avoid.
+
+Fixed by passing --source explicitly, pointed at setup/ so .chezmoiroot redirects the rest of the way, exactly as sync.sh does. The check now asks about the checkout it is checking rather than about whatever the machine last recorded. It also exits non-zero if chezmoi fails rather than continuing with an empty set, since silently treating failure as "nothing is managed" is what made this destructive rather than merely wrong.
+
+Two things found alongside, both worth their own attention.
+
+The recorded sourceDir was repaired on this machine with `theme --record-source /home/vincemaina/Arch/setup`, but nothing stops it happening again: sync.sh run from a worktree will record the worktree path, and removing that worktree leaves every bare chezmoi command on the machine silently operating on nothing.
+
+And with sourceDir repaired, the machine turns out to be well behind the repository - 19 dotfiles differ, including a foot.ini still carrying the tokyonight-night include that was fixed long ago. Three other checks fail as a direct result. Running sync.sh should clear them.
+<!-- SECTION:NOTES:END -->
