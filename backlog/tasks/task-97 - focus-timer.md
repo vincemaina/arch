@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-22 00:47'
-updated_date: '2026-08-22 12:39'
+updated_date: '2026-08-22 12:47'
 labels: []
 dependencies: []
 priority: low
@@ -49,6 +49,12 @@ Then the escapes were written as $'\u{f252}', the form other languages use. bash
 A third, in tools/shortcuts.sh and unrelated to this ticket, was found by checking TASK-74's criterion: its note about the scroll layer was guarded on the exact string 'capslock = layer(scroll)', which stopped matching when the binding changed, so the note silently vanished from the report.
 
 Reopened: it had been marked Done in a backlog tidy-up while still unimplemented, and is being built now.
+
+A later session started rebuilding this without checking git first, and overwrote the committed script and config with a near-identical reimplementation before noticing commit 7631277 already existed. Reverted with git checkout; nothing was lost.
+
+Re-verified end to end at that point rather than assumed: the bar shows a counting-down timer, and forcing the work period to end while a stream was playing moved the player from Playing to Paused with the phase becoming break_pending - which is the pause-on-break behaviour the follow-up request asked about, already present.
+
+Worth recording because the near-miss is the interesting part: the reimplementation arrived at the same design independently - one always-awake loop in the bar module rather than a second daemon, and resuming only the players it had itself paused - which is reassuring about the design and says nothing good about checking the repository first.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
