@@ -1811,6 +1811,18 @@ Still needs a human, because no script can observe them:
                                                 while and the desktop stays
                                                 responsive throughout.
                                                 Then: journalctl -u earlyoom
+  5. In a NEW terminal, press Ctrl+Shift+A.     Expect: a notification saying
+                                                how many lines were copied, and
+                                                that many lines on the
+                                                clipboard. A new terminal
+                                                because foot reads its config
+                                                once, at startup. No script can
+                                                press this: sway has no
+                                                key-injection IPC, and foot
+                                                ignores swaymsg's synthetic
+                                                clicks, so the keypress itself
+                                                is the one link in the chain
+                                                nothing here can test.
 
 MANUAL
 
