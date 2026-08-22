@@ -1586,6 +1586,42 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Sway config reaches the running session"
+
+# A binding written to disk that the running sway has never been told about is
+# a key that does nothing, and nothing reports it. That happened: $mod+v was
+# added, synced, and did nothing, because sync applies dotfiles and only the
+# THEME reload script restarts sway - a binding change moves no theme value, so
+# it never fired.
+#
+# run_onchange_after_reload-sway.sh.tmpl fixes it by hashing each file sway
+# reads. This is the drift that fix introduces: add a file to config.d/ and
+# forget its hash line, and reloads silently stop covering it.
+#
+# 30-appearance.conf.tmpl is deliberately excluded there - it is rendered from
+# the palette, and the theme reload already covers every way that changes.
+sway_reload_tmpl="$CHECKS_REPO/setup/dotfiles/run_onchange_after_reload-sway.sh.tmpl"
+sway_config_dir="$CHECKS_REPO/setup/dotfiles/dot_config/sway/config.d"
+
+if [[ ! -f "$sway_reload_tmpl" ]]; then
+    fail "no sway reload script, so a keybinding change reaches disk and not the running session"
+elif [[ ! -d "$sway_config_dir" ]]; then
+    skip "the sway config directory is not in this checkout"
+else
+    unhashed=""
+    for f in "$sway_config_dir"/*.conf; do
+        [[ -f "$f" ]] || continue
+        base="$(basename "$f")"
+        grep -qF "$base" "$sway_reload_tmpl" || unhashed+="$base "
+    done
+    if [[ -n "$unhashed" ]]; then
+        fail "sway config files the reload script does not hash: ${unhashed}- editing one would reach disk and not the running session"
+    else
+        pass "every sway config file is hashed by the reload script, so a change reloads the session"
+    fi
+fi
+
+# ----------------------------------------------------------------------
 section "Dotfiles this repository stopped shipping (TASK-94)"
 
 # chezmoi apply NEVER removes a file the source state has stopped shipping. So

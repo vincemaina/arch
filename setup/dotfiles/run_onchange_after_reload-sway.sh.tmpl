@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Make a sway config change take effect, rather than only be written.
+#
+# WHY THIS EXISTS
+#
+# chezmoi writes ~/.config/sway/, and sway reads it once at startup. So a
+# keybinding added to the repository reached the disk on the next ./sync.sh and
+# reached the running session at the next logout - with nothing in between
+# saying so. The key simply did nothing.
+#
+# That is exactly the failure this repository keeps finding, and it was found
+# the same way as all the others: by someone pressing the key. $mod+v was added
+# for the clipboard, synced, and did nothing; `swaymsg unbindsym Mod4+v`
+# answered "Could not find binding", which is the running compositor saying it
+# had never been told.
+#
+# run_onchange_after_reload-theme.sh already reloads sway, but only when the
+# theme, the wallpaper style or the palette changes - a binding change moves
+# none of those, so it never fired for this.
+#
+# WHAT MAKES IT RE-RUN
+#
+# The hashes below. run_onchange_ re-runs a script when the *rendered script*
+# changes, so these lines are load-bearing rather than informational: one per
+# file sway actually reads, so editing any of them changes this script and
+# triggers the reload. Adding a file to config.d/ means adding a line here.
+#
+# config:    {{ include "dot_config/sway/config" | sha256sum }}
+{{- range $path := list
+      "dot_config/sway/config.d/10-input.conf"
+      "dot_config/sway/config.d/20-output.conf"
+      "dot_config/sway/config.d/40-window-rules.conf"
+      "dot_config/sway/config.d/50-keybindings.conf"
+      "dot_config/sway/config.d/51-modes.conf"
+      "dot_config/sway/config.d/52-media-keys.conf"
+      "dot_config/sway/config.d/60-startup.conf" }}
+# {{ $path }}: {{ include $path | sha256sum }}
+{{- end }}
+#
+# 30-appearance.conf.tmpl is deliberately absent: it is rendered from the
+# palette, and the theme reload script already covers every way that changes.
+# Hashing it here would mean two scripts reloading sway on every theme switch.
+
+# Nothing to reload outside a session - and rendering to a scratch destination
+# to preview a template still runs scripts, which CLAUDE.md says in as many
+# words, so this must be a no-op there rather than an error.
+if [[ -z "${SWAYSOCK:-}" ]]; then
+    exit 0
+fi
+
+echo "    sway configuration changed, reloading"
+
+# A reload with a broken config leaves the old one running and reports the
+# error, which is the safe direction - but say so, because a silent failure
+# here is the same class of bug this script exists to fix.
+if ! swaymsg reload >/dev/null; then
+    echo "    sway did not reload; run 'swaymsg reload' to see the error" >&2
+fi
