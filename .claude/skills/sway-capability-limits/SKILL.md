@@ -74,6 +74,29 @@ and all five fields become live on it: the title bar is drawn with
 dead per-window, not per-config — worth knowing before concluding a colour
 setting does nothing.
 
+## Title bars have no buttons
+
+`sway(5)` documents everything a title bar can carry — `title_format` (a
+template of `%title`/`%app_id`/`%class`/etc.), `title_align`,
+`titlebar_padding`, `titlebar_border_thickness`, `hide_edge_borders`, and the
+`font` used to render it — and every one of them controls text: what it says,
+where it sits, how much space is around it. `close_button`, `minimize`,
+`maximize` and `titlebar_buttons` appear **zero times** in the man page, and
+there is no per-window command (`bindsym --border`, `for_window`, etc.) that
+attaches a clickable icon to the decoration. A sway title bar is a text label
+in a coloured rectangle, nothing else — confirmed visually: a `foot` window
+given `border normal` (sway's own server-side decoration) on a headless
+output renders exactly that, no icons and no clickable region beyond
+drag-to-move.
+
+The one door left open is `border csd`, which hands decoration drawing to the
+*client* instead of sway. A GTK app implementing its own header bar can put
+close/minimize buttons there — but that is the application's decision, not a
+sway setting, and it only ever applies to windows that opt into `csd`. This
+repository's borders are `default_border pixel 3` (see `30-appearance.conf.tmpl`),
+which has no title bar at all, so the question is moot here regardless of
+which door is asked about. TASK-57.
+
 ## Resize target = border width
 
 The border is not only decoration. It is the area the pointer has to hit to

@@ -534,19 +534,39 @@ if [[ "$orphans" -gt 0 ]]; then
     found=1
 fi
 
-if systemctl --user list-units --all --no-legend --no-pager --type=service \
-     | grep -q 'atspi.Registry'; then
-    n=$(systemctl --user list-units --all --no-legend --no-pager --type=service \
-        | grep -c 'atspi.Registry' || true)
-    if [[ "$n" -gt 1 ]]; then
-        echo "  $n at-spi2-registryd instances are running."
-        echo "    at-spi's registry is D-Bus activated into app.slice, which is not bound"
-        echo "    to wayland-session@sway.target, so one is left behind by every graphical"
-        echo "    session and they accumulate until reboot. Each is around 6 MiB RSS but"
-        echo "    well under 1 MiB PSS, so this is a process leak rather than a memory one."
-        echo
-        found=1
+# at-spi's registry is D-Bus activated into app.slice, which is not bound to
+# wayland-session@sway.target, so one used to be left behind by every graphical
+# session and they accumulated until reboot (TASK-95).
+# environment.d/20-accessibility.conf stops GTK asking for the bus at all - but
+# environment.d is read by the user manager, so it only governs sessions started
+# after it landed. Report both halves: without the second, a machine that has not
+# logged in since the change looks unfixed, and a machine where the variables
+# never arrived looks fixed.
+#
+# grep -c rather than grep -q: -q closes the pipe at the first match, the writer
+# takes SIGPIPE, and pipefail reports the pipeline as failed. See scripting-traps.
+n=$(systemctl --user list-units --all --no-legend --no-pager --type=service \
+    | grep -c 'atspi.Registry' || true)
+armed=$(systemctl --user show-environment \
+    | grep -c -E '^(NO_AT_BRIDGE|GTK_A11Y)=' || true)
+if [[ "$n" -gt 0 ]]; then
+    echo "  $n at-spi2-registryd instance(s) are running - the target is none at all."
+    if [[ "$armed" -eq 2 ]]; then
+        echo "    The bridge IS suppressed in this session: NO_AT_BRIDGE and GTK_A11Y are"
+        echo "    both in the user manager's environment, so no GTK application started"
+        echo "    since asks for the accessibility bus. What is running predates that and"
+        echo "    goes at the next reboot - machine state, not something setup/ can fix."
+    else
+        echo "    The bridge is NOT suppressed in this session ($armed of the 2 variables"
+        echo "    present). setup/dotfiles/dot_config/environment.d/20-accessibility.conf"
+        echo "    sets both, but environment.d is read by the user manager, so it needs a"
+        echo "    fresh login rather than a sync. Until then one registryd is left behind"
+        echo "    by every graphical session."
     fi
+    echo "    Each is around 6 MiB RSS but well under 1 MiB PSS, so it is a process"
+    echo "    leak rather than a memory one."
+    echo
+    found=1
 fi
 
 # chezmoi does not delete a file when the repo stops shipping it. A dead file in

@@ -767,6 +767,33 @@ else
     fail "EDITOR is unset, so git and systemctl edit fall back to their own default rather than the chosen editor"
 fi
 
+# The GTK accessibility bridge, suppressed - and BOTH variables are required.
+#
+# GTK3 honours NO_AT_BRIDGE and ignores GTK_A11Y; GTK4 is the other way round.
+# Measured on this machine rather than taken from documentation, because either
+# one alone is a half fix that looks exactly like a whole one: the session goes
+# on activating at-spi from whichever toolkit was not covered, and nothing says
+# so. Hence checking for two, not for either.
+#
+# What it buys: at-spi2-registryd was D-Bus activated into app.slice, which is
+# not bound to wayland-session@sway.target, so one was left behind by every
+# login and they accumulated until reboot. Nothing here uses a screen reader.
+# TASK-95.
+#
+# Same pending-login distinction as EDITOR above: environment.d is read when the
+# user manager starts, so declared-but-not-live is a skip rather than a failure.
+declared_a11y="$(cat "$HOME/.config/environment.d/"*.conf 2>/dev/null |
+    grep -c -E '^(NO_AT_BRIDGE=1|GTK_A11Y=none)$' || true)"
+live_a11y="$(systemctl --user show-environment 2>/dev/null |
+    grep -c -E '^(NO_AT_BRIDGE|GTK_A11Y)=' || true)"
+if [[ "$declared_a11y" -lt 2 ]]; then
+    fail "the GTK accessibility bridge is not suppressed: environment.d must set BOTH NO_AT_BRIDGE=1 (GTK3) and GTK_A11Y=none (GTK4) - either alone leaves half the session activating at-spi"
+elif [[ "$live_a11y" -eq 2 ]]; then
+    pass "NO_AT_BRIDGE and GTK_A11Y are both in this session, so no GTK application asks for the accessibility bus"
+else
+    skip "the accessibility bridge is suppressed in environment.d but not in this session - log out and in"
+fi
+
 # ----------------------------------------------------------------------
 section "Editor (TASK-24)"
 
