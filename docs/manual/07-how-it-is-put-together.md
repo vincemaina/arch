@@ -204,8 +204,8 @@ changes nothing — it is the way to see what a sync would do before doing it.
 
 ## Session components are systemd user units
 
-Waybar, mako, swayidle, the polkit agent, autotiling and the workspace
-greeter are not started from sway's `exec` — they are systemd **user units**,
+Waybar, mako, swayidle, the polkit agent and autotiling are not started from
+sway's `exec` — they are systemd **user units**,
 defined in `setup/dotfiles/dot_config/systemd/user/` (Waybar's unit ships
 with its package; the repository carries only a drop-in override for it), and
 enabled by a committed symlink in `wayland-session@sway.target.wants/` rather

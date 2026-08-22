@@ -2069,15 +2069,15 @@ resize each other when one opens.
 ### What it would cost, counted rather than estimated
 
 609 lines of compositor config, 69 keybindings and 19 window rules, none of
-which port — niri uses KDL and upstream offers no translator. Nine helper
+which port — niri uses KDL and upstream offers no translator. Eight helper
 scripts speak sway IPC. Six pieces of repository tooling parse sway's config
 syntax or its IPC, the largest being the shortcuts panel at 678 lines, which
 reads the sway config directly and subscribes to sway window events.
 
-Four features have no niri equivalent at all: autotiling, whose concept
-disappears under scrollable tiling; binding modes; the scratchpad; and the
-workspace greeter, which assumes numbered static workspaces where niri's are
-dynamic.
+Three features have no niri equivalent at all: autotiling, whose concept
+disappears under scrollable tiling; binding modes; and the scratchpad. A fourth
+was counted here until TASK-113 removed it: the workspace greeter, which
+assumed numbered static workspaces where niri's are dynamic.
 
 Everything below or beside the compositor survives untouched — keyd, greetd,
 uwsm, chezmoi, the palette and its non-sway consumers, the installer.
