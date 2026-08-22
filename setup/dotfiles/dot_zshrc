@@ -102,6 +102,7 @@ alias la='eza -la --git --group-directories-first'
 alias lt='eza --tree --level=2 --group-directories-first'
 alias cat='bat --style=plain --paging=never'
 alias grep='grep --color=auto'
+alias q='exit'
 
 # bat and eza both take their colours from the terminal palette rather than
 # carrying their own, so they follow the selected theme for free.

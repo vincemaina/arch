@@ -1738,11 +1738,11 @@ none of this.
 
 **A floating disk-usage window at login** was the original idea and is rejected.
 It puts a filesystem walk on the critical path of every login to answer a
-question nobody asked at that moment, and the login greeting already reports
-filesystem usage — `fastfetch`'s config carries a `disk` module. What is missing
-from that report is not the free-space number, it is which directory to blame,
-and that is worth one command when the question comes up rather than a scan
-every time the machine starts.
+question nobody asked at that moment, and `fastfetch` already reports
+filesystem usage — its config carries a `disk` module — for anyone who runs it.
+What is missing from that report is not the free-space number, it is which
+directory to blame, and that is worth one command when the question comes up
+rather than a scan every time the machine starts.
 
 ---
 

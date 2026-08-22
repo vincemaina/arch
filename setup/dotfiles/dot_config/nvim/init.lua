@@ -46,11 +46,10 @@ vim.keymap.set({ 'n', 'v' }, '<Space>', '<Nop>', { silent = true, desc = 'Leader
 
 local o = vim.opt
 
+-- Absolute line numbers. Relative numbers were tried - they make `12j` a
+-- thing you can see rather than count - and rejected: TASK-116, they read as
+-- noise rather than as a distance once you are used to plain numbers.
 o.number = true
--- Relative numbers make `12j` a thing you can see rather than count. The
--- current line still shows its absolute number, which is what `number` above
--- is doing alongside this.
-o.relativenumber = true
 
 -- Four spaces, no tabs, as the default. Per-language overrides are below -
 -- javascript and its relatives conventionally use two, and fighting a

@@ -130,10 +130,6 @@ OPTIONAL = {
         "new windows split the way sway would on its own. The manual split "
         "bindings are unchanged",
     ),
-    "greeting": (
-        "opens a greeting terminal on an empty workspace",
-        "empty workspaces stay empty. $mod+Return still opens a terminal",
-    ),
     "mako": (
         "notification popups",
         "notifications are not shown. Nothing else depends on it",

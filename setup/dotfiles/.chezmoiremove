@@ -53,3 +53,11 @@
 # has since disproved is worse than no file.
 .config/environment.d/10-cursor.conf
 .config/environment.d/20-path.conf
+
+# greeting.service opened a terminal on login and on every empty workspace.
+# TASK-113: it had become more annoying than useful, so the whole mechanism -
+# the unit, its wants symlink, and the helper script that watched sway for an
+# empty workspace - is gone rather than merely toggled off.
+.config/systemd/user/greeting.service
+.config/systemd/user/wayland-session@sway.target.wants/greeting.service
+.local/bin/sway-workspace-greeter

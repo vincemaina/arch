@@ -100,7 +100,6 @@ understatements:
 | pipewire-pulse | 11.9 MiB | 0.028% |
 | wireplumber | 9.6 MiB | 0.004% |
 | polkit-agent (polkit-gnome) | 9.1 MiB | 0.001% |
-| greeting (fastfetch driver) | 7.4 MiB | 0.015% |
 | gvfs-daemon | 12.7 MiB | < 0.001% |
 | xdg-desktop-portal | 3.8 MiB | 0.001% |
 | xdg-desktop-portal-gtk | 7.4 MiB | 0.004% |
@@ -263,7 +262,7 @@ the line, **↓** means an entry below in this document.
 | `firefox` | The other browser, for WebExtensions and DRM that `qutebrowser`'s webengine cannot do at all | M, D: Two browsers: qutebrowser for everything, firefox for DRM and extensions |
 | `rofi` | The launcher — one prompt, several sources via `combi` | M, D: rofi, reversing an earlier decision |
 | `rofi-calc` | Calculator source for that prompt, via libqalculate | M |
-| `fastfetch` | The system summary shown by `greeting.service` | M |
+| `fastfetch` | System summary, run manually | M |
 
 ### desktop.txt — appearance
 

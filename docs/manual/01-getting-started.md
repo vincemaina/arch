@@ -31,19 +31,17 @@ it.
 4. **Sway** starts and, because it was launched through uwsm, reaches
    `wayland-session@sway.target`. That target pulls in a set of systemd user
    units: **Waybar** (the bar), **mako** (notifications), **swayidle** (idle
-   and lock handling), a **polkit agent** (authentication prompts),
-   **autotiling** (automatic split direction) and a **workspace greeter**
-   (opens a terminal with a system summary on an empty workspace). None of
-   these are started from Sway's own config with `exec` - they are units,
-   which is why they get restarted if they crash and shut down cleanly when
-   the session ends.
+   and lock handling), a **polkit agent** (authentication prompts) and
+   **autotiling** (automatic split direction). None of these are started from
+   Sway's own config with `exec` - they are units, which is why they get
+   restarted if they crash and shut down cleanly when the session ends.
 
 You can verify every one of these on a running machine rather than trust this
 description:
 
 ```bash
 systemctl --user status waybar.service mako.service swayidle.service \
-    polkit-agent.service autotiling.service greeting.service
+    polkit-agent.service autotiling.service
 swaymsg -t get_version
 ```
 
@@ -61,10 +59,7 @@ binding below uses it. The full reference, generated from the actual
 configuration rather than typed out here, is
 [The keyboard](03-the-keyboard.md).
 
-- **Open a terminal.** `$mod+Return`. You will likely already be looking at
-  one: the workspace greeter opens a terminal automatically on an empty
-  workspace, with a one-time system summary the first time in a session and
-  a plain terminal after that.
+- **Open a terminal.** `$mod+Return`.
 - **Open the launcher.** `$mod+space` opens a single prompt (rofi in combi
   mode) that searches installed applications, open windows, files and does
   arithmetic, all from the same box. Most things on this desktop that are not

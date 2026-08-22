@@ -237,7 +237,8 @@ yazi
 # remove it quietly. Same reasoning as polkit. See TASK-26.
 mesa
 
-# The system summary shown once at login, from greeting.service. fastfetch
-# rather than neofetch: neofetch was archived by its author in 2024 and is
-# unmaintained, while fastfetch is in extra and considerably quicker.
+# A system summary, run by hand. fastfetch rather than neofetch: neofetch was
+# archived by its author in 2024 and is unmaintained, while fastfetch is in
+# extra and considerably quicker. Used to run automatically from
+# greeting.service; TASK-113 removed that, not this.
 fastfetch

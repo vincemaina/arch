@@ -315,8 +315,8 @@ for pid in os.listdir("/proc"):
                       rss=rss, pss=pss, unit=unit, started=started))
 
 # Which package owns each binary. An interpreter answers "python" for every
-# script it runs, which is useless - autotiling and the workspace greeter are
-# not the same thing - so for an interpreter, ask about the script instead.
+# script it runs, which is useless - autotiling and startup are not the same
+# thing - so for an interpreter, ask about the script instead.
 INTERPRETERS = ("python", "bash", "sh", "zsh", "perl", "ruby", "node")
 lookup = {}
 for p in procs:

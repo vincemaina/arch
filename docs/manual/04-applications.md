@@ -20,11 +20,6 @@ why text stays sharp. A finished command that outlives your attention flashes
 the window and, if it is not focused, raises a desktop notification — mpv
 finishing a build, or a long command completing on another workspace.
 
-The first terminal you open in a session — and only the first — greets you
-with a `fastfetch` system summary before dropping you into the shell. Every
-terminal after that opens straight into the shell; a summary you have already
-read once is not worth scrolling past again on every new window.
-
 Copying out of it is mostly foot's own doing: `Ctrl+Shift+C` copies the
 selection, `Ctrl+Shift+V` pastes. `Ctrl+Shift+A` is this setup's addition — it
 puts the **whole** terminal on the clipboard, scrollback included, and tells

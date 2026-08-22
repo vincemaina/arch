@@ -1,40 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# requires: foot fastfetch zsh swaymsg python3
+# requires: foot zsh swaymsg python3
 
 # Opens a terminal.
 #
 #   terminal              matches whatever is focused: floating if that is,
 #                         tiled otherwise
-#   terminal --floating   always floating, for the automatic ones
-#   terminal --greeting   floating, and greets you with a system summary
+#   terminal --floating   always floating
 #
-# THE SUMMARY IS NOW ONCE A SESSION, NOT ONCE A WINDOW
+# THE FLOATING app_id
 #
-# fastfetch used to run in every terminal this opened. That was a deliberate
-# choice and it was the wrong one: sway-workspace-greeter opens a card on every
-# empty workspace, so the summary appeared again on every workspace and every
-# new terminal, and a system summary you have already read is just noise you
-# have to scroll past. It now runs for the FIRST card of a session only -
-# TASK-88 - which is where it was actually wanted: you land, you see the
-# machine, you get on with it.
-#
-# It still does not live in .zshrc, for the original reason: there it would run
-# for nested shells, subshells and ssh sessions too, and would add its time to
-# the shell startup the checks measure.
-#
-# `fastfetch; exec zsh` rather than foot --hold: --hold leaves a dead terminal
-# that cannot be typed into. This way the summary scrolls up as you work,
-# exactly like any other command you have run.
-#
-# THE TWO FLOATING app_idS ARE NOT THE SAME
-#
-# `greeting` is the once-a-session card. `floating-term` is every other floating
-# terminal. They were one app_id until TASK-88, which meant a window rule could
-# not tell them apart and - much worse - a selector like
-# `swaymsg [app_id=greeting] kill` matched most of the terminals on the machine
-# including the one being worked in. See TASK-87.
+# `floating-term` is every floating terminal. It used to share an app_id with
+# `greeting`, a terminal that opened itself on login and on every empty
+# workspace - TASK-113 removed that mechanism, since it had become more
+# annoying than useful. While the two shared an id, a window rule could not
+# tell them apart and, worse, a selector like `swaymsg [app_id=greeting] kill`
+# matched most of the terminals on the machine including the one being worked
+# in - TASK-87, TASK-88.
 
 # Inherit the focused window's placement unless told otherwise.
 #
@@ -72,32 +55,20 @@ sys.exit(1)
 }
 
 floating=false
-greeting=false
 case "${1:-}" in
-    --greeting) floating=true; greeting=true ;;
     --floating) floating=true ;;
     "")         focused_is_floating && floating=true || true ;;
-    *)          echo "usage: terminal [--floating|--greeting]" >&2; exit 2 ;;
+    *)          echo "usage: terminal [--floating]" >&2; exit 2 ;;
 esac
 
 # Sized in characters, not pixels, so the grid comes from the font metrics and
 # the window fits its contents rather than leaving dead space that shifts with
-# any font-size change. fastfetch prints 90 columns by 21 rows; the extra row is
-# the prompt underneath. The plain floating terminal keeps the same size so the
-# two look like the same kind of object rather than two different cards.
+# any font-size change.
 #
 # exec'd throughout. This used to launch in the background so the script could
 # outlive it and reposition the window; sway-place-floating did that and has
 # been taken out - see 40-window-rules.conf for why. Nothing needs to happen
 # after the launch any more, so nothing waits around for it.
-if $greeting; then
-    exec foot \
-        --app-id=greeting \
-        --title=greeting \
-        --window-size-chars=92x23 \
-        -e zsh -c 'fastfetch; exec zsh -i'
-fi
-
 if $floating; then
     exec foot \
         --app-id=floating-term \

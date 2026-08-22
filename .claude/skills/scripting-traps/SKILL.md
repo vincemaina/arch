@@ -110,9 +110,12 @@ swaymsg -t get_tree | python3 -c "...print pid, app_id, focused for every node..
 
 The general form is the same as `pkill -f` two entries below: **a selector that
 describes a category will match members of that category you did not have in
-mind, including the one you are standing in.** The greeting card is the trap
-here specifically because it looks transient - a fastfetch splash - and is
-actually the everyday terminal.
+mind, including the one you are standing in.** The greeting card was the trap
+here specifically because it looked transient - a fastfetch splash - and was
+actually the everyday terminal. TASK-113 removed `greeting.service` itself, but
+the app_id it warns about lives on as `floating-term` (see
+`40-window-rules.conf`), and the lesson applies to any category selector, not
+just that one.
 
 ## `pkill -f` matches your own command line
 

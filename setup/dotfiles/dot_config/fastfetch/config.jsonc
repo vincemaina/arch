@@ -1,4 +1,6 @@
-// fastfetch, shown once at login by greeting.service.
+// fastfetch. Run it by hand for a system summary - it is no longer wired
+// into anything automatic. TASK-113 removed greeting.service, which used to
+// show this once at login.
 //
 // COLOURS
 //

@@ -650,12 +650,13 @@ section "Terminal windows (TASK-88)"
 # The app_id ties two files together, and nothing else notices when they
 # disagree - the window simply tiles.
 #
-# `terminal` sets one of two app_ids for its floating windows and
-# 40-window-rules.conf has to float and centre both. They were a single app_id
-# until TASK-88, which is why this exists: sharing it meant a rule could not
-# name one without the other, and a selector like `swaymsg [app_id=greeting]
-# kill` matched most of the terminals on the machine, including the one being
-# worked in. Splitting them is only useful if they stay split.
+# `terminal` sets an app_id for its floating windows and 40-window-rules.conf
+# has to float and centre it. This used to also guard against a second,
+# regressed app_id - `terminal --greeting` shared `floating-term`'s id until
+# TASK-88 split them, because sharing it meant a selector like
+# `swaymsg [app_id=greeting] kill` matched most of the terminals on the
+# machine, including the one being worked in. TASK-113 removed the greeting
+# terminal outright, so that risk cannot recur and the guard went with it.
 while IFS='|' read -r verdict message; do
     [[ -z "$verdict" ]] && continue
     case "$verdict" in
@@ -693,11 +694,6 @@ else:
             say("fail", f"terminal sets app_id {', '.join(missing_centre)} but no rule centres it")
         else:
             say("pass", f"every app_id the terminal sets ({', '.join(sorted(set_ids))}) is floated and centred by a matching rule")
-
-    if len(set_ids) < 2:
-        say("fail", "the greeting card and the ordinary floating terminal share one app_id again")
-    else:
-        say("pass", "the greeting card and ordinary floating terminals have different app_ids")
 
 print("\n".join(out))
 TERMCHECK_EOF

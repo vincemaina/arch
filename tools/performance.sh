@@ -84,7 +84,6 @@ marks = [
     ("sway ready",               r"Started Main service for Sway"),
     ("waybar started",           r"Started Highly customizable Wayland bar"),
     ("mako started",             r"Started Notification daemon"),
-    ("greeting card started",    r"Started Greet empty workspaces"),
 ]
 
 times = {}
@@ -124,9 +123,6 @@ echo "Per-component, from systemd's own cgroup accounting."
 echo
 echo "wayland-wm@sway is excluded from the total: its cgroup holds every window"
 echo "sway has ever spawned, so it measures your browser, not the compositor."
-echo "greeting.service used to have the same problem and no longer does - it"
-echo "launches each greeting terminal into its own transient scope - but the"
-echo "journal still carries gigabyte-sized figures for it from before that fix."
 echo
 python3 - <<'PY'
 import subprocess
@@ -270,8 +266,7 @@ journalctl --user -b --no-pager 2>/dev/null \
     | sort -u | tail -20 | sed 's/^/  /' || true
 echo
 echo "(Repeats are separate sessions. wayland-wm@sway carries the same caveat as"
-echo "above, and greeting.service lines older than the transient-scope fix do"
-echo "too - a gigabyte there is a terminal, not a greeter.)"
+echo "above.)"
 
 # ---------------------------------------------------------------- the bar
 

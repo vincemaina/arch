@@ -142,10 +142,9 @@ cleanup of the generated cache would reasonably empty.
 ## Startup toggles
 
 `startup` controls what the session starts with, for a small, deliberately
-limited set of components: `waybar`, `autotiling`, `greeting` (the
-once-per-workspace greeting terminal), `mako` and `swayidle`. Run it bare for
-a launcher picker, `startup --list` to see current state and memory cost for
-each, or `startup <component> on|off` to flip one.
+limited set of components: `waybar`, `autotiling`, `mako` and `swayidle`. Run
+it bare for a launcher picker, `startup --list` to see current state and
+memory cost for each, or `startup <component> on|off` to flip one.
 
 It tracks **two separate questions**, because "do I want this at all" and
 "get it out of my way for ten minutes" are different requests:

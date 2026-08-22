@@ -3,11 +3,10 @@ set -uo pipefail
 
 # requires:
 #
-# Nothing external. `focus-timer` is deliberately not listed, on the same
-# grounds sway-workspace-greeter gives for `terminal`: the requires header is
-# for commands that must come from a declared package, and that one is our own
-# helper alongside this script, resolved by absolute path rather than found on
-# PATH.
+# Nothing external. `focus-timer` is deliberately not listed: the requires
+# header is for commands that must come from a declared package, and that one
+# is our own helper alongside this script, resolved by absolute path rather
+# than found on PATH.
 
 # The focus timer's readout, and the only part of it that is ever awake.
 #

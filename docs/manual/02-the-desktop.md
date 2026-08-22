@@ -117,17 +117,6 @@ that rather than scripting something that spans displays, and
 [DECISIONS.md](../../DECISIONS.md) records what was tried and why it was
 rejected, if you have more than one monitor and want to know what to expect.
 
-Whenever you switch to an empty workspace - including a new one you have just
-created - the workspace greeter opens a terminal on it automatically. It
-listens for sway's workspace-*focus* event specifically, so closing the last
-window on the workspace you are already looking at does not retrigger it:
-sway does not send any workspace event for that case, since what is focused
-has not changed. Switch away and back and you are greeted again, because that
-is a focus event. The first terminal in a session prints a system
-summary; every one after that is a plain terminal. It cannot loop: opening a
-terminal makes the workspace non-empty, so the greeter has nothing left to
-react to until that terminal is closed again.
-
 ## The bar
 
 Waybar sits across the top of the screen. Every module is a coloured pill -
