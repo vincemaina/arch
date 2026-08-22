@@ -188,7 +188,7 @@ you.** It meant something in most of these programs already:
 
 | Where | What Ctrl+K was | What to use instead |
 | --- | --- | --- |
-| zsh | `kill-line` | `Alt+K`, rebound in `~/.zshrc` for exactly this reason |
+| zsh | `kill-line` | nothing - it moved to `Alt+K`, then lost that to the arrows below, and is now unbound |
 | Neovim | move to the split above | `Ctrl+W` then `k` |
 | fzf | move the selection up | `Ctrl+P`, or the arrow key |
 | lazygit | move a commit up in a rebase | `Alt+Up` |
@@ -211,6 +211,70 @@ as a note above the table, because no configuration the tool parses mentions
 it. That note reads the key out of the keyd config rather than asserting it,
 so changing which key sends Escape changes the report without anyone editing
 the report.
+
+## The arrow keys, on the home row
+
+The arrow cluster is the one group of keys you cannot reach without lifting
+the whole right hand off the home row and finding your way back afterwards.
+So: **hold Alt, and `h`/`j`/`k`/`l` become Left, Down, Up and Right.**
+
+Alt is the physical bottom-left key - keyd swapped it with Control, so the key
+*labelled* `Ctrl` is the one that does this. That makes it a stretch of the
+left little finger rather than a journey for the right hand, which is the
+entire argument for the feature.
+
+These are real arrow key events emitted below the compositor, so they arrive
+in every program alike: a text field in a GTK dialog, a browser, the Backlog
+TUI, Neovim, a file chooser. Nothing is configured per program, and nothing
+can opt out.
+
+**They compose**, which is what makes them arrow keys rather than an imitation
+of arrow keys. keyd strips only the Alt, so everything you would normally hold
+alongside an arrow still works:
+
+| Chord | What the program receives |
+| --- | --- |
+| `Alt+H` | Left |
+| `Alt+Shift+H` | Shift+Left - select a character |
+| `Alt+Ctrl+H` | Ctrl+Left - jump a word |
+| `Alt+Ctrl+Shift+H` | Ctrl+Shift+Left - select a word |
+
+That was measured by reading back what keyd emits, not assumed from the
+manual, because an arrow key that could not select or jump a word would have
+been half a feature wearing the name of a whole one.
+
+**What it costs.** Alt+`hjkl` already meant something in a few places:
+
+| Where | What it was | What to use instead |
+| --- | --- | --- |
+| zsh | `Alt+H` run-help, `Alt+L` down-case-word | `run-help` typed as a command |
+| zsh | `Alt+K` kill-line | nothing - see below |
+| yazi | `Alt+J`/`Alt+K` step the completion popup | nothing changes: Up and Down do the same thing there |
+| Firefox | `Alt+H` opened the Help menu | the hamburger menu |
+| GTK dialogs | any button whose mnemonic is `h`, `j`, `k` or `l` | Tab, or the pointer |
+
+fzf, Neovim, Sway, rofi, foot, lazygit, qutebrowser and the Backlog TUI bind
+no bare Alt+`hjkl` at all, so they cost nothing. Each of those was asked on
+this machine rather than recalled.
+
+**`kill-line` is now gone from this desktop entirely**, and that is a decision
+rather than an oversight. It was `Ctrl+K` until Escape took that key, then
+`Alt+K` until the arrows took that one. Rather than move it a third time it
+was dropped: `Ctrl+U` kills the whole line, `Ctrl+W` and `Alt+Backspace` kill
+the word behind the cursor, and `Alt+D` kills the word ahead. What is genuinely
+gone is truncating a line from the middle to its end. `~/.zshrc` says so where
+the binding used to be, and says how to bring it back.
+
+One thing worth knowing if this ever misbehaves: to emit a *bare* arrow, keyd
+releases Alt and re-presses it around the keystroke. A bare Alt tap opens the
+menu bar in Firefox and in GTK applications - but this does not, because keyd
+presses Control inside the Alt hold and an intervening key cancels that
+gesture. If you ever see a menu bar flickering as you navigate, that is the
+mechanism that has changed.
+
+`tools/shortcuts.sh` reports these above the table, the same way it reports
+the scroll layer and the second Escape, and for the same reason: no
+configuration it parses mentions them.
 
 ## The generated reference
 

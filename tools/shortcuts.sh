@@ -181,9 +181,10 @@ escape_note() {
     local trailer=""
     if grep -qx 'k' <<<"$keys"; then
         trailer="
-Ctrl+K displaces what that chord meant elsewhere: kill-line in zsh (moved to
-Alt+K), the split-above mapping in nvim (removed - use Ctrl+W then k), and
-'move up' in fzf, where it now ABORTS instead (use Ctrl+P)."
+Ctrl+K displaces what that chord meant elsewhere: kill-line in zsh (which then
+lost Alt+K to the arrows below and is now unbound entirely - see dot_zshrc), the
+split-above mapping in nvim (removed - use Ctrl+W then k), and 'move up' in fzf,
+where it now ABORTS instead (use Ctrl+P)."
     fi
     if grep -qx 'semicolon' <<<"$keys"; then
         trailer="${trailer}
@@ -204,9 +205,54 @@ Like the layer above, these come from keyd rather than sway, so they are not in
 the table below."
 }
 
+# The arrow cluster on the home row, invisible for the same reason as the two
+# above.
+#
+# Reads the [alt] layer rather than asserting a binding string, for the reason
+# escape_note gives: a guard that asserts a config it does not own goes quiet
+# when that config is reworded, and takes the note with it. Rebind Alt+h to
+# something else and this reports the something else; take the layer out and
+# the note disappears, which is correct.
+arrows_note() {
+    command -v keyd &>/dev/null || return 0
+    systemctl is-active --quiet keyd 2>/dev/null || return 0
+
+    local pairs
+    pairs="$(awk '
+        /^\[/    { in_alt = ($0 ~ /^\[alt(:[A-Z]*)?\]/) ; next }
+        !in_alt  { next }
+        /^[a-z0-9]+[[:space:]]*=[[:space:]]*(left|right|up|down)[[:space:]]*$/ {
+            key = $0; sub(/[[:space:]]*=.*/, "", key)
+            val = $0; sub(/^[^=]*=[[:space:]]*/, "", val); sub(/[[:space:]]*$/, "", val)
+            printf "%s %s\n", key, val
+        }
+    ' /etc/keyd/default.conf 2>/dev/null)"
+    [[ -n "$pairs" ]] || return 0
+
+    local body="" k v ku
+    while read -r k v; do
+        [[ -n "$k" ]] || continue
+        ku="$(tr '[:lower:]' '[:upper:]' <<<"$k" | tr -d '\n')"
+        body="${body}$(printf '    Alt+%-12s %s' "$ku" "$v")\n"
+    done <<<"$pairs"
+
+    note "Holding Alt puts the arrow keys on the home row:
+
+$(printf '%b' "$body")
+Shift and Ctrl compose with them, because keyd strips only Alt: Alt+Shift+H
+selects a character to the left, Alt+Ctrl+H jumps a word, Alt+Ctrl+Shift+H
+selects a word. Alt is the physical bottom-left key, since keyd swaps it with
+Control - a pinky stretch rather than moving the hand to the arrow cluster,
+which is the whole reason these exist.
+
+Like the layers above, these come from keyd rather than sway, so they are not
+in the table below."
+}
+
 swap_note
 scroll_note
 escape_note
+arrows_note
 
 # Canonical form so a sway binding and a zsh binding can be compared at all:
 # lower case, modifiers sorted, Mod4 spelled Super.
