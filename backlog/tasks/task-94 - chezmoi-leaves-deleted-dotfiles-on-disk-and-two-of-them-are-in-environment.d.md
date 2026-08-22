@@ -1,9 +1,11 @@
 ---
 id: TASK-94
 title: 'chezmoi leaves deleted dotfiles on disk, and two of them are in environment.d'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-08-21 21:11'
+updated_date: '2026-08-22 00:01'
 labels:
   - desktop
   - repo
@@ -31,7 +33,29 @@ Note that most of what this search turns up is a false positive: a file deleted 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The two stale files are gone from the reference machine by a mechanism a rebuild reproduces, not by rm
-- [ ] #2 A dotfile deleted from setup/dotfiles/ in future is removed from machines that already have it, or a check reports that it was not
-- [ ] #3 The check distinguishes a genuinely orphaned target from one that was re-added under a different chezmoi source name, such as a plain file becoming a .tmpl
+- [x] #1 The two stale files are gone from the reference machine by a mechanism a rebuild reproduces, not by rm
+- [x] #2 A dotfile deleted from setup/dotfiles/ in future is removed from machines that already have it, or a check reports that it was not
+- [x] #3 The check distinguishes a genuinely orphaned target from one that was re-added under a different chezmoi source name, such as a plain file becoming a .tmpl
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Both files removed through .chezmoiremove rather than rm, so a rebuild reproduces it (AC1). Verified inert before removing rather than assuming: the user manager's PATH contains no ~/.local/bin and no unexpanded $PATH, and xdg-terminal-exec now resolves to /usr/local/bin - so 20-path.conf was doing nothing, as ea2af45 concluded. 10-cursor.conf was not inert: it duplicated XCURSOR_THEME and XCURSOR_SIZE and sorts after the 10-appearance.conf that replaced it, so it won.
+
+AC2 and AC3 are a new session.sh section. It replays every deletion under setup/dotfiles/ out of git history, maps each chezmoi source name back to its target path - stripping the attribute prefixes and .tmpl, turning dot_ into a leading dot - and reports any that still exist on disk while no longer being managed.
+
+THE CHECK PASSED WHEN IT SHOULD HAVE FAILED, AND THAT WAS THE INTERESTING PART. Written, run, green on the first attempt. Putting 10-cursor.conf back by hand and re-running produced green again.
+
+Cause: 'chezmoi managed' lists every path in .chezmoiremove as well, because managing a file's removal is a kind of managing it. The check asked 'is this target still managed?' to avoid reporting a file re-added under a different source name - which is correct and necessary - and that same question made it skip precisely the files it was written to find. It would have passed forever.
+
+Fixed by subtracting .chezmoiremove from the managed set. Now: with a stale file present it fails naming the path; with the machine clean it passes; and the four files that were deleted and re-added as .tmpl - waybar's config.jsonc and style.css, foot.ini, yazi.toml - all exist on disk and are correctly not reported, which is AC3 demonstrated rather than argued.
+
+Recorded in the scripting-traps skill, both the chezmoi behaviour and the general form: a check that has never failed has not been tested.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The two stale environment.d files are gone via .chezmoiremove, so a rebuild reproduces their absence, and checks/session.sh now replays every deletion under setup/dotfiles/ and reports any target still on disk that chezmoi no longer manages. The check passed on first writing and the passing was the bug: 'chezmoi managed' includes .chezmoiremove paths, so it skipped exactly the files it existed for. Proven working by putting a stale file back and watching it fail, and proven not to false-positive on the four files that were deleted and re-added as templates.
+<!-- SECTION:FINAL_SUMMARY:END -->

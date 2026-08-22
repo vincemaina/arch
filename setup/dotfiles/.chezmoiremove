@@ -35,3 +35,21 @@
 # window exists, so it appeared centred and then jumped, which read as a glitch
 # on every login. The greeting card is centred by a window rule instead.
 .local/bin/sway-place-floating
+
+# Two environment.d files this repository deleted and then left behind on every
+# machine that already had them. TASK-94.
+#
+# 10-cursor.conf had its contents folded into 10-appearance.conf in 87abc7c.
+# Leaving it was not harmless: the user manager reads *.conf in lexicographic
+# order and the last one wins, so 10-cursor sorts AFTER 10-appearance and its
+# copy of XCURSOR_THEME and XCURSOR_SIZE overrode the managed file - on machines
+# that had it, and not on a fresh one. A difference between the running system
+# and a rebuild that no diff would show.
+#
+# 20-path.conf was deleted in ea2af45, the commit that established environment.d
+# cannot prepend to PATH and moved xdg-terminal-exec to /usr/local/bin instead.
+# Measured inert here - the user manager's PATH contains no ~/.local/bin and no
+# unexpanded $PATH - but a file arguing at length for a mechanism the repository
+# has since disproved is worse than no file.
+.config/environment.d/10-cursor.conf
+.config/environment.d/20-path.conf

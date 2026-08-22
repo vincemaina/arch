@@ -279,6 +279,46 @@ The trap is not the missing directory, it is that a harness fault is
 indistinguishable from the fault it was built to detect. Eight themes failing
 identically is a signal about the harness, not about the eight themes.
 
+## `chezmoi managed` includes what `.chezmoiremove` deletes
+
+**Symptom.** A check written to find dotfiles this repository deleted but left
+on disk passed on a machine that demonstrably had one. Putting a stale file back
+by hand and re-running produced a green result.
+
+**Cause.** The check asked whether the target path was still managed, on the
+reasoning that a file deleted and re-added under a different source name — a
+plain file becoming a `.tmpl` — is legitimately still managed and must not be
+reported. That much is right. What is not obvious is that `chezmoi managed`
+also lists **every path in `.chezmoiremove`**, because managing a file's removal
+is a kind of managing it:
+
+```console
+$ grep 10-cursor setup/dotfiles/.chezmoiremove
+.config/environment.d/10-cursor.conf
+$ chezmoi managed | grep 10-cursor
+.config/environment.d/10-cursor.conf      # listed, despite being a removal
+```
+
+So the files the check existed for were exactly the files it skipped. It would
+have passed forever.
+
+**Fix.** Subtract `.chezmoiremove` from the managed set before comparing:
+
+```python
+managed = set(run(["chezmoi", "managed"]).stdout.split())
+for line in open(source_dir + "/.chezmoiremove"):
+    line = line.strip()
+    if line and not line.startswith("#"):
+        managed.discard(line)
+```
+
+The general form, and the reason this is worth a section: **a check that has
+never failed has not been tested.** This one was written, run, and passed on the
+first try, and the passing was the bug. Break the condition on purpose and watch
+it go red before believing a green result — the same discipline as the
+contrast-floor and language-server checks elsewhere in this repository, both of
+which were also proven by deliberately breaking them.
+
 ## One patch is not a measurement
 
 **Symptom.** Two contradictory conclusions about the same thing, both from

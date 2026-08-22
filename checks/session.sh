@@ -1341,6 +1341,118 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Dotfiles this repository stopped shipping (TASK-94)"
+
+# chezmoi apply NEVER removes a file the source state has stopped shipping. So
+# deleting a dotfile from setup/dotfiles/ removes it from a fresh install and
+# from nowhere else - every machine that already had it keeps it, and quietly
+# stops matching what a rebuild would produce.
+#
+# Two were live when this was written, both in ~/.config/environment.d, which is
+# the worst place for it: the user manager reads *.conf in lexicographic order
+# and the last one wins, so a leftover 10-cursor.conf sorted AFTER the
+# 10-appearance.conf that replaced it and overrode it. On that machine only.
+# No diff would have shown it and no check was looking.
+#
+# The fix for a specific file is .chezmoiremove. This is the half that notices
+# when somebody forgets: it replays every deletion under setup/dotfiles/ out of
+# git history, works out what target path each source name meant, and reports
+# any that still exist on disk while no longer being managed.
+#
+# The false positive to avoid, which is most of what a naive version finds: a
+# file deleted and re-added under a different source name - a plain file
+# becoming a .tmpl, or gaining an executable_ prefix - is still managed, just
+# from a different source. So this compares against `chezmoi managed`, which
+# knows the target paths, rather than against git alone.
+# The repository this check is running from, derived from the script rather than
+# from the working directory - session.sh is meant to be runnable from anywhere.
+CHECKS_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if ! command -v chezmoi &>/dev/null; then
+    skip "chezmoi is not installed"
+elif ! git -C "$CHECKS_REPO" rev-parse --git-dir &>/dev/null; then
+    skip "not a git checkout, so there is no deletion history to replay"
+else
+    orphans="$(
+        git -C "$CHECKS_REPO" log --diff-filter=D --name-only --format= -- setup/dotfiles/ 2>/dev/null |
+        sort -u |
+        CHEZMOI_SOURCE_DIR="$CHECKS_REPO/setup/dotfiles" python3 -c '
+import os, subprocess, sys
+
+home = os.path.expanduser("~")
+source_dir = os.environ.get("CHEZMOI_SOURCE_DIR", "")
+
+managed = set()
+try:
+    managed = set(subprocess.run(["chezmoi", "managed"], capture_output=True,
+                                 text=True, timeout=30).stdout.split())
+except Exception:
+    sys.exit(0)
+# `chezmoi managed` INCLUDES everything listed in .chezmoiremove, because
+# managing a file removal is a kind of managing it. Reasonable of chezmoi and
+# fatal here: without this, a file queued for removal counts as still managed,
+# this check reads it as a re-add under another source name, and it never fires
+# for the exact files it was written for. Found only by putting a stale file
+# back and watching the check pass.
+try:
+    with open(os.path.join(source_dir, ".chezmoiremove")) as fh:
+        for line in fh:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                managed.discard(line)
+except OSError:
+    pass
+
+# chezmoi source names encode the target. Strip the attribute prefixes and the
+# template suffix, and turn dot_ back into a leading dot.
+PREFIXES = ("encrypted_", "private_", "readonly_", "executable_", "symlink_",
+            "empty_", "modify_", "create_", "remove_")
+
+def target(source):
+    parts = source.split("/")
+    out = []
+    for part in parts:
+        changed = True
+        while changed:
+            changed = False
+            for pre in PREFIXES:
+                if part.startswith(pre):
+                    part = part[len(pre):]
+                    changed = True
+        if part.endswith(".tmpl"):
+            part = part[:-len(".tmpl")]
+        if part.startswith("dot_"):
+            part = "." + part[len("dot_"):]
+        out.append(part)
+    return "/".join(out)
+
+stale = []
+for line in sys.stdin:
+    line = line.strip()
+    if not line.startswith("setup/dotfiles/"):
+        continue
+    rel = line[len("setup/dotfiles/"):]
+    base = rel.split("/")[-1]
+    # Scripts and chezmoi metadata are not target files at all.
+    if base.startswith((".chezmoi", "run_")):
+        continue
+    t = target(rel)
+    if t in managed:
+        continue                      # re-added under another source name
+    if os.path.lexists(os.path.join(home, t)):
+        stale.append(t)
+
+print(" ".join(sorted(set(stale))))
+'
+    )"
+    if [[ -n "$orphans" ]]; then
+        fail "deleted from setup/dotfiles/ but still on this machine: $orphans"$'\n'"        add them to setup/dotfiles/.chezmoiremove, then run ./sync.sh"
+    else
+        pass "every dotfile this repository has deleted is gone from this machine too"
+    fi
+fi
+
+# ----------------------------------------------------------------------
 section "Screenshot helper (TASK-10)"
 
 if [[ -x "$HOME/.local/bin/sway-screenshot" ]]; then

@@ -1,9 +1,11 @@
 ---
 id: TASK-91
 title: 'Decide the two browsers: one lightweight, one full-fledged'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-21 20:51'
+updated_date: '2026-08-21 23:56'
 labels: []
 dependencies: []
 priority: low
