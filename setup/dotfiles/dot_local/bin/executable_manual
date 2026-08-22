@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: xdg-open
+
+# Open the manual.
+#
+# The manual is written in docs/manual/ in the repository, which is repository
+# tooling and never reaches a built machine - so what lands here is only the
+# rendered copy, installed by sync.sh. That means the manual on a machine is as
+# current as its last sync, exactly like every other dotfile, and stale in the
+# same visible way rather than a different invisible one.
+
+MANUAL="$HOME/.local/share/manual/manual.html"
+
+if [[ ! -r "$MANUAL" ]]; then
+    cat >&2 <<'MSG'
+The manual has not been installed on this machine.
+
+It is built from the repository, not carried in the dotfiles:
+
+    cd /path/to/your/Arch/clone
+    ./sync.sh                 # builds and installs it, along with everything else
+    ./tools/manual.sh --open  # or just build and read it in place
+
+MSG
+    exit 1
+fi
+
+exec xdg-open "$MANUAL"

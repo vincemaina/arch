@@ -76,8 +76,14 @@ Two consequences worth holding onto:
 # Does what is installed match the manifests, in both directions?
 ./checks/packages.sh
 
+# Does the manual still describe a system that exists?
+./checks/manual.sh
+
 # A report, not a check: every shortcut, grouped by the context it applies in.
 ./tools/shortcuts.sh
+
+# Build docs/manual/ into one self-contained HTML page and open it.
+./tools/manual.sh --open
 
 # Backlog task management (see the CRITICAL_INSTRUCTION block above)
 backlog task list
@@ -280,7 +286,7 @@ Two things will silently break it, and `checks/session.sh` covers both:
 
 ## Checks
 
-Four scripts, run from the repo on the target machine:
+Five scripts, run from the repo on the target machine:
 
 | Script | Answers |
 | --- | --- |
@@ -288,10 +294,12 @@ Four scripts, run from the repo on the target machine:
 | `checks/sway-bindings.sh` | Is any key bound twice? Prints the full binding table. |
 | `checks/session.sh` | Does the running machine match what the repo intends? |
 | `checks/packages.sh` | Does what is installed match `packages/*.txt`, both ways? |
+| `checks/manual.sh` | Does the manual still name files, helpers and bindings that exist? |
 
 `tools/` holds things that produce output rather than verdicts.
 `tools/shortcuts.sh` lists every shortcut by context and flags keys that mean
-different things in different tools. Keep the distinction: `checks/` exits
+different things in different tools; `--markdown` emits the same table for the
+manual to embed. `tools/manual.sh` builds `docs/manual/` into one HTML page. Keep the distinction: `checks/` exits
 non-zero on a problem, `tools/` produces something to read. Neither reaches the
 built machine — which is why the wallpaper generator lives in `dot_local/bin/`
 and not here: it is the one piece of the theming machinery that has to run on
@@ -354,6 +362,28 @@ matches before starting.
 
 Like `backlog/` and this file, they are repository tooling and never reach the
 built machine.
+
+## The manual
+
+`docs/manual/` is the only document here written to be *read* rather than
+consulted: ten chapters on using the desktop and on changing it, for someone
+who has never seen this repository. It is the fifth documentation surface after
+this file, `README.md`, `FLOW.md` and `DECISIONS.md`, and it should not restate
+any of them — it links across instead.
+
+Two rules keep it honest, and both exist because prose goes stale exactly the
+way configuration does. Anything derivable from the configuration is generated
+from it: chapter 3 contains the line `{{shortcuts}}` and no shortcut table at
+all. Anything asserted by hand is checked: `checks/manual.sh` fails when the
+manual names a file, a helper script or a `$mod` binding that does not exist,
+and it caught a real drift within an hour of being written.
+
+The markdown dialect is restricted and `tools/manual-render.py` **refuses**
+what it does not understand rather than approximating it. The dialect and the
+reasoning are in `docs/manual/README.md` and in `DECISIONS.md`. Like everything
+else here, the manual is repository tooling: nothing it needs may be added to
+`setup/packages/`, which is why there is no pandoc. `sync.sh` installs the
+built page so the `manual` command and the launcher entry can open it.
 
 ## Reference material
 

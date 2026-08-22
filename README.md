@@ -184,6 +184,15 @@ installed, so the keys simply did nothing and nothing reported an error.
 Prints every sway binding and fails if any key is bound twice — sway does not
 warn about that, it just lets the later definition win.
 
+```bash
+./checks/manual.sh
+```
+
+Fails if [the manual](./docs/manual/README.md) names a file, a helper script or
+a `$mod` keybinding that no longer exists. Prose goes stale the same way
+configuration does, and in this repository that is the failure that matters: a
+chapter describing a binding nobody bound reads exactly like one that is right.
+
 `tools/` is the other half of the distinction: it produces something to read
 rather than a verdict, and never exits non-zero for a number someone else has
 to judge.
@@ -194,7 +203,17 @@ to judge.
 
 Every shortcut this setup defines, grouped by the context it applies in,
 derived from the actual configuration, with any key that means different things
-in different contexts called out.
+in different contexts called out. `--markdown` emits the same table for the
+manual to embed, so the two cannot disagree.
+
+```bash
+./tools/manual.sh --open
+```
+
+Renders [`docs/manual/`](./docs/manual/README.md) into one self-contained HTML
+page — every chapter, a contents column that stays on screen, and links between
+them — and opens it. `./sync.sh` builds it too, and installs the result where
+the `manual` command and the launcher entry find it.
 
 ## Design
 
@@ -210,6 +229,7 @@ The setup is intentionally:
 
 | | |
 | --- | --- |
+| [**`docs/manual/`**](./docs/manual/README.md) | **The manual.** How to use this desktop and how to change it, in ten chapters. The one to read first, and the only one written to be read start to finish. |
 | [`FLOW.md`](./FLOW.md) | How the repository becomes a running machine: what runs, in what order, in which environment, and where to change each thing. |
 | [`DECISIONS.md`](./DECISIONS.md) | Why each technology and layout was chosen, with the trade-offs and the alternatives rejected. |
 | [`docs/software/`](./docs/software/README.md) | Every declared package accounted for, and what the running system measurably costs. |

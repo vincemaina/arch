@@ -7,3 +7,8 @@ docs/wallpapers/*.png
 # for testing rather than executed.
 __pycache__/
 *.pyc
+
+# The manual is built from docs/manual/*.md by tools/manual.sh. The chapters are
+# tracked; the rendered HTML and the generated keyboard reference are not, since
+# both are derived and one of them changes whenever a keybinding does.
+docs/manual/build/

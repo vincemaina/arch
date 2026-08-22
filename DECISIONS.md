@@ -2712,6 +2712,100 @@ The repository should avoid configuration for configuration's sake.
 
 ---
 
+## A manual, built as one HTML page
+
+The repository documents itself for whoever is building it, in four places that
+all assume you already know how the system was made. `docs/manual/` is the
+fifth and is the only one written to be *read*: ten chapters covering how to
+use the desktop and how to change it, in `docs/manual/*.md`, assembled by
+`tools/manual.sh` into one self-contained HTML page.
+
+`tools/manual-render.py` is a markdown renderer of about 250 lines of standard
+library Python, reading a dialect this repository defines.
+
+### Why
+
+**One document, not ten files.** A manual split across a directory is a manual
+nobody reads end to end: you open the one file whose name looked relevant and
+never find out what the other nine say. One page with a contents column that
+stays on screen and links between every chapter is the actual requirement, and
+HTML is what delivers it.
+
+**Self-contained matters as much as single.** No stylesheet to fetch, no font to
+download, nothing to install to read it. Copy the file to a phone or to the
+laptop you are about to install this onto — precisely the moment the machine it
+describes does not exist yet — and it still works. A browser will print it if
+you want it on paper, which is where the print stylesheet earns its keep, but
+paper is the fallback rather than the target.
+
+Writing a renderer rather than installing one is the part that needs justifying,
+and the justification is the `setup/` boundary. It is also a smaller job than it
+sounds, because the output is HTML rather than PDF: there is no page model, no
+font embedding and no typesetting — only markup. The manual is repository
+tooling: like `backlog`, `checks/` and `tools/`, it never reaches the built
+machine, so nothing it needs may be added to `setup/packages/`. That leaves a
+repository-level dependency, and every candidate was disproportionate. None of
+pandoc, weasyprint or wkhtmltopdf is installed here; the cheapest costs more
+than the document weighs, and `pandoc-cli` alone is a static Haskell binary
+larger than the fonts, the icons and the compositor put together.
+
+The input is not arbitrary markdown from the internet. It is ours, written to a
+dialect stated in `docs/manual/README.md`, which makes a purpose-built reader a
+few hundred lines rather than a research project.
+
+### The property that actually matters
+
+Not that it renders markdown — that it **refuses** what it does not understand,
+with a file and a line number. An image silently dropped, or a nested list
+flattened, would put this document in the same category as every other bug this
+repository has hit: looks correct, does nothing. The renderer treats images, raw
+HTML, footnotes, task lists and reference-style links as build failures rather
+than as things to approximate.
+
+The same reasoning produced `checks/manual.sh`, which fails when the manual
+names a file, a helper script or a `$mod` keybinding that does not exist, and
+`tools/shortcuts.sh --markdown`, which generates the entire keyboard reference
+from the sway and zsh configuration. Chapter 3 contains no hand-typed shortcut
+table, because a hand-kept one is wrong the first time somebody changes a
+binding and forgets the document.
+
+### Trade-off
+
+The dialect is narrower than markdown, and a writer who reaches for something
+outside it gets a build error rather than a rendered page. That is the intended
+direction of failure, but it is a real cost: the manual cannot contain a
+diagram, and a screenshot has to be described in words.
+
+The rendered manual is not tracked. `docs/manual/build/` is ignored, so reading
+it requires building it — which `sync.sh` now does, installing the result where
+the `manual` command and the launcher entry find it. A machine's manual is
+therefore as current as its last sync, stale in the same visible way as every
+other dotfile rather than in a new invisible one.
+
+### Alternatives considered
+
+**pandoc.** The obvious answer, and the one to revisit if the manual ever needs
+something the dialect cannot express. Rejected on size against a document it
+would outweigh, and on the `setup/` boundary. Note that it was only ever needed
+for PDF; producing HTML never required it.
+
+**`python-markdown`.** About a megabyte, does the job properly, and has table
+and fenced-code extensions already. Rejected because it is still a package, and
+adding one to the built machine so that repository tooling can run is exactly
+the exception `pacman-contrib` already is — one is a documented irregularity,
+two is a pattern.
+
+**Markdown only, no build.** Readable on disk and on GitHub, and free. Rejected
+because it is the ten-files problem: no single document, no contents column
+that follows you, and nothing to hand to someone who does not have the
+repository. The chapters stay readable as markdown regardless — the build adds
+a way to read them together, it does not replace them.
+
+**A static site generator, or mdbook.** More than is wanted. The output needed
+is one file, not a site with navigation and a search index.
+
+---
+
 # Guiding principle
 
 When evaluating future changes, prefer the option that best preserves this balance:

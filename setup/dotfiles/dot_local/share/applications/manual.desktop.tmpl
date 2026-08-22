@@ -1,0 +1,20 @@
+# Exec is an absolute path for the same reason every other entry here is:
+# ~/.local/bin is not on the PATH that sway and rofi hand to what they spawn,
+# so a bare `Exec=manual` works when tested from a terminal and silently does
+# nothing from the launcher.
+#
+# The manual has no keybinding. Every key it could reasonably take is already
+# doing something more frequent, and a document you read a few times is exactly
+# what the launcher is for.
+
+[Desktop Entry]
+Type=Application
+Name=Manual
+GenericName=The manual for this system
+Comment=How to use and how to change this desktop, from logging in to adding a package
+Icon=help-contents
+Exec={{ .chezmoi.homeDir }}/.local/bin/manual
+Terminal=false
+Categories=Documentation;System;
+Keywords=manual;docs;documentation;help;handbook;guide;shortcuts;howto;
+NoDisplay=false

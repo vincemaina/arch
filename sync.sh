@@ -268,6 +268,37 @@ if ! $DRY_RUN && [[ -x "$HOME/.local/bin/theme" ]]; then
 fi
 
 # ----------------------------------------------------------------------
+# The manual
+# ----------------------------------------------------------------------
+#
+# docs/manual/ is repository tooling and is never copied onto a built machine,
+# so a fresh install has no manual at all and a synced one has whatever its
+# last sync rendered. Installing the built copy here is what makes `manual`
+# and the launcher entry find something.
+#
+# After the dotfiles, because the helper that opens it is one of them. Failures
+# warn rather than abort: a manual that would not render is a reason to look at
+# the manual, not a reason to fail a sync that has already reconciled packages
+# and system configuration.
+
+echo
+echo "==> Building the manual"
+
+MANUAL_DEST="$HOME/.local/share/manual"
+
+if $DRY_RUN; then
+    echo "    Would render docs/manual/ into $MANUAL_DEST/manual.html"
+elif build_out="$("$REPO_ROOT/tools/manual.sh" 2>&1)"; then
+    mkdir -p "$MANUAL_DEST"
+    install -m 0644 "$REPO_ROOT/docs/manual/build/manual.html" "$MANUAL_DEST/manual.html"
+    echo "    $(grep -oE '[0-9]+ chapters, [0-9]+ KiB' <<<"$build_out" || echo installed) -> $MANUAL_DEST/manual.html"
+    echo "    Open it with 'manual', or find it in the launcher"
+else
+    echo "    WARNING: the manual did not render, leaving the installed copy alone" >&2
+    sed 's/^/        /' <<<"$build_out" | tail -3 >&2
+fi
+
+# ----------------------------------------------------------------------
 # Login shell
 # ----------------------------------------------------------------------
 #
