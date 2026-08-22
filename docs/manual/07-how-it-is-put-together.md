@@ -87,6 +87,10 @@ It owns:
 
 - The `CONFIG_FILES` table: which repository file under `setup/system/`
   installs to which path under `/etc` (or `/usr/local/share`).
+- The console keymap: `/etc/vconsole.conf`, from `KEYMAP` in `install.conf` —
+  the one thing it reads out of machine identity rather than copying a file
+  under `setup/system/`, so a wrong wizard answer can still be corrected by
+  `sync.sh` instead of needing a hand-typed fix.
 - Rendering the greeter's stylesheet from the selected theme, as the invoking
   user rather than root, so it reflects that machine's own theme choice
   rather than the tracked default.
@@ -103,7 +107,8 @@ It owns:
 `sync.sh`'s. Without it, the script only writes files and enables units —
 which is all a chroot can do, since there is no running system inside it to
 restart anything on. With it, the change also takes effect now:
-`sysctl --system`, a `daemon-reload`, and restarts of `earlyoom` and `keyd`.
+`sysctl --system`, a `daemon-reload`, and restarts of `earlyoom`, `keyd` and
+`systemd-vconsole-setup`.
 Failures after `--activate` warn rather than abort the sync, because the
 configuration is already written and one service refusing to restart should
 not fail everything else that follows it.

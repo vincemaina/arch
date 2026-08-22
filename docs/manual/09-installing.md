@@ -96,11 +96,11 @@ read that before touching any stage script. In brief:
 2. **Base system** (`02-base.sh`) — `pacstrap`s the base package set and
    writes `/etc/fstab`.
 3. **System configuration** (`03-system.sh`) — timezone, locale, hostname,
-   keymap, the user account, sudo, NetworkManager, and the bootloader. Asks
-   for the root and user passwords here.
+   the user account, sudo, NetworkManager, and the bootloader. Asks for the
+   root and user passwords here.
 4. **Desktop** (`04-desktop.sh`) — installs the desktop and development
    package sets, then applies machine-wide configuration (zram, earlyoom,
-   keyd, greetd, the boot hooks).
+   keyd, greetd, the console keymap, the boot hooks).
 5. **Dotfiles** (`05-dotfiles.sh`) — applies your user configuration with
    chezmoi, then switches the login shell to zsh once its config is
    confirmed to parse.
