@@ -113,13 +113,18 @@ compositor, in `setup/system/keyd/default.conf`:
 
 - **Hold Caps Lock**, and `j`/`k`/`h`/`l` emit real mouse-wheel scroll
   events - down, up, left, right. Because these are genuine wheel events
-  rather than keypresses, they scroll whatever is under the **mouse
-  pointer**, regardless of which window has keyboard focus, and they work
-  inside a text field where an arrow or Page key would only move the caret.
-- **Hold Caps Lock**, and `d`/`u` send Page Down / Page Up instead, which go
-  to whichever window has **keyboard** focus - the case the wheel keys
-  cannot reach, since sway's default pointer behaviour leaves the mouse
-  behind on a keyboard-driven focus change.
+  rather than keypresses, they work inside a text field, where an arrow or
+  Page key would only move the caret. The other half of that is that a wheel
+  event goes to whatever is under the **mouse pointer** and ignores keyboard
+  focus - so Sway is configured with `mouse_warping container` in
+  `setup/dotfiles/dot_config/sway/config.d/10-input.conf`, which puts the
+  pointer on whichever window gains focus. That setting exists for this
+  feature: with it, scrolling goes where typing goes, unless the pointer has
+  since been moved by hand.
+- **Hold Caps Lock**, and `d`/`u` send Page Down / Page Up instead. These are
+  ordinary key events, so they go to whichever window has **keyboard** focus,
+  wherever the pointer happens to be - the answer when the pointer has been
+  left over some other window, or over a window on another output.
 - **Tapping** Caps Lock on its own still toggles caps lock normally. The
   layer only engages on a hold, or when another key is struck while it is
   held down.
@@ -139,8 +144,14 @@ than assumed: both the emulated keyboard's LED and keyd's own virtual one
 change together, so the swap and the daemon are not the cause. The machine
 is a KVM guest with an emulated keyboard, and the LED belongs to the
 *host*, which keeps its own Caps Lock state and is never told about the
-guest's. On real hardware, the device Sway updates is the physical
-keyboard, so the light works as expected and this does not apply.
+guest's.
+
+The expectation is that this disappears on real hardware, where the device
+Sway updates is the keyboard the light is attached to. Read that as an
+expectation and not a finding: nothing in this repository records the build
+ever running on physical hardware, so nobody has watched the light there. If
+you are the first to boot it on metal, look at the Caps Lock light and
+correct this paragraph either way.
 
 ## Ctrl+K is another Escape
 
