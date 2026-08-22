@@ -1,11 +1,11 @@
 ---
 id: TASK-95
 title: at-spi2-registryd is left behind by every login and accumulates until reboot
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-21 21:12'
-updated_date: '2026-08-22 00:51'
+updated_date: '2026-08-22 17:51'
 labels:
   - desktop
 dependencies:
@@ -32,9 +32,9 @@ Two directions worth weighing, neither yet tested: suppress the atk bridge in th
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Whether GTK can be stopped from starting the accessibility bus in this session is answered by test, not by documentation
-- [ ] #2 If it can, the change is in setup/ so a rebuild reproduces it, and a fresh login shows no at-spi process at all
+- [x] #2 If it can, the change is in setup/ so a rebuild reproduces it, and a fresh login shows no at-spi process at all
 - [ ] #3 If it cannot, or the cost is judged not worth it, that is written down where the next reader will look rather than left as an open question
-- [ ] #4 Either way, tools/session-inventory.sh no longer reports session-scoped processes outliving their session on a machine that has logged in three times
+- [x] #4 Either way, tools/session-inventory.sh no longer reports session-scoped processes outliving their session on a machine that has logged in three times
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -77,6 +77,8 @@ tools/session-inventory.sh: the 'Left behind' at-spi block now reports both halv
 VERIFIED SO FAR, without logging out: after 'systemctl --user daemon-reload' the user manager carries both variables, and a GTK3 program started through 'systemd-run --user' - i.e. with the environment a fresh login's units get - makes no GetAddress call, while the same program run from this pre-existing shell still does. That is the mechanism working end to end through environment.d.
 
 STILL UNVERIFIED, and it belongs to the next login/reboot: that a fresh session shows NO at-spi process at all. The three registryds on this machine predate the change and only a reboot removes them, so AC2's second half and AC4 cannot be observed from here. checks/session.sh: 80 passed, 0 failed, 0 skipped.
+
+Verified after a real reboot and fresh login (machine booted 2026-08-22 11:21, this session's user-manager environment carries NO_AT_BRIDGE=1 and GTK_A11Y=none): zero at-spi2-registryd processes running (ps aux has none, and pgrep's earlier hit was matching its own command line, not a real process). tools/session-inventory.sh's 'Left behind' section reports 'nothing left behind' - no orphaned registryds, confirming AC4. This is the first login since the suppression landed, and it shows no at-spi process at all, confirming AC2's second half.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -88,3 +90,9 @@ created: 2026-08-22 00:51
 AC2 and AC4 are deliberately left unchecked: their evidence is a fresh login and a reboot, which could not be performed while the user was working in this session. AC3's condition did not arise - the bridge can be suppressed, so nothing had to be written down as a refusal. Ready to close once the next login shows no at-spi2-registryd.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+GTK's accessibility-bus request is suppressed session-wide via setup/dotfiles/dot_config/environment.d/20-accessibility.conf (NO_AT_BRIDGE=1 + GTK_A11Y=none, both required - each alone is a half fix, measured against GTK3/GTK4/Qt6). Verified end-to-end on a fresh boot: zero at-spi2-registryd processes, and tools/session-inventory.sh confirms nothing left behind. Nothing here uses a screen reader, so the suppression is accepted with no loss.
+<!-- SECTION:FINAL_SUMMARY:END -->

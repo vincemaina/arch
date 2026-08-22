@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@vincemaina'
 created_date: '2026-08-22 14:02'
-updated_date: '2026-08-22 17:43'
+updated_date: '2026-08-22 17:51'
 labels: []
 dependencies: []
 priority: medium
@@ -28,7 +28,7 @@ The locale stays `en_GB.UTF-8`: it governs dates, paper size and currency, not k
 <!-- AC:BEGIN -->
 - [x] #1 sway's input config declares xkb_layout us, and the running compositor reports it
 - [x] #2 install.conf declares KEYMAP="us", so a fresh install gets a US text console
-- [ ] #3 The running machine's /etc/vconsole.conf agrees (applied by hand; sync.sh has no path for KEYMAP)
+- [x] #3 The running machine's /etc/vconsole.conf agrees (applied by hand; sync.sh has no path for KEYMAP)
 - [x] #4 The manual's keyboard chapter names the layout
 <!-- AC:END -->
 
@@ -62,6 +62,8 @@ AC #3 is deliberately unchecked: /etc/vconsole.conf needs root and this session 
 Follow-up raised as TASK-115: sync.sh has no path for KEYMAP, which is why AC #3 needs a human.
 
 Merged to main (a725ecb, TASK-121's stale-dotfile fix landed just before it). Verified in the merged repo: setup/install.conf declares KEYMAP="us", setup/dotfiles/dot_config/sway/config.d/10-input.conf declares xkb_layout us, docs/manual/03-the-keyboard.md documents the layout and the vconsole.conf gap. AC1's live-compositor confirmation was captured during implementation on the reference machine at the time (swaymsg reported English (US)); the current machine has not yet run sync.sh to pick up this merge, so its live xkb_active_layout_name and /etc/vconsole.conf still read gb/uk pending that sync and the one-off root edit AC3 already calls for. Not re-verifying AC1 against this specific machine's live state before closing, since the config-and-manual side of the task is what TASK-114 owns; TASK-115 is the tracked fix for reconciling the console keymap through sync.sh, and AC3 stays unchecked here for that reason.
+
+Confirmed on the running machine after the user ran sync.sh and applied the console change by hand: swaymsg -t get_inputs reports xkb_active_layout_name "English (US)" for every keyboard, and /etc/vconsole.conf now reads KEYMAP=us. AC1 and AC3 both verified against the running system, not just the file.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
