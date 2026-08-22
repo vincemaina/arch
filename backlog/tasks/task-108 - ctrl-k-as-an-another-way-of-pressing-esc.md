@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 12:03'
-updated_date: '2026-08-22 12:45'
+updated_date: '2026-08-22 13:57'
 labels: []
 dependencies: []
 priority: medium
@@ -121,6 +121,22 @@ Three criteria were REMOVED from here and added to TASK-110 rather than checked,
 They belong on TASK-110 anyway. That ticket ends the trial, and the trial cannot be judged until both keys are actually live and observed - /etc currently carries k = esc alone, so Ctrl+semicolon is written and not yet applied. Whoever closes TASK-110 has to apply and verify regardless, so the work is not lost, it is where it will actually be done.
 
 The outcome that mattered most here was not the binding but the finding that Ctrl+semicolon costs nothing: there is no ASCII control code for semicolon, so no terminal program CAN bind it, and none on this machine does. Ctrl+K costs three daily bindings, all now replaced - kill-line in zsh moved to Alt+K, the nvim split-above mapping removed, move-up in fzf where the same key now ABORTS instead. That comparison is what TASK-110 decides between, and cost is already settled; only which one the hand reaches for is open.
+
+AC#5 done: setup/system/keyd/default.conf and /etc/keyd/default.conf are byte-identical (diff -q clean) and keyd reloaded at 14:52:54 with DEVICE: match on the AT Translated Set 2 keyboard. Both k = esc and semicolon = esc are live. tools/shortcuts.sh reports both, read out of /etc.
+
+AC#3 AND AC#4 STILL NOT CHECKED, and the reason is worth recording because it nearly went the other way.
+
+The uinput probe ran and printed (nothing) for every injected chord - plain k, leftalt+k, plain semicolon, leftalt+semicolon. That reads exactly like four broken bindings. It was not. keyd own log says:
+
+    DEVICE: ignoring dead:beef:a35c1de0  (keyd-probe)
+
+The probe declared only the fifteen key codes it meant to press, and keyd decides what counts as a keyboard from the key bitmap a device advertises. A device with a dozen keys is not one, so keyd never grabbed it, every injected key bypassed keyd, and its virtual keyboard emitted nothing. [ids] is * and was never the issue.
+
+The tell: plain k -> (nothing). On a grabbed device even an UNBOUND key reappears on keyd virtual keyboard. Getting nothing for an unbound key means the device was never grabbed, not that the key is broken.
+
+Probe fixed two ways, the second mattering more: it now declares a whole keyboard (range 1..249) and injects only what it cares about, AND it reads journalctl for its own device name and ABORTS loudly if keyd says ignoring - so it can never again report a confident negative while disconnected from the thing it claims to observe. Recorded in .claude/skills/scripting-traps as "keyd ignores a uinput device that is not keyboard-shaped", with the general shape named: a measurement apparatus that silently is not measuring produces confident negative results.
+
+So AC#3 and AC#4 remain open on evidence, not on doubt. The bindings are applied and either pressing them or one more probe run settles it.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

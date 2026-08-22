@@ -528,3 +528,48 @@ error: a passing check that was lying, a menu that rendered its own protocol as
 text, an edit that reported success, a launcher entry that silently did
 nothing. That is the same failure mode `CLAUDE.md` describes for configuration,
 arriving through the scripts instead.
+
+## keyd ignores a uinput device that is not keyboard-shaped
+
+To prove what a keyd binding actually emits, you can create a uinput device,
+inject a chord on it, and read back what appears on keyd's virtual keyboard.
+That is real evidence rather than a config read-back, and it is worth the
+trouble.
+
+The first attempt declared only the fifteen key codes it intended to press.
+keyd left the device alone:
+
+```
+DEVICE: ignoring dead:beef:a35c1de0  (keyd-probe)
+```
+
+despite `[ids]` being `*`. keyd decides what counts as a keyboard from the key
+bitmap a device advertises, and a device with a dozen keys is not one. Every
+injected key therefore bypassed keyd entirely, and the probe printed:
+
+```
+  plain k             -> (nothing)
+  leftalt + k         -> (nothing)
+  leftalt + semicolon -> (nothing)
+```
+
+which reads exactly like three broken bindings and was nothing of the kind.
+The bindings were fine; the apparatus was not measuring.
+
+Two fixes, and the second matters more than the first:
+
+- Declare a whole keyboard — `open_uinput(range(1, 249))` — and inject only
+  the keys you care about.
+- **Make the probe prove it was grabbed before it reports anything.** Read
+  `journalctl -u keyd` for the device name and abort loudly on `ignoring`.
+  Without that check the probe cannot distinguish "the binding does not work"
+  from "keyd never saw the key", and those two print identically.
+
+The tell, if you meet this again: an unbound key. On a device keyd has grabbed,
+even a key with no binding reappears on keyd's virtual keyboard. `plain k ->
+(nothing)` means the device was never grabbed, not that `k` is broken.
+
+The general shape is worth naming, because it is not specific to keyd: **a
+measurement apparatus that silently is not measuring produces confident
+negative results.** Every probe should first demonstrate that it is connected
+to the thing it claims to observe.
