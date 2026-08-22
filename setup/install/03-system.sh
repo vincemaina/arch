@@ -36,13 +36,48 @@ chmod 440 /etc/sudoers.d/wheel
 echo "==> Enabling NetworkManager"
 systemctl enable NetworkManager
 
+# Passwords, asked here and stored nowhere - see the foot of install.conf.
+#
+# A bare `passwd` under `set -e` was the whole bug in TASK-131: passwd exits
+# non-zero when the two entries do not match, so one typo ended the stage,
+# arch-chroot returned non-zero, and install.sh gave up - having already
+# erased the disk in stage 1 and pacstrapped the base system in stage 2. The
+# cheapest mistake available cost the entire install.
+#
+# Bounded rather than an unconditional `until`: passwd reading from a pipe or
+# a closed stdin fails instantly and forever, and an install with no terminal
+# would otherwise spin here rather than failing. Five attempts is generous for
+# a human - passwd already retries internally before it returns at all - and
+# finite for everything else. Exhausting them still fails the stage, because a
+# machine whose root password was never set is not one to carry on building.
+set_password() {
+    local who="$1"
+    local attempt
+
+    for (( attempt = 1; attempt <= 5; attempt++ )); do
+        if passwd "$who"; then
+            return 0
+        fi
+
+        if (( attempt < 5 )); then
+            echo
+            echo "That did not take - the two entries most likely did not match."
+            echo "Try again ($attempt of 5)."
+        fi
+    done
+
+    echo >&2
+    echo "Could not set the password for $who after 5 attempts." >&2
+    return 1
+}
+
 echo
 echo "Set root password:"
-passwd
+set_password root
 
 echo
 echo "Set password for $USERNAME:"
-passwd "$USERNAME"
+set_password "$USERNAME"
 
 echo
 echo "==> Installing systemd-boot"

@@ -93,7 +93,22 @@ build skips the wizard automatically, with no flag needed.
 
 **Passwords are never asked here and never stored in the repository.** Stage
 03 (`03-system.sh`) prompts for the root password and the new user's password
-interactively, at the point the accounts are created.
+interactively, at the point the accounts are created. Mistyping one — so that
+the two entries disagree — re-asks rather than ending the install; it used to
+end it, after the disk had already been erased.
+
+## If a run stops partway
+
+Any stage after the first can fail, and the target's filesystems are left
+mounted on `/mnt` when one does — `install.sh` only unmounts them on the way
+out of a successful run.
+
+Simply run `install.sh` again. Stage 01 clears those leftovers itself, after
+you confirm with `ERASE` and before it writes anything. Earlier this was the
+point at which a second attempt failed, with an error saying the disk's
+partitions were in use: the disk was fine, and what was holding it was the
+previous run. If something the installer cannot clear is holding the disk, it
+now says what.
 
 ## The five stages
 
