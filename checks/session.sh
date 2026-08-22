@@ -592,6 +592,23 @@ if os.path.isdir(bin_dir):
         except (OSError, UnicodeDecodeError):
             continue
 
+# Comments are not invocations.
+#
+# This scans source text for calls to sway-toggle-window and takes the next
+# token as the app_id. A helper that merely MENTIONS the toggle - explaining in
+# a comment why it does NOT use it - had its next token, a bare "#", read as an
+# app_id, and this failed asking why nothing floats a window called "#". The
+# scripting-traps entry "a replace can match a comment about the section", one
+# layer up: here it is a check matching a comment about the thing it checks.
+#
+# Whole comment lines only, rather than everything after a "#" anywhere: a
+# click command can legitimately contain one, and cutting there would silently
+# shorten the command being examined.
+searched = "\n".join(
+    line for line in searched.splitlines()
+    if not line.lstrip().startswith(("#", "//"))
+)
+
 toggled = set(re.findall(r"sway-toggle-window[\"']?\s+(\S+)", searched))
 toggled = {a.strip('"\'\\') for a in toggled if not a.startswith(("-", "$", "<"))}
 unfloated = [
