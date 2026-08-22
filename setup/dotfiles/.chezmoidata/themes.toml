@@ -57,6 +57,7 @@
 theme = "neon"
 
 [themes.neon]
+description = "Electric cyan and magenta on near-black. The loudest of the set."
     bg          = "#0b0e14"  # window background
     bar         = "#000000"  # the bar's base. Black, and deliberately not
                              # tinted here: the stylesheet mixes accent and
@@ -120,6 +121,7 @@ theme = "neon"
 # shows up once a theme is actually on screen. Taking it darker fixes the number
 # and keeps the ember reading.
 [themes.ember]
+description = "Warm amber and coral on brown-black. The only warm theme."
     bg          = "#14100d"  # window background, black with a brown cast
     bar         = "#000000"  # as neon: the stylesheet tints it
     bg_dim      = "#0c0908"  # lock screen, behind everything
@@ -170,6 +172,7 @@ theme = "neon"
 # that proves the mechanism is about more than hue: nothing here is a rotation
 # of the neon palette, the whole thing is lower contrast by intent.
 [themes.slate]
+description = "Muted blue-violet on cool grey. Soft, low glare."
     bg          = "#11151a"  # window background
     bar         = "#000000"  # as neon: the stylesheet tints it
     bg_dim      = "#0b0e12"  # lock screen, behind everything
@@ -216,6 +219,7 @@ theme = "neon"
 # green theme the healthy-battery colour would otherwise be invisible as a
 # signal, because everything is already that colour.
 [themes.verdant]
+description = "Green on deep forest black. Calm, high contrast."
     bg          = "#0a1210"
     bar         = "#000000"
     bg_dim      = "#060c0a"
@@ -254,6 +258,7 @@ theme = "neon"
 # wheel - the darkest background of any theme here, which makes it the one
 # to reach for in a dark room.
 [themes.abyss]
+description = "Cyan and indigo on deep navy. Cold and deep."
     bg          = "#080f16"
     bar         = "#000000"
     bg_dim      = "#050a10"
@@ -293,6 +298,7 @@ theme = "neon"
 # without being orange. Note `urgent` is pushed to a clear red rather than
 # the usual rose, because a rose alarm on a pink desktop says nothing.
 [themes.orchid]
+description = "Purple and pink on aubergine. Rich, unusual."
     bg          = "#120b16"
     bar         = "#000000"
     bg_dim      = "#0b0710"
@@ -331,6 +337,7 @@ theme = "neon"
 # murky and low, this is vivid and high-contrast - the two are not the same
 # theme with different numbers.
 [themes.cobalt]
+description = "Bright blue and violet on midnight. Crisp and vivid."
     bg          = "#0a0f1c"
     bar         = "#000000"
     bg_dim      = "#060a14"
@@ -373,6 +380,7 @@ theme = "neon"
 # # A grey `urgent` is not a signal, and the point of a quiet theme is that
 # # the few things which do speak are heard.
 [themes.mono]
+description = "Greyscale on charcoal. No hue at all - colour only for warnings."
     bg          = "#0e0e10"
     bar         = "#000000"
     bg_dim      = "#08080a"

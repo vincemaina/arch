@@ -1,27 +1,45 @@
-# Stations for ~/.local/bin/focus-music. One per line: a name, a tab, a URL.
+# Stations for ~/.local/bin/focus-music. One per line: a name, a TAB, a URL.
 #
 # Tracked here rather than inside the helper, so adding a station is editing
 # data rather than editing a script - and so a rebuilt machine has the same
 # list. Comments and blank lines are ignored.
 #
-# WHY SOMAFM AND NOT A YOUTUBE LOFI CHANNEL
+# THE NAMES LEAD WITH THE SOUND, NOT THE BRAND
 #
-# These are direct audio URLs. They need no yt-dlp, no API, no key, and no
-# resolving step that can break independently of the player - all six were
-# checked returning audio/mpeg before being written down. A YouTube live stream
-# needs yt-dlp to resolve it on every start, and the video id changes whenever
-# the channel restarts, which turns a station into a thing that stops working
-# for reasons nobody can see.
+# "Fluid" and "Lush" tell you nothing at the moment you are choosing, which is
+# the only moment the name is read. The descriptor comes first and the station
+# name follows it, so the list can be skimmed for a mood and still says where
+# each one came from. rofi matches anywhere in the line, so typing "lush" or
+# "dub" both still find them.
 #
-# yt-dlp is still declared, so pasting a YouTube or SoundCloud link at the
-# helper works. It is just not what the defaults depend on.
+# WHY DIRECT AUDIO URLS
 #
-# SomaFM is listener-supported and asks for a donation rather than serving ads:
-# https://somafm.com/support/
+# No yt-dlp, no API, no key, and no resolving step that can break independently
+# of the player - every URL below was checked returning audio before being
+# written down. A YouTube live stream needs resolving on every start and its
+# video id changes whenever the channel restarts, which turns a station into a
+# thing that stops working for reasons nobody can see.
+#
+# yt-dlp is still declared, so pasting a YouTube or SoundCloud link here works.
+# It is just not what the defaults depend on.
+#
+# SomaFM is listener-supported and serves no ads: https://somafm.com/support/
+# Their channel list, with ids for the URL pattern below, is at
+# https://somafm.com/channels.json
 
-Groove Salad	https://ice1.somafm.com/groovesalad-128-mp3
-Drone Zone	https://ice1.somafm.com/dronezone-128-mp3
-Deep Space One	https://ice1.somafm.com/deepspaceone-128-mp3
-Lush	https://ice1.somafm.com/lush-128-mp3
-Fluid	https://ice1.somafm.com/fluid-128-mp3
-Mission Control	https://ice1.somafm.com/missioncontrol-128-mp3
+# --- for working to ---------------------------------------------------------
+Chilled downtempo · Groove Salad	https://ice1.somafm.com/groovesalad-128-mp3
+Deep ambient drift · Drone Zone	https://ice1.somafm.com/dronezone-128-mp3
+Lofi beats · laut.fm	https://lofi.stream.laut.fm/lofi
+Instrumental hip-hop · Fluid	https://ice1.somafm.com/fluid-128-mp3
+
+# --- further out ------------------------------------------------------------
+Spacey experimental ambient · Deep Space One	https://ice1.somafm.com/deepspaceone-128-mp3
+Dub and deep bass · Dub Step Beyond	https://ice1.somafm.com/dubstep-128-mp3
+Vaporwave · Vaporwaves	https://ice1.somafm.com/vaporwaves-128-mp3
+
+# --- with more going on -----------------------------------------------------
+Bossa nova and samba · Bossa Beyond	https://ice1.somafm.com/bossa-128-mp3
+Mellow vocal electronica · Lush	https://ice1.somafm.com/lush-128-mp3
+Music for hacking · DEF CON Radio	https://ice1.somafm.com/defcon-128-mp3
+Space-flight ambient · Mission Control	https://ice1.somafm.com/missioncontrol-128-mp3

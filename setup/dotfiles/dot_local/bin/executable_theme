@@ -101,6 +101,25 @@ list_themes() {
     theme_data | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin)["themes"]))'
 }
 
+# The same list, with each theme's description beside it.
+#
+# "verdant" and "abyss" say nothing at the moment the name is actually read,
+# which is while choosing. The description lives in themes.toml next to the
+# colours it describes, so it cannot drift from them, and checks/session.sh
+# already enforces that every theme defines every key every other theme does -
+# so a new theme without one fails at render rather than showing a blank row.
+#
+# Kept separate from list_themes deliberately: validation, the CLI argument and
+# the error message all work on bare names, and only the menu is labelled.
+list_themes_labelled() {
+    theme_data | python3 -c '
+import json, sys
+themes = json.load(sys.stdin)["themes"]
+width = max(len(n) for n in themes)
+for name, t in themes.items():
+    print("%-*s   %s" % (width, name, t.get("description", "")))'
+}
+
 current_theme() {
     theme_data | python3 -c 'import json,sys; print(json.load(sys.stdin)["'"$THEMES_KEY"'"])'
 }
@@ -144,9 +163,12 @@ if [[ -z "$wanted" ]]; then
     # rofi's own theme is one of the things being switched, so the menu appears
     # in the theme being left rather than the one being chosen. That is the
     # right way round: it is the last thing the old theme does.
-    wanted="$(list_themes | rofi -dmenu -i -p "Theme" -no-custom \
+    # Labelled in the menu, bare everywhere else: the first field is the name,
+    # so the selection is cut back to it before anything else sees it.
+    wanted="$(list_themes_labelled | rofi -dmenu -i -p "Theme" -no-custom \
         -select "$(current_theme)" || true)"
     [[ -n "$wanted" ]] || exit 0
+    wanted="${wanted%% *}"
 fi
 
 # Validate before writing. An unknown name would otherwise be written to the
