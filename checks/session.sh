@@ -1667,6 +1667,12 @@ if ! command -v chezmoi &>/dev/null; then
 elif ! git -C "$CHECKS_REPO" rev-parse --git-dir &>/dev/null; then
     skip "not a git checkout, so there is no deletion history to replay"
 else
+    # The exit status is read, and that is not decoration. This script runs
+    # without `set -e`, so a python that gives up returns an EMPTY orphan list -
+    # which reads as "nothing is stale" and prints a green PASS. That is the
+    # same silent-success shape as the bare `chezmoi managed` this check was
+    # fixed for: the answer was never computed, and the check said everything
+    # was fine. Ask, and fail loudly when the answer is missing.
     orphans="$(
         git -C "$CHECKS_REPO" log --diff-filter=D --name-only --format= -- setup/dotfiles/ 2>/dev/null |
         sort -u |
@@ -1758,7 +1764,10 @@ for line in sys.stdin:
 print(" ".join(sorted(set(stale))))
 '
     )"
-    if [[ -n "$orphans" ]]; then
+    orphan_status=$?
+    if (( orphan_status != 0 )); then
+        fail "could not work out which dotfiles are stale: chezmoi could not be asked what it manages from $CHECKS_REPO/setup"$'\n'"        this check reports nothing rather than guessing, because the guess would be \"delete them\""
+    elif [[ -n "$orphans" ]]; then
         fail "deleted from setup/dotfiles/ but still on this machine: $orphans"$'\n'"        add them to setup/dotfiles/.chezmoiremove, then run ./sync.sh"
     else
         pass "every dotfile this repository has deleted is gone from this machine too"
