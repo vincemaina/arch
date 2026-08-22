@@ -1639,6 +1639,49 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Where a bare chezmoi command looks (TASK-121.1)"
+
+# Everything in this repository drives chezmoi with an explicit --source. A
+# human does not: `chezmoi status` typed into a terminal reads sourceDir from
+# ~/.config/chezmoi/chezmoi.toml, which sync.sh records.
+#
+# chezmoi does not check that the recorded directory exists, and the two
+# commands you would reach for disagree about saying so. Measured against
+# chezmoi 2.72 with a sourceDir that does not exist:
+#
+#   chezmoi managed  ->  no output, exit 0     <- indistinguishable from healthy
+#   chezmoi status   ->  "no such file", exit 1
+#
+# So the silent one is `managed`, and `managed` is what tooling calls. This
+# check asks it, because zero managed files is the exact state that made the
+# stale-dotfile check below recommend deleting seven live config files.
+if ! command -v chezmoi &>/dev/null; then
+    skip "chezmoi is not installed"
+else
+    recorded_source="$(chezmoi source-path 2>/dev/null || true)"
+    managed_count="$(chezmoi managed 2>/dev/null | wc -l)"
+    # What to tell someone to record. Not $CHECKS_REPO blindly: these checks are
+    # often run from a worktree, and advising the path that causes this bug is
+    # how a check hands you a fix worse than the fault. `git worktree list`
+    # puts the main working tree first.
+    suggest_repo="$(git -C "$CHECKS_REPO" worktree list --porcelain 2>/dev/null |
+                    sed -n '1{s/^worktree //p;}')"
+    [[ -n "$suggest_repo" && -d "$suggest_repo/setup" ]] || suggest_repo="$CHECKS_REPO"
+    if (( managed_count > 0 )); then
+        # A worktree is a checkout with a deadline. It answers today and
+        # vanishes with the task, so this is the one failure worth reporting
+        # while everything still works.
+        if [[ "$recorded_source" == *"/.claude/worktrees/"* ]]; then
+            fail "a bare chezmoi command looks inside a git worktree: $recorded_source"$'\n'"        that directory is deleted with the task, and chezmoi will then find nothing without saying so"$'\n'"        repair it with: theme --record-source $suggest_repo/setup"
+        else
+            pass "a bare chezmoi command finds $managed_count managed files in ${recorded_source:-its default source}"
+        fi
+    else
+        fail "a bare chezmoi command manages nothing, so anything not passing --source silently does nothing: ${recorded_source:-no source recorded}"$'\n'"        repair it with: theme --record-source $suggest_repo/setup"
+    fi
+fi
+
+# ----------------------------------------------------------------------
 section "Dotfiles this repository stopped shipping (TASK-94)"
 
 # chezmoi apply NEVER removes a file the source state has stopped shipping. So
@@ -1662,11 +1705,24 @@ section "Dotfiles this repository stopped shipping (TASK-94)"
 # becoming a .tmpl, or gaining an executable_ prefix - is still managed, just
 # from a different source. So this compares against `chezmoi managed`, which
 # knows the target paths, rather than against git alone.
+#
+# Only the two-commit form of that reaches here at all: renaming a file within
+# a single commit is recorded as a rename, and --diff-filter=D does not report
+# it. Both forms exist in this repository's history and both were exercised
+# against this check before it was trusted - a probe deleted and re-added as a
+# .tmpl, another re-added with an executable_ prefix, and a third deleted for
+# good, with all three present on disk. Only the third was reported.
 if ! command -v chezmoi &>/dev/null; then
     skip "chezmoi is not installed"
 elif ! git -C "$CHECKS_REPO" rev-parse --git-dir &>/dev/null; then
     skip "not a git checkout, so there is no deletion history to replay"
 else
+    # The exit status is read, and that is not decoration. This script runs
+    # without `set -e`, so a python that gives up returns an EMPTY orphan list -
+    # which reads as "nothing is stale" and prints a green PASS. That is the
+    # same silent-success shape as the bare `chezmoi managed` this check was
+    # fixed for: the answer was never computed, and the check said everything
+    # was fine. Ask, and fail loudly when the answer is missing.
     orphans="$(
         git -C "$CHECKS_REPO" log --diff-filter=D --name-only --format= -- setup/dotfiles/ 2>/dev/null |
         sort -u |
@@ -1758,7 +1814,10 @@ for line in sys.stdin:
 print(" ".join(sorted(set(stale))))
 '
     )"
-    if [[ -n "$orphans" ]]; then
+    orphan_status=$?
+    if (( orphan_status != 0 )); then
+        fail "could not work out which dotfiles are stale: chezmoi could not be asked what it manages from $CHECKS_REPO/setup"$'\n'"        this check reports nothing rather than guessing, because the guess would be \"delete them\""
+    elif [[ -n "$orphans" ]]; then
         fail "deleted from setup/dotfiles/ but still on this machine: $orphans"$'\n'"        add them to setup/dotfiles/.chezmoiremove, then run ./sync.sh"
     else
         pass "every dotfile this repository has deleted is gone from this machine too"

@@ -3,10 +3,10 @@ id: TASK-121
 title: >-
   The stale-dotfile check reports templates as deleted, and its advice would
   delete them
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-22 16:07'
-updated_date: '2026-08-22 16:20'
+updated_date: '2026-08-22 17:12'
 labels:
   - repo
 dependencies:
@@ -42,10 +42,10 @@ Also worth deciding what the check should do about the genuine case it was writt
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A dotfile converted to a template is not reported as deleted
-- [ ] #2 The other chezmoi source prefixes are handled too - dot_, executable_, private_, symlink_ - rather than only .tmpl
-- [ ] #3 The genuine case TASK-94 was written for still fails: a file the repository has actually stopped shipping and is still on disk
-- [ ] #4 The check is exercised against both cases before being trusted, since it currently passes for prefixed files only because none have been removed
+- [x] #1 A dotfile converted to a template is not reported as deleted
+- [x] #2 The other chezmoi source prefixes are handled too - dot_, executable_, private_, symlink_ - rather than only .tmpl
+- [x] #3 The genuine case TASK-94 was written for still fails: a file the repository has actually stopped shipping and is still on disk
+- [x] #4 The check is exercised against both cases before being trusted, since it currently passes for prefixed files only because none have been removed
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -64,4 +64,28 @@ Two things found alongside, both worth their own attention.
 The recorded sourceDir was repaired on this machine with `theme --record-source /home/vincemaina/Arch/setup`, but nothing stops it happening again: sync.sh run from a worktree will record the worktree path, and removing that worktree leaves every bare chezmoi command on the machine silently operating on nothing.
 
 And with sourceDir repaired, the machine turns out to be well behind the repository - 19 dotfiles differ, including a foot.ini still carrying the tokyonight-night include that was fixed long ago. Three other checks fail as a direct result. Running sync.sh should clear them.
+
+Continued in a later session. The --source fix described above had landed (a588b3b) and the machine had been synced, so checks/session.sh was already at 92 passed, 0 failed and chezmoi status was clean - the 19-files-behind half of these notes is resolved.
+
+Two things were still missing, and both were about whether the check can be trusted rather than about the fix itself.
+
+The first is a real defect the previous session believed it had fixed. The notes say it 'exits non-zero if chezmoi fails rather than continuing with an empty set'. The python does exit 3, but nothing read that status: session.sh runs 'set -uo pipefail' with no -e, so the assignment simply received an empty string, and an empty orphan list is indistinguishable from a clean machine. Proved by putting a chezmoi on PATH that exits 1 - the check printed a green PASS, 'every dotfile this repository has deleted is gone from this machine too'. Exactly the silent-success shape that made the original bug destructive, reintroduced by the guard against it. Now the exit status is read and the check fails saying it could not compute an answer.
+
+The second is AC 4, which had never been done: the check had passed for prefixed and templated files only because none had been removed. Exercised with three live probes committed to a worktree branch - one dotfile deleted outright, one deleted and re-added as .tmpl, one re-added with an executable_ prefix - all three targets created on disk. Only the genuine deletion was reported. Probes then reset out of history and removed from disk.
+
+Found while doing it: git records a rename inside a single commit as a rename, so --diff-filter=D never reports it. Only delete-then-readd across commits reaches the source-name comparison at all. Noted in the check, since the first probe attempt used git mv and silently tested nothing.
+
+The remaining half of these notes - that nothing stops sync.sh recording a worktree sourceDir again - is now TASK-121.1.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The check was already fixed by passing --source explicitly; what this session added was proof it works and one defect found while getting it.
+
+The defect: the python guard that exits non-zero when chezmoi cannot be asked what it manages was inert, because session.sh has no set -e and nothing read the status. A failing chezmoi produced an empty orphan list and a green PASS - the same silent-success that made the original bug destructive. The exit status is now read, and the check says it could not compute an answer instead of reporting a pass.
+
+Verified by running checks/session.sh with a chezmoi on PATH that exits 1: PASS before, FAIL after. Then with three probes committed to a throwaway branch and their targets created on disk - one dotfile stopped being shipped, one converted to .tmpl, one given an executable_ prefix - only the genuine deletion was reported. Probes removed, and the full check is back to 92 passed, 0 failed with chezmoi status clean.
+
+Also recorded that a single-commit rename is never seen by this check at all, and gave the manual's chezmoi-pointed-at-nothing bullet the other half of the story. The unresolved sourceDir recurrence is TASK-121.1.
+<!-- SECTION:FINAL_SUMMARY:END -->

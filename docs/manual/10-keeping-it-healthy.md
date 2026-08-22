@@ -183,15 +183,26 @@ reasoning about the file:
   clone uses that rather than the copy the installer leaves in `/opt`. Run
   from inside a temporary git worktree, it records the *worktree* — and once
   that worktree is deleted, every plain `chezmoi` command on the machine
-  silently operates on nothing. `chezmoi managed` lists no files and
-  `chezmoi status` prints nothing at all, without any error. Empty output
-  reads exactly like "everything is up to date", which is how it survived
+  silently operates on nothing — but only half of it is silent, and which
+  half you happen to type decides whether you notice. Pointed at a source
+  directory that does not exist, `chezmoi managed` prints nothing and exits
+  zero, which looks exactly like a clean machine, while `chezmoi status` says
+  "no such file" and exits one.
+  The quiet one is the one tooling calls, which is how this survived
   unnoticed and how a check that trusted it came to recommend deleting seven
   live config files. If chezmoi seems to do nothing, ask it where it is
   looking: `chezmoi source-path` should name the `setup/` directory of your
   checkout, and `chezmoi managed` should list a hundred or so files — zero
   means it is pointed at nothing. Repair it with
   `theme --record-source /path/to/checkout/setup`.
+
+  Both halves are now covered. `sync.sh` run from a worktree records the main
+  checkout instead, because a worktree is a checkout with a deadline and that
+  deadline should not be written into machine state; `./sync.sh --dry-run`
+  says which path it would record. And `checks/session.sh` fails when a bare
+  chezmoi command manages nothing, whatever the cause — a deleted worktree, a
+  moved clone, a repository renamed — rather than reporting a pass because it
+  got an empty answer.
 
 - **Media keys called a binary that was never installed.** The playback
   keys ran `playerctl`, which was not in any manifest. Pressing them did
