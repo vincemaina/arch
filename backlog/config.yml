@@ -5,7 +5,7 @@ labels: []
 date_format: yyyy-mm-dd
 max_column_width: 20
 auto_open_browser: true
-hide_empty_columns: false
+hide_empty_columns: true
 default_port: 6420
 remote_operations: true
 auto_commit: false

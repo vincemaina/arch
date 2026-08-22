@@ -4,7 +4,7 @@ title: One place that records what every feature costs to run
 status: To Do
 assignee: []
 created_date: '2026-08-22 11:59'
-updated_date: '2026-08-22 12:00'
+updated_date: '2026-08-22 12:16'
 labels: []
 dependencies:
   - TASK-27
@@ -36,3 +36,15 @@ Low priority. Nothing is blocked on it; it is worth doing once and then keeping 
 - [ ] #4 A feature is measured as a whole rather than as its most obvious process, and while it is doing its job rather than idle
 - [ ] #5 A new feature has an obvious place and format to add its figures to
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+FIRST CONCRETE JOB FOR THIS TICKET, found by TASK-27 while verifying the existing figures: the session-cost table in docs/software/README.md is stale, and stale in the most misleading direction.
+
+It was measured while the VM rendered in software. Since then the hypervisor 3D acceleration was turned on - DECISIONS.md has an entry titled "The VM rendered in software, and no longer does" - and sway now shows 65.2 MiB RSS against the 143.8 MiB on record. The single largest number in that table, the one used to argue that sway costs as much as the rest of the session combined, is less than half what it says.
+
+This is exactly the failure this ticket exists to prevent: a measured figure is only true for the machine it was measured on, and nothing in the document said loudly enough which machine that was or that the machine had changed underneath it. Whatever format this ticket settles on has to make a figure obsolete VISIBLY when its conditions change - at minimum every row carries the date and the rendering path, and there is a way to notice that the current machine no longer matches.
+
+Note also that confirming the rendering path needs root here (reading /proc/PID/fd for the compositor, or fuser against /dev/dri/renderD128), so "how do we establish this" is part of the method this ticket has to write down rather than something to work out again each time.
+<!-- SECTION:NOTES:END -->

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 02:24'
-updated_date: '2026-08-22 12:07'
+updated_date: '2026-08-22 12:16'
 labels: []
 dependencies: []
 priority: low
@@ -71,6 +71,18 @@ Re-verified before closing rather than trusted:
   * AC#1 - visualiser.desktop.tmpl renders Name=Visualiser and Exec=foot --app-id=visualiser --title=visualiser -e cava, so it is reachable by name from the launcher. cava is installed. The pulse input with source=auto attaches to the default sink monitor, so it shows whatever is audible rather than one player.
   * AC#2 - all 8 themes (neon, ember, slate, verdant, abyss, orchid, cobalt, mono) define every one of the five gradient keys the config reads: accent, info, secondary, tertiary, urgent. None missing, so no theme fails at render.
   * AC#3 - measured, see the previous note. 3.27% of one core and ~20 MiB, of which the terminal is the larger half.
+
+CORRECTION to the machine description on the measurement above. I labelled it "software rendering", copying the machine description docs/software/README.md records. That label is very likely wrong now.
+
+Evidence gathered afterwards, prompted by TASK-27 finding the same staleness:
+  * sway RSS is 65.2 MiB today. The figure on record, measured under llvmpipe, is 143.8 MiB - less than half.
+  * The "Refusing to try glamor on llvmpipe" and DRI2 EGL failure messages in the journal are all from 20 Aug. Nothing like them appears for the sway running now, started 11:21 on 22 Aug.
+  * virtio_gpu is loaded with 8 users and /dev/dri/card1 and renderD128 both exist.
+  * DECISIONS.md already carries an entry titled "The VM rendered in software, and no longer does".
+
+NOT CONCLUSIVE, and worth saying so rather than upgrading a strong inference into a fact: confirming which renderer the running sway actually holds needs root to read /proc/PID/fd or to run fuser against /dev/dri/renderD128, and passwordless sudo is not available here. What is established is that the "software rendering" label contradicts the evidence, not which label is right.
+
+The cava figure itself is unaffected. It was measured today, on whatever this machine is now, so it describes the current configuration. Only the description of the machine was wrong, and it mattered because the ticket AC specifically framed the cost as "a per-frame redraw on a CPU-rendered desktop" - if that premise is gone, 3.27% may be the cost of a slower path than the one this desktop now uses.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
