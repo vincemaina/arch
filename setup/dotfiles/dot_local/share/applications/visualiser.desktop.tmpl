@@ -1,0 +1,18 @@
+# foot is named bare rather than absolutely, unlike the helpers in ~/.local/bin:
+# it lives in /usr/bin, which IS on the PATH sway and rofi hand to what they
+# spawn. The helpers are the exception, not the rule.
+#
+# A distinct app_id so a window rule can find it later without matching every
+# terminal - the coupling CLAUDE.md warns about, set here where it is visible.
+
+[Desktop Entry]
+Type=Application
+Name=Visualiser
+GenericName=Audio spectrum
+Comment=Show a spectrum of whatever is currently playing
+Icon=multimedia-volume-control
+Exec=foot --app-id=visualiser --title=visualiser -e cava
+Terminal=false
+Categories=AudioVideo;Audio;
+Keywords=visualiser;visualizer;spectrum;cava;audio;music;waveform;
+NoDisplay=false

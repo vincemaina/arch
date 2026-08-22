@@ -1,11 +1,11 @@
 ---
 id: TASK-101
 title: Focus music without opening a browser
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-22 01:59'
-updated_date: '2026-08-22 02:07'
+updated_date: '2026-08-22 02:20'
 labels: []
 dependencies: []
 priority: low
@@ -39,8 +39,8 @@ Worth deciding what 'focus music' actually means before picking: a handful of kn
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Music plays and pauses from the bar and the media keys, verified by pressing them rather than by the tool claiming MPRIS support
-- [ ] #2 Starting it takes one keypress or one launcher entry, and it does not leave a window that has to be managed
+- [x] #1 Music plays and pauses from the bar and the media keys, verified by pressing them rather than by the tool claiming MPRIS support
+- [x] #2 Starting it takes one keypress or one launcher entry, and it does not leave a window that has to be managed
 - [x] #3 Whatever is chosen comes from the official repositories, or TASK-43 is explicitly reopened rather than quietly worked around
 - [x] #4 The chosen tool follows the theme, or its inability to is stated - it will sit next to tools that all do
 - [x] #5 If a helper holds a list of streams, that list is in the repository so a rebuilt machine has it
@@ -77,4 +77,12 @@ mpv is started with systemd-run --user --scope, for the reason the workspace gre
 VERIFIED HERE: the picker renders all six stations in the launcher's own styling, screenshotted (AC4 - it is rofi, so it follows the theme by construction; mpv itself has no UI to theme). The desktop entry passes desktop-file-validate and its icon exists in the installed Papirus theme. The station list is tracked (AC5). All three packages are from official repositories (AC3). session.sh 89 passed, 0 failed.
 
 NOT VERIFIED, AND CANNOT BE FROM HERE: AC1 and AC2. mpv, mpv-mpris and yt-dlp are declared and not installed - there is no sudo in this session - so nothing has actually played, the bar has never shown it, and no playback key has been pressed at it. checks/packages.sh and checks/sway-commands.sh both report them missing, which is those checks working. After ./sync.sh the test is: open Focus Music from the launcher, pick a station, and confirm the bar's media module names it and the play/pause key stops it.
+
+AC1 and AC2 CONFIRMED BY THE USER after ./sync.sh: the station name displays in the bar's media module and the play/pause keys control it. That is the criterion as written - verified by pressing the keys rather than by the tool claiming MPRIS support - and it was the right criterion to insist on, since the whole design turns on one line loading the mpris plugin.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+mpv, mpv-mpris and yt-dlp with a tracked SomaFM station list and a launcher entry. mpv rather than a music application, so the bar's media module and the playback keys control it and the helper is never involved again - which turns entirely on script=/usr/lib/mpv-mpris/mpris.so, without which mpv plays perfectly and the desktop cannot see it. Stations are data rather than code, chosen as direct URLs so no resolving step can fail independently of the player. Confirmed working by the user: the station name shows in the bar and the play/pause keys stop it.
+<!-- SECTION:FINAL_SUMMARY:END -->

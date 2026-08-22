@@ -137,6 +137,12 @@ mpv
 mpv-mpris
 yt-dlp
 
+# The spectrum display, on the same audio. 195 KiB, and it needs no integration
+# with any player: it reads the default output's MONITOR, so it visualises
+# whatever is audible - the radio, a video in the browser, a notification -
+# without knowing what produced it.
+cava
+
 # Cursor theme, so the pointer looks the same in every application
 adwaita-cursors
 

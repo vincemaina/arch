@@ -1,0 +1,55 @@
+{{- $palette := index .themes .theme -}}
+# cava, reading whatever the machine is playing.
+#
+# Rendered from .chezmoidata/themes.toml like every other consumer - editing a
+# colour means editing that file and running sync.sh, never this one.
+#
+# WHAT IT LISTENS TO, AND WHY THAT IS THE POINT
+#
+# The pulse method with source = auto attaches to the default output's MONITOR,
+# not to a microphone and not to a particular player. So it visualises whatever
+# is audible - focus-music, a video in the browser, a notification sound - and
+# needs no integration with any of them. Confirmed on this machine reading a
+# SomaFM stream through mpv while mpv knew nothing about it.
+
+[general]
+# 60 would be smoother and this desktop is CPU-rendered in a VM. 30 is
+# indistinguishable for bars that move this fast and costs half as much.
+framerate = 30
+
+# Let the terminal decide how many bars fit, rather than fixing a number that is
+# wrong in every window that is not the size it was chosen for.
+autosens = 1
+lower_cutoff_freq = 50
+higher_cutoff_freq = 10000
+
+[input]
+method = pulse
+source = auto
+
+[output]
+method = ncurses
+channels = stereo
+mono_option = average
+
+[smoothing]
+noise_reduction = 77
+
+[color]
+# `default` rather than the theme's bg, deliberately: it keeps the terminal's
+# own background, which foot renders at alpha 0.90. Painting a colour here would
+# make the visualiser the one opaque rectangle among the terminal tools - the
+# same reasoning that gives the editor a transparent Normal.
+background = default
+foreground = default
+
+# The gradient runs quiet-to-loud through the theme's own identity colours
+# rather than through a fixed green-yellow-red. Every theme defines all five, so
+# this renders for all of them.
+gradient = 1
+gradient_count = 5
+gradient_color_1 = '{{ $palette.accent }}'
+gradient_color_2 = '{{ $palette.info }}'
+gradient_color_3 = '{{ $palette.secondary }}'
+gradient_color_4 = '{{ $palette.tertiary }}'
+gradient_color_5 = '{{ $palette.urgent }}'
