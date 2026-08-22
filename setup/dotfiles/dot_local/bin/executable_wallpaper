@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# requires: python3 rofi chezmoi
+# requires: python3 rofi chezmoi curl xdg-user-dir
 
 """Choose and generate the wallpaper for the selected theme.
 
@@ -10,6 +10,7 @@
     wallpaper --path          where the current image is, generated or not
     wallpaper --ensure        generate the current image if it is missing
     wallpaper --regenerate    generate it again even if it exists
+    wallpaper <path|url>      use that image, downloading it if it is a URL
     wallpaper ~/pics/foo.png  use a file of your own instead
 
 WHY THIS IS GENERATED AND NOT SHIPPED
@@ -48,6 +49,7 @@ numpy and Pillow, was never committed, and was gone by the time a second
 wallpaper was wanted.
 """
 
+import hashlib
 import json
 import math
 import os
@@ -484,6 +486,114 @@ def generate(theme, style, pal, path):
 # Selection
 # ----------------------------------------------------------------------
 
+# ----------------------------------------------------------------------
+# Images of your own
+# ----------------------------------------------------------------------
+#
+# The generated styles are the point of this tool, but they are not the only
+# thing anyone wants on their desktop. An image chosen or downloaded is stored
+# as an absolute path in exactly the same per-theme setting a style name goes
+# in, because 30-appearance.conf.tmpl already treats a value starting with "/"
+# as the background itself - so nothing about the rendering had to change.
+#
+# WHY ~/Pictures/wallpapers AND NOT THE CACHE
+#
+# ~/.local/share/wallpapers holds GENERATED images. They are disposable: delete
+# one and it is rebuilt in a second and a half from the palette. An image you
+# downloaded or made is not disposable, and putting it somewhere a cleanup would
+# reasonably empty is how it gets lost. Pictures is where a person looks for a
+# picture, and it means dropping a file in with a file manager makes it appear
+# in this menu with nothing else to do.
+
+
+def pictures_dir():
+    """~/Pictures, or wherever xdg-user-dirs says pictures live."""
+    try:
+        out = subprocess.run(["xdg-user-dir", "PICTURES"],
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+        if out:
+            return pathlib.Path(out) / "wallpapers"
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return pathlib.Path.home() / "Pictures" / "wallpapers"
+
+
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+
+
+def saved_images():
+    """Every image in the library, newest first."""
+    directory = pictures_dir()
+    if not directory.is_dir():
+        return []
+    files = [f for f in directory.iterdir()
+             if f.is_file() and f.suffix.lower() in IMAGE_SUFFIXES]
+    return sorted(files, key=lambda f: f.stat().st_mtime, reverse=True)
+
+
+def looks_like_an_image(data):
+    """Magic bytes, because a 404 page saved as .jpg is still a 404 page.
+
+    Checked before anything is written to the library: a file that is not an
+    image sets a background swaybg cannot load, and the failure is a black
+    screen with the reason in a log nobody is reading.
+    """
+    return (data.startswith(b"\x89PNG\r\n\x1a\n")          # png
+            or data.startswith(b"\xff\xd8\xff")               # jpeg
+            or data[:4] == b"GIF8"                             # gif
+            or (data[:4] == b"RIFF" and data[8:12] == b"WEBP")  # webp
+            or data[:2] == b"BM")                              # bmp
+
+
+def suffix_for(data, url):
+    for suffix, test in (
+        (".png",  lambda d: d.startswith(b"\x89PNG")),
+        (".jpg",  lambda d: d.startswith(b"\xff\xd8\xff")),
+        (".gif",  lambda d: d[:4] == b"GIF8"),
+        (".webp", lambda d: d[:4] == b"RIFF" and d[8:12] == b"WEBP"),
+        (".bmp",  lambda d: d[:2] == b"BM"),
+    ):
+        if test(data):
+            return suffix
+    return pathlib.Path(url).suffix.lower() or ".img"
+
+
+def download_image(url):
+    """Fetch a URL into the library and return the path, or None.
+
+    DEDUPLICATED BY CONTENT, not by name. The same picture saved twice under
+    two names is two files that look different in the menu and identical on the
+    screen, and the name a URL gives you is often a meaningless id. So the file
+    is named by a hash of its bytes, which makes a second download of the same
+    image land on the file that is already there and change nothing.
+    """
+    directory = pictures_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+
+    try:
+        result = subprocess.run(
+            ["curl", "-fsSL", "--max-time", "60", "--max-filesize", "50M", url],
+            capture_output=True, timeout=90)
+    except (OSError, subprocess.SubprocessError) as error:
+        die(f"could not fetch that URL: {error}")
+    if result.returncode != 0:
+        die(f"could not fetch that URL: curl exited {result.returncode}")
+
+    data = result.stdout
+    if not looks_like_an_image(data):
+        die("that URL did not return an image")
+
+    digest = hashlib.sha256(data).hexdigest()[:16]
+    existing = [f for f in saved_images() if f.stem.startswith(digest)]
+    if existing:
+        return existing[0]      # already have it, under whatever name
+
+    stem = pathlib.Path(url.split("?")[0]).stem[:40] or "wallpaper"
+    path = directory / f"{digest}-{stem}{suffix_for(data, url)}"
+    path.write_bytes(data)
+    return path
+
+
 def image_path(theme=None, style=None):
     theme = theme or current_theme()
     style = style or current_style()
@@ -554,7 +664,12 @@ def main():
     if not wanted:
         # The picker runs in the theme being left, since rofi is one of the
         # things a theme colours. That is the right way round.
-        listing = "\n".join(STYLES)
+        # The generated styles, then a way into the images. One extra row rather
+        # than mixing filenames in with style names: they are chosen for
+        # different reasons and a list of twenty downloads would bury the four
+        # things this tool actually generates.
+        IMAGES_ENTRY = "Image..."
+        listing = "\n".join(list(STYLES) + [IMAGES_ENTRY])
         result = subprocess.run(
             ["rofi", "-dmenu", "-i", "-p", f"Wallpaper ({theme})",
              "-select", current_style()],
@@ -563,7 +678,34 @@ def main():
         if not wanted:
             return
 
+        if wanted == IMAGES_ENTRY:
+            URL_ENTRY = "Paste a URL..."
+            images = saved_images()
+            rows = [URL_ENTRY] + [f.name for f in images]
+            chosen = subprocess.run(
+                ["rofi", "-dmenu", "-i", "-p", "Image",
+                 "-theme-str", f"listview {{ lines: {min(len(rows), 9)}; }}"],
+                input="\n".join(rows), capture_output=True, text=True
+            ).stdout.strip()
+            if not chosen:
+                return
+            if chosen == URL_ENTRY:
+                url = subprocess.run(
+                    ["rofi", "-dmenu", "-p", "URL", "-lines", "0"],
+                    input="", capture_output=True, text=True).stdout.strip()
+                if not url:
+                    return
+                wanted = str(download_image(url))
+            else:
+                match = [f for f in images if f.name == chosen]
+                if not match:
+                    die(f"no image called '{chosen}'")
+                wanted = str(match[0].resolve())
+
     # A path of your own, rather than one of the generated styles.
+    if wanted not in STYLES and wanted.startswith(("http://", "https://")):
+        wanted = str(download_image(wanted))
+
     if wanted not in STYLES:
         candidate = pathlib.Path(wanted).expanduser()
         if candidate.is_file():
