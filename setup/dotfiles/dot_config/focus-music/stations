@@ -1,0 +1,27 @@
+# Stations for ~/.local/bin/focus-music. One per line: a name, a tab, a URL.
+#
+# Tracked here rather than inside the helper, so adding a station is editing
+# data rather than editing a script - and so a rebuilt machine has the same
+# list. Comments and blank lines are ignored.
+#
+# WHY SOMAFM AND NOT A YOUTUBE LOFI CHANNEL
+#
+# These are direct audio URLs. They need no yt-dlp, no API, no key, and no
+# resolving step that can break independently of the player - all six were
+# checked returning audio/mpeg before being written down. A YouTube live stream
+# needs yt-dlp to resolve it on every start, and the video id changes whenever
+# the channel restarts, which turns a station into a thing that stops working
+# for reasons nobody can see.
+#
+# yt-dlp is still declared, so pasting a YouTube or SoundCloud link at the
+# helper works. It is just not what the defaults depend on.
+#
+# SomaFM is listener-supported and asks for a donation rather than serving ads:
+# https://somafm.com/support/
+
+Groove Salad	https://ice1.somafm.com/groovesalad-128-mp3
+Drone Zone	https://ice1.somafm.com/dronezone-128-mp3
+Deep Space One	https://ice1.somafm.com/deepspaceone-128-mp3
+Lush	https://ice1.somafm.com/lush-128-mp3
+Fluid	https://ice1.somafm.com/fluid-128-mp3
+Mission Control	https://ice1.somafm.com/missioncontrol-128-mp3

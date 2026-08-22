@@ -1,0 +1,16 @@
+# Exec is an absolute path for the same reason theme.desktop's is: ~/.local/bin
+# is not on the PATH sway and rofi hand to what they spawn, so a bare
+# `Exec=focus-music` works when tested from a terminal and silently does nothing
+# from the launcher.
+
+[Desktop Entry]
+Type=Application
+Name=Focus Music
+GenericName=Background radio
+Comment=Play a station in the background, controlled from the bar and the media keys
+Icon=multimedia-audio-player
+Exec={{ .chezmoi.homeDir }}/.local/bin/focus-music
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=music;focus;radio;lofi;ambient;background;somafm;stream;
+NoDisplay=false

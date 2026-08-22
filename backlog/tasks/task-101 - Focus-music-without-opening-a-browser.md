@@ -1,9 +1,11 @@
 ---
 id: TASK-101
 title: Focus music without opening a browser
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-22 01:59'
+updated_date: '2026-08-22 02:07'
 labels: []
 dependencies: []
 priority: low
@@ -39,7 +41,40 @@ Worth deciding what 'focus music' actually means before picking: a handful of kn
 <!-- AC:BEGIN -->
 - [ ] #1 Music plays and pauses from the bar and the media keys, verified by pressing them rather than by the tool claiming MPRIS support
 - [ ] #2 Starting it takes one keypress or one launcher entry, and it does not leave a window that has to be managed
-- [ ] #3 Whatever is chosen comes from the official repositories, or TASK-43 is explicitly reopened rather than quietly worked around
-- [ ] #4 The chosen tool follows the theme, or its inability to is stated - it will sit next to tools that all do
-- [ ] #5 If a helper holds a list of streams, that list is in the repository so a rebuilt machine has it
+- [x] #3 Whatever is chosen comes from the official repositories, or TASK-43 is explicitly reopened rather than quietly worked around
+- [x] #4 The chosen tool follows the theme, or its inability to is stated - it will sit next to tools that all do
+- [x] #5 If a helper holds a list of streams, that list is in the repository so a rebuilt machine has it
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Declare mpv, mpv-mpris and yt-dlp in packages/desktop.txt.
+2. Load the mpris plugin from an mpv config, so every mpv is visible to the bar rather than only this helper's.
+3. Track the stream list as data, not inside the helper, so adding one is not editing a script.
+4. Helper: rofi picker, toggle-off when already playing, started in its own scope so closing the launcher does not take it.
+5. Launcher entry. No keybinding - the launcher satisfies the criterion and the binding table is already at 70.
+6. Verify what can be verified without the packages, and say plainly what needs the user's sync.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED, and the half that cannot be verified from here is named rather than assumed.
+
+mpv, mpv-mpris and yt-dlp declared in packages/desktop.txt, all three from extra, so TASK-43 stays closed and cliamp stays out on the packaging rule rather than on its merits.
+
+mpv rather than a music application, which is the whole design: it plays a URL and exposes itself over MPRIS, so the bar's media module and the playback keys control it from then on and the helper is not involved again. No library, no daemon, no second window.
+
+THE ONE LINE THAT MATTERS is script=/usr/lib/mpv-mpris/mpris.so in ~/.config/mpv/mpv.conf. Without it mpv plays perfectly and nothing on the desktop can see it - the bar shows nothing and every playback key controls nothing. That is precisely the shape of bug this repository keeps finding, and it is one line away. The path was read out of the package rather than guessed: the plugin ships at a fixed location, not in a directory mpv scans.
+
+Stations are DATA, in ~/.config/focus-music/stations, so adding one is not editing a script. SomaFM direct URLs rather than a YouTube lofi channel, deliberately: they need no yt-dlp, no resolving step that can fail independently of the player, and no video id that changes when a channel restarts. All six were checked returning HTTP 206 and audio/mpeg before being written down. yt-dlp is still declared so a pasted YouTube or SoundCloud link works; it is just not what the defaults depend on.
+
+mpv is started with systemd-run --user --scope, for the reason the workspace greeter learned expensively: a child of whatever spawned it sits in that cgroup, and systemd's default KillMode is control-group. Music that stops when the launcher closes, or when an unrelated unit restarts, is not worth having.
+
+--force-media-title so the bar shows the station name. A radio stream's own metadata is the current track and changes under you - useful inside a player, confusing as the answer to 'what am I listening to'.
+
+VERIFIED HERE: the picker renders all six stations in the launcher's own styling, screenshotted (AC4 - it is rofi, so it follows the theme by construction; mpv itself has no UI to theme). The desktop entry passes desktop-file-validate and its icon exists in the installed Papirus theme. The station list is tracked (AC5). All three packages are from official repositories (AC3). session.sh 89 passed, 0 failed.
+
+NOT VERIFIED, AND CANNOT BE FROM HERE: AC1 and AC2. mpv, mpv-mpris and yt-dlp are declared and not installed - there is no sudo in this session - so nothing has actually played, the bar has never shown it, and no playback key has been pressed at it. checks/packages.sh and checks/sway-commands.sh both report them missing, which is those checks working. After ./sync.sh the test is: open Focus Music from the launcher, pick a station, and confirm the bar's media module names it and the play/pause key stops it.
+<!-- SECTION:NOTES:END -->

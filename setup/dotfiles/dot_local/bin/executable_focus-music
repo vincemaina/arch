@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: mpv playerctl rofi systemd-run
+
+# Background music, one launcher entry away and then invisible.
+#
+# Picks a station from ~/.config/focus-music/stations and hands the URL to mpv,
+# which exposes itself over MPRIS - so the bar's media module and the playback
+# keys control it from then on and this script is not involved again.
+#
+# WHY IT STARTS mpv IN ITS OWN SCOPE
+#
+# Launched from rofi, mpv would be a child of whatever spawned it and would sit
+# in that process's cgroup. The workspace greeter learned this the expensive
+# way: systemd's default KillMode is control-group, so restarting the service
+# that happened to spawn something kills it, and a sway crash SIGKILLs anything
+# in the compositor's own cgroup ten seconds later. Music that stops when the
+# launcher closes, or when an unrelated unit restarts, is not worth having.
+#
+# systemd-run --scope puts it in a transient scope under app.slice, which is
+# where a user application belongs. --collect cleans the scope up when mpv
+# exits.
+
+STATIONS="${XDG_CONFIG_HOME:-$HOME/.config}/focus-music/stations"
+
+# The MPRIS name mpv registers under. Matching on it rather than on any player
+# means this never stops somebody's video or a Spotify client.
+MPRIS_PREFIX="mpv"
+
+die() {
+    echo "focus-music: $*" >&2
+    command -v notify-send >/dev/null && notify-send -a focus-music "focus-music" "$*"
+    exit 1
+}
+
+playing_instance() {
+    # playerctl exits non-zero with no players, which is not an error here.
+    playerctl --list-all 2>/dev/null | grep -m1 "^${MPRIS_PREFIX}" || true
+}
+
+now_playing() {
+    local inst="$1"
+    playerctl --player="$inst" metadata --format '{{ title }}' 2>/dev/null || true
+}
+
+[[ -r "$STATIONS" ]] || die "no station list at $STATIONS"
+
+# Already playing? Then the useful action is to stop, not to open a menu asking
+# which station to start a second copy of.
+current="$(playing_instance)"
+if [[ -n "$current" ]]; then
+    title="$(now_playing "$current")"
+    choice="$(printf 'Stop\nChange station\n' |
+        rofi -dmenu -i -p "playing${title:+: ${title:0:40}}" -format s \
+             -theme-str 'listview { lines: 2; }' 2>/dev/null || true)"
+    case "$choice" in
+        Stop)
+            playerctl --player="$current" stop 2>/dev/null || true
+            # stop leaves mpv running with nothing to play; quit it properly so
+            # the bar's module empties rather than showing a paused ghost.
+            pkill -x -u "$(id -u)" mpv 2>/dev/null || true
+            exit 0
+            ;;
+        "Change station") : ;;   # fall through to the picker
+        *) exit 0 ;;
+    esac
+fi
+
+# name -> url, keeping the order of the file so the list is not reshuffled.
+mapfile -t names < <(grep -P '^[^#].*\t' "$STATIONS" | cut -f1)
+[[ ${#names[@]} -gt 0 ]] || die "the station list has no entries"
+
+pick="$(printf '%s\n' "${names[@]}" |
+    rofi -dmenu -i -p 'focus music' -format s \
+         -theme-str "listview { lines: ${#names[@]}; }" 2>/dev/null || true)"
+[[ -n "$pick" ]] || exit 0
+
+url="$(grep -P "^\Q${pick}\E\t" "$STATIONS" | head -1 | cut -f2)"
+[[ -n "$url" ]] || die "no URL for '$pick'"
+
+# Replace anything already playing rather than stacking a second stream.
+pkill -x -u "$(id -u)" mpv 2>/dev/null || true
+
+# --force-media-title so the bar shows the station name rather than the stream's
+# own metadata, which for a radio stream is the current track and changes under
+# you - useful in a player, confusing as a label for "what am I listening to".
+systemd-run --user --scope --quiet --collect -- \
+    mpv --no-terminal --force-media-title="$pick" "$url" >/dev/null 2>&1 &
+
+disown

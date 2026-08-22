@@ -119,6 +119,24 @@ libnotify
 # Media player control, used by the playback keys
 playerctl
 
+# Background music without a browser - TASK-101.
+#
+# mpv is not a music application and that is the point: it plays a URL and
+# exposes itself over MPRIS, so the bar's media module and the playback keys
+# control it exactly as they would anything else. No library, no daemon, no
+# second window to manage.
+#
+# mpv-mpris is the plugin that makes it visible to those - without it mpv plays
+# perfectly and the desktop cannot see it, which is the shape of bug this
+# repository keeps finding. ~/.config/mpv/mpv.conf loads it.
+#
+# yt-dlp is what turns a YouTube or SoundCloud link into a stream mpv can play.
+# The tracked stations need none of it - they are direct audio URLs - so it is
+# here for pasting a link rather than for the default path.
+mpv
+mpv-mpris
+yt-dlp
+
 # Cursor theme, so the pointer looks the same in every application
 adwaita-cursors
 
