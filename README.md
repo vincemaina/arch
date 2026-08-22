@@ -20,17 +20,26 @@ Download the latest Arch ISO from the [official Arch Linux download page](https:
 
 Boot the machine from the ISO.
 
-This setup assumes a **UEFI** system.
+This setup assumes a **UEFI** system with **Secure Boot turned off** —
+`03-system.sh` installs an unsigned boot binary, and a machine with Secure
+Boot on will finish the install and then refuse to boot from it.
 
 ### 2. Connect to the internet
 
-Verify connectivity:
+A wired connection should normally work automatically. On wifi, connect
+first:
+
+```bash
+iwctl station wlan0 connect "your-network-name"
+```
+
+`iwctl device list` shows the interface name if it isn't `wlan0`.
+
+Verify connectivity either way:
 
 ```bash
 ping -c 3 archlinux.org
 ```
-
-A wired connection should normally work automatically.
 
 ### 3. Install Git
 

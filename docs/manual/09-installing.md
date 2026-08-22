@@ -10,13 +10,25 @@ reasoning lives in [DECISIONS.md](../../DECISIONS.md) and
 
 - An Arch Linux installation ISO, booted on the target machine. Download it
   from the official Arch download page.
-- A **UEFI** machine. This installer does not support legacy BIOS.
+- A **UEFI** machine, with **Secure Boot turned off** in firmware. This
+  installer does not support legacy BIOS, and `03-system.sh` installs an
+  unsigned boot binary (`bootctl install`) — a machine with Secure Boot on
+  will finish the install and then refuse to boot from it.
 - A target disk you are prepared to lose everything on. There is no
   confirmation beyond the one the installer itself asks for (see below).
 - A network connection. The live ISO needs one to fetch packages; a wired
-  connection normally works without any setup, `ping -c 3 archlinux.org`
-  confirms it.
+  connection normally works without any setup. On wifi, connect with `iwctl`
+  first — see below.
 - `git`, which is not on the live ISO by default: `pacman -Sy git`.
+
+On wifi, connect before doing anything else:
+
+```bash
+iwctl station wlan0 connect "your-network-name"
+```
+
+`iwctl device list` shows the interface name if it isn't `wlan0`.
+`ping -c 3 archlinux.org` confirms either kind of connection is up.
 
 Clone the repository onto the live system and run the installer from inside
 it:
