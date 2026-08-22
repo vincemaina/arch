@@ -1,0 +1,232 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: cliphist rofi python3 wl-copy
+
+# Everything you have copied, in the launcher, with the pictures showing.
+#
+# Reached three ways, all the same script: $mod+v, the "Clipboard" entry in
+# $mod+space, or by name from a terminal. Enter puts the entry back on the
+# clipboard - it does NOT paste it for you, and that is a decision rather than
+# a gap; see "WHY NOTHING IS TYPED FOR YOU" at the bottom.
+#
+# The store is filled by cliphist@text.service and cliphist@image.service, via
+# ~/.local/bin/clipboard-store, which is also where the privacy filtering
+# lives. Nothing here writes to the history except the two forget actions.
+
+self="$(readlink -f "$0")"
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+# Python builds the menu, for the reason notification-centre does: rofi's
+# per-row icon protocol is `text\0icon\x1f<name>`, with a literal NUL, and a
+# bash variable cannot hold one - it is dropped silently and every row renders
+# as the word "icon" followed by the icon name. Files have no such limitation.
+#
+# It is doing a second job here as well. `cliphist list` renders an image as
+#
+#   5   [[ binary data 1 MiB png 1920x1080 ]]
+#
+# which is all you get from the list itself: a placeholder, not a preview.
+# What makes it a preview is that the icon side of that protocol accepts a
+# FILE PATH as happily as a freedesktop icon name. So each image entry is
+# decoded to a file and rofi is handed the path, and the row shows the actual
+# picture. Verified by screenshot, not assumed - a 200x200 red circle and a
+# 1920x1080 screenshot are told apart at a glance at the size set below.
+python3 - "$tmp" <<'PYEOF'
+import os, re, subprocess, sys
+
+out_dir = sys.argv[1]
+img_dir = os.path.join(out_dir, "img")
+os.makedirs(img_dir, exist_ok=True)
+
+# How many of the most recent entries get a real decoded thumbnail. cliphist
+# keeps 750 by default and decoding every image in a full history would write
+# hundreds of megabytes to /tmp on each open, for rows nobody scrolls to.
+# Beyond this an image row keeps its size and dimensions and falls back to a
+# generic icon.
+THUMBNAIL_BUDGET = 60
+
+# `[[ binary data 1 MiB png 1920x1080 ]]` - size, kind, dimensions. Kind and
+# dimensions are both absent for something cliphist stored but could not
+# decode as an image, so they are ONE optional group rather than two: made
+# separately optional, `[[ binary data 12 KiB ]]` parses as size "12" and kind
+# "KiB", and the row is then labelled after a unit.
+BINARY = re.compile(r"^\[\[ binary data (.+?)(?: (\w+) (\d+x\d+))? \]\]$")
+
+MAGIC = [
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
+    (b"\xff\xd8\xff",      "image/jpeg"),
+    (b"GIF87a",            "image/gif"),
+    (b"GIF89a",            "image/gif"),
+    (b"BM",                "image/bmp"),
+    (b"II*\x00",           "image/tiff"),
+    (b"MM\x00*",           "image/tiff"),
+]
+
+def sniff(data):
+    # The mime type is sniffed from the bytes rather than taken from the
+    # preview text, because the preview is cliphist's own wording and the
+    # thing that has to be right is what wl-copy is told to offer. A picture
+    # put back as text/plain is not a picture any more.
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    for prefix, mime in MAGIC:
+        if data.startswith(prefix):
+            return mime
+    return "application/octet-stream"
+
+try:
+    listing = subprocess.run(["cliphist", "list"], capture_output=True,
+                             text=True, check=True).stdout
+except Exception:
+    listing = ""
+
+rows, actions, lines = [], [], []
+
+def add(label, icon, action, raw=""):
+    rows.append("{}\0icon\x1f{}".format(label, icon))
+    actions.append(action)
+    # cliphist deletes an entry by being fed the exact line `cliphist list`
+    # printed for it, images included - so the line is kept, index for index,
+    # rather than reconstructed later from the id.
+    lines.append(raw)
+
+decoded = 0
+for line in listing.splitlines():
+    if "\t" not in line:
+        continue
+    ident, preview = line.split("\t", 1)
+
+    m = BINARY.match(preview)
+    if not m:
+        add(preview, "edit-paste", "copy\t{}\t".format(ident), line)
+        continue
+
+    size, kind, dims = m.group(1), m.group(2) or "binary", m.group(3) or ""
+    label = "  ".join(x for x in (kind, dims, size) if x)
+
+    icon, mime = "image-x-generic", ""
+    if decoded < THUMBNAIL_BUDGET:
+        try:
+            data = subprocess.run(["cliphist", "decode", ident],
+                                  capture_output=True, check=True).stdout
+            mime = sniff(data)
+            if mime.startswith("image/"):
+                path = os.path.join(img_dir, "{}.{}".format(ident, kind))
+                with open(path, "wb") as fh:
+                    fh.write(data)
+                icon = path
+                decoded += 1
+        except Exception:
+            pass
+
+    add(label, icon, "copy\t{}\t{}".format(ident, mime), line)
+
+if not rows:
+    add("Nothing copied yet", "edit-paste", "none\t0\t")
+
+# Always last, so it is never where your finger lands. It asks before doing
+# anything; see the confirmation below.
+add("Clear the whole history", "user-trash", "wipe\t0\t")
+
+with open(os.path.join(out_dir, "menu"), "w") as fh:
+    fh.write("\n".join(rows))
+with open(os.path.join(out_dir, "actions"), "w") as fh:
+    fh.write("\n".join(actions))
+with open(os.path.join(out_dir, "lines"), "w") as fh:
+    fh.write("\n".join(lines))
+PYEOF
+
+# The footer the theme draws is written for the launcher; these are different
+# keys, so it is overridden for this list only. Written by codepoint rather
+# than pasted: this repository has lost glyphs to a paste more than once.
+footer="$(printf '\u2191\u2193 move \u00b7 \u23ce copy \u00b7 Ctrl+d forget \u00b7 Esc close')"
+
+# 44px icons over 7 rows rather than the theme's 26px over 9. That is the whole
+# difference between "there is an image here" and being able to see which
+# image, and it was chosen by looking: 26px leaves a smudge, 4em overflows the
+# window and pushes the search box off the top of the screen, 44px fills the
+# same box the launcher does - a 200x200 red circle and a 1920x1080 screenshot
+# of a terminal are distinguishable at a glance, which 26px does not manage.
+#
+# -show-icons because dmenu mode does not inherit it from config.rasi, and
+# -replace because this is normally launched *from* rofi, which may still be
+# holding the pidfile.
+#
+# Ctrl+d is rofi's own kb-remove-char-forward, and rofi refuses to start when a
+# key is claimed twice - so that action is moved to plain Delete, which it also
+# has by default, and Ctrl+d is taken for forgetting the highlighted entry.
+run_menu() {
+    rofi -dmenu -i -p clipboard -format i -show-icons -replace \
+        -kb-remove-char-forward 'Delete' \
+        -kb-custom-1 'Control+d' \
+        -theme-str 'listview { lines: 7; } element-icon { size: 44px; }' \
+        -theme-str "textbox-footer { content: \"$footer\"; }" \
+        "$@"
+}
+
+set +e
+choice="$(run_menu < "$tmp/menu")"
+rc=$?
+set -e
+
+# 1 is Escape. 0 is Enter, 10 is Ctrl+d.
+[[ $rc -eq 0 || $rc -eq 10 ]] || exit 0
+[[ -n "$choice" ]] || exit 0
+
+IFS=$'\t' read -r verb id mime < <(sed -n "$((choice + 1))p" "$tmp/actions")
+
+if [[ $rc -eq 10 ]]; then
+    # Forget this one, then come straight back to the list. `cliphist delete`
+    # wants the line `cliphist list` printed, on stdin - which is why python
+    # kept them. delete-query would not do: it matches text, and half of these
+    # rows are pictures.
+    if [[ "$verb" == "copy" ]]; then
+        sed -n "$((choice + 1))p" "$tmp/lines" | cliphist delete || true
+    fi
+    # The EXIT trap does not run across an exec, so tidy up by hand.
+    rm -rf "$tmp"
+    trap - EXIT
+    exec "$self"
+fi
+
+case "$verb" in
+    copy)
+        # --type only when the entry is not text. wl-copy's default is
+        # text/plain, which is right for the overwhelming majority of rows and
+        # wrong for every image, hence the sniffed mime above.
+        if [[ -n "$mime" && "$mime" != "text/"* ]]; then
+            cliphist decode "$id" | wl-copy --type "$mime"
+        else
+            cliphist decode "$id" | wl-copy
+        fi
+        ;;
+    wipe)
+        # A confirmation, because this is the one row that destroys something
+        # and Enter is one keystroke away from it. The safe answer is first,
+        # so the default selection is the harmless one.
+        answer="$(printf 'No, keep it\nYes, forget everything' |
+            rofi -dmenu -i -p 'clear the clipboard history?' -format i -replace \
+                -theme-str 'listview { lines: 2; }' || true)"
+        [[ "$answer" == "1" ]] && cliphist wipe
+        ;;
+    none) : ;;
+esac
+
+# WHY NOTHING IS TYPED FOR YOU.
+#
+# The obvious next step is to send the paste keystroke after copying, and it
+# does work: `wtype` is in extra at 24 KiB, sway implements the virtual
+# keyboard protocol it needs, and `wtype -M ctrl -M shift -k v -m shift -m ctrl`
+# was watched putting text into a foot window during this ticket.
+#
+# It is not done because the keystroke is not one keystroke. That trial worked
+# because foot pastes on Ctrl+SHIFT+V; a browser or a text field wants Ctrl+V;
+# and Ctrl+V typed into a shell is readline's quoted-insert, which eats the
+# next character instead. There is no way to ask the focused window which it
+# is, so auto-pasting means guessing, and guessing wrong does something silent
+# and wrong rather than nothing - the exact failure mode this repository keeps
+# meeting. Putting the entry on the clipboard and letting you press the paste
+# key you were going to press anyway is one keystroke more and always correct.

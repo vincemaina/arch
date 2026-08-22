@@ -1084,6 +1084,61 @@ better one. The second browser exists precisely to be the heavy one.
 
 ---
 
+## Clipboard history: cliphist behind rofi, two watchers, no auto-paste
+
+**Decision:** `cliphist` storing the history, rofi showing it, two watcher units
+rather than one, and nothing that pastes for you.
+
+### Why
+
+The smallest thing in the official repositories that does the job — 2.3 MiB,
+depending only on glibc and `wl-clipboard`, which was already declared. It is
+headless, so the interface stays rofi and the clipboard looks like the launcher
+rather than like a second application.
+
+**Two watchers, because one cannot see both.** `wl-paste --watch` with no
+`--type` asks for text, so a single watcher records URLs and silently drops
+every screenshot — measured: a PNG on the clipboard produced three text rows and
+no image at all until a second watcher with `--type image` was added. So
+`cliphist@.service` is a template with `text` and `image` instances.
+
+The package ships its own unit and it is wrong on all three counts that matter
+here — `graphical-session.target` rather than the sway-specific target, a single
+text-only watcher, and `Restart=on-failure` where these components use `always`.
+It is not used, and the unit file says why.
+
+Images preview because rofi's icon protocol accepts a **file path** as readily
+as an icon name, so each image entry is decoded to a temp file and rofi is
+handed the path. At the theme's 26px an image is a smudge; 44px with seven rows
+is legible in a window the size of the launcher.
+
+### Trade-off
+
+**The history is plaintext on a disk that is deliberately unencrypted.** A
+wrapper drops anything whose offered mime types mention a password, which
+catches password managers that set the hint — proved in both directions, since
+a filter that silently never fires looks identical to one that works. What it
+cannot catch is a password copied from a terminal or a browser's saved-logins
+page: that is ordinary text and it is stored. Hence a key to forget one entry
+and a menu row to wipe the lot, behind a confirmation defaulting to No.
+
+### Alternatives considered
+
+**copyq** — 8.7 MiB before a Qt and KDE dependency tail, draws a KDE-shaped
+window next to a GTK-dark desktop, and wants a system tray this desktop does not
+have.
+
+**clipman, clipse, greenclip** — all AUR-only, so ruled out by TASK-43. Named
+here rather than dropped silently.
+
+**Auto-paste with `wtype`.** It works — verified pasting into foot. Rejected
+because it only worked by knowing foot pastes on Ctrl+Shift+V: a browser wants
+Ctrl+V, and Ctrl+V in a shell is readline's quoted-insert. Nothing can ask the
+focused window which it is, so the feature would fail differently in every
+application and silently in some.
+
+---
+
 ## rofi, reversing an earlier decision
 
 **Decision:** Use rofi as the application launcher, and build the desktop's own

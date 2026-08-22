@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: cliphist wl-paste
+
+# The thing that decides whether a copy is remembered.
+#
+# `wl-paste --watch` runs this with the copied content on stdin, once per copy,
+# from cliphist@text.service and cliphist@image.service. Everything it does not
+# drop it hands straight to `cliphist store`.
+#
+# WHY THERE IS A WRAPPER HERE AT ALL, RATHER THAN `cliphist store` IN THE UNIT.
+#
+# A clipboard history is a log of everything you have copied, kept on disk in
+# the clear, and password managers are the obvious thing to copy. cliphist has
+# no notion of a secret - `strings` on the 0.7.0 binary finds no mention of
+# x-kde-passwordManagerHint, "sensitive", "secret" or "conceal", so there is
+# nothing to configure. The filtering has to happen before it, or not at all.
+#
+# The convention every password manager on Wayland uses is to offer an extra
+# mime type alongside the text, so that a clipboard manager can recognise the
+# copy and skip it. KeePassXC and the KDE tools offer
+# `x-kde-passwordManagerHint`; the hint is advisory and costs nothing to
+# honour. `wl-paste --list-types` is how you see them:
+#
+#   $ wl-paste --list-types
+#   text/plain
+#   text/plain;charset=utf-8
+#   x-kde-passwordManagerHint
+#
+# The match below is deliberately loose - any offered type mentioning
+# "password", case-insensitively - because the two outcomes are not
+# symmetrical. A false positive costs one clipboard entry that is not in the
+# history; a false negative puts a password on disk. Erring towards the first
+# is free.
+#
+# WHAT THIS DOES NOT PROTECT, WHICH IS THE PART WORTH READING. Nothing here
+# can recognise a secret that arrives as ordinary text: a password copied out
+# of a terminal, out of Firefox's saved-logins page, or out of a file is
+# indistinguishable from any other string and IS stored. The db lives at
+# ~/.cache/cliphist/db, unencrypted, on a disk that is also unencrypted by
+# choice (see DECISIONS.md), and it keeps 750 entries by default. That is the
+# honest position, and it is why `clipboard-history` carries both a per-entry
+# "forget" on Ctrl+d and a "Clear the whole history" row. See TASK-67.
+
+types="$(wl-paste --list-types 2>/dev/null || true)"
+
+# grep -c rather than grep -q: under `set -o pipefail` a -q that exits at the
+# first match makes the writer take SIGPIPE, and the pipeline reports 141
+# rather than 0. Counting reads the input to the end. See the scripting-traps
+# skill.
+if [[ "$(grep -ci password <<<"$types")" -gt 0 ]]; then
+    # Swallow stdin so wl-paste never sees a closed pipe, and store nothing.
+    cat >/dev/null
+    exit 0
+fi
+
+exec cliphist store

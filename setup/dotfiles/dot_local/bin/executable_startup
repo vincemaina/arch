@@ -1,0 +1,518 @@
+#!/usr/bin/env python3
+# requires: python3 rofi systemctl
+
+"""Decide what the desktop starts with, and what is running right now.
+
+    startup                     pick a component from the launcher
+    startup --list              what is optional, its state, and what it costs
+    startup --current           the same, one line per component, for scripts
+    startup waybar off          off now and off at the next login
+    startup waybar on           on now and on at the next login
+    startup mako --now off      stop it now, still starts at the next login
+    startup mako --autostart off   next login only, leave it running now
+
+TWO AXES, BECAUSE THEY ARE DIFFERENT QUESTIONS
+
+"Do I want the bar at all" and "get the bar out of my way for ten minutes" are
+not the same request, and a single on/off answers only one of them. systemd
+already separates them - a unit is enabled or not, and active or not - so this
+keeps that separation rather than flattening it. Every combination is reachable,
+including the awkward one: switched off at login and running right now.
+
+WHAT IS OFFERED, AND WHAT DELIBERATELY IS NOT
+
+Only components whose absence is *visible and recoverable*. If a thing can fail
+in a way you would not notice, it does not belong here at any memory saving -
+see NOT_OFFERED below, which is the interesting half of this file.
+
+HOW "AT LOGIN" IS SWITCHED OFF, AND WHY IT IS NOT `systemctl --user disable`
+
+This is the whole difficulty, and the obvious answer does not work.
+
+The session components are pulled in by symlinks in
+~/.config/systemd/user/wayland-session@sway.target.wants/, and **chezmoi ships
+those symlinks**. So `systemctl --user disable mako` deletes a file chezmoi
+manages, and the next ./sync.sh puts it back - a toggle that silently reverts,
+which is worse than no toggle. Measured, rather than assumed: after the symlink
+is removed, `chezmoi apply` does not quietly recreate it, it *prompts*
+
+    .config/.../wayland-session@sway.target.wants/mako.service has changed
+    since chezmoi last wrote it?
+
+on every single run, forever, and sync.sh's non-interactive path fails outright
+with --error-on-conflict. So `disable` is not merely undone; it makes syncing
+the machine worse.
+
+Three other routes were tried on this machine and rejected, each because it
+produced a confident-looking wrong result rather than an error:
+
+  * A `Wants=` reset in a drop-in on wayland-session@sway.target. The reset
+    syntax is real and this repository already uses it for `After=` in waybar's
+    override - but symlink dependencies are added *after* the fragments are
+    parsed, so the reset does not clear them. `systemctl show -p Wants` before
+    and after the drop-in prints exactly the same list. It looks like a
+    configured toggle and does nothing at all.
+
+  * `systemctl --user mask`. A user mask lands in ~/.config/systemd/user/, which
+    is precisely where chezmoi writes five of these six unit files; and it also
+    blocks starting the unit by hand, which collapses the two axes into one.
+
+  * `mask --runtime`, which lands in $XDG_RUNTIME_DIR and is gone by the next
+    boot, so it cannot express "at login" at all.
+
+What is used instead is a drop-in chezmoi does not know about:
+
+    ~/.config/systemd/user/<unit>.d/50-startup-off.conf
+
+carrying a condition that is false at login. chezmoi manages files, not
+directories-with-anything-in-them: an unmanaged file inside a managed directory
+is invisible to `chezmoi status` and `chezmoi apply` (checked, by putting one in
+waybar.service.d and looking). So the symlink stays exactly as the repository
+wrote it, nothing ever conflicts, ./sync.sh stays quiet - and the unit still
+does not start.
+
+There is exactly one thing this costs, and it is written down here rather than
+discovered later: `systemctl --user is-enabled mako` still says "enabled",
+because the symlink really is still there. `startup --list` reports the
+effective state instead, read from systemd's own view of the drop-in
+(`systemctl --user cat` shows it, and `status` says "start condition unmet"), so
+there is no private database anywhere - but the systemctl one-liner will
+disagree with reality until the follow-up below is done.
+
+THE FOLLOW-UP THAT REMOVES THAT WART
+
+Two lines in setup/dotfiles/.chezmoiignore - which already exists to hold
+exactly this kind of escape hatch, and says so - would make chezmoi stop
+managing the .wants symlink of a component recorded as off, at which point
+`systemctl --user disable` becomes safe and `is-enabled` tells the truth. That
+is a change to a tracked file and belongs with the repository, not here.
+
+WHY THE MARKER FILE EXISTS
+
+A condition is evaluated for *every* start job, a manual one included - measured
+on a throwaway unit: `systemctl --user start` on a condition-blocked unit exits
+0 and leaves it inactive, silently. So switching a component off at login would
+also make it unstartable, which is the collapse of the two axes this file exists
+to avoid. The condition therefore names a marker under $XDG_RUNTIME_DIR that
+this script creates for the length of one start job and removes again. A marker
+left behind by a killed process would let the component start at the next login;
+every run of this script sweeps stray markers first, and --list reports one if
+it finds it, so the failure is loud rather than invisible.
+"""
+
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+
+# ----------------------------------------------------------------------
+# What may be switched off
+# ----------------------------------------------------------------------
+#
+# The rule is the one the ticket asked for: optional means the desktop keeps
+# working and you can always get back. A component is listed here only once
+# someone has answered "what breaks, and how would I notice" - which is the
+# second string.
+#
+# Anything wanted by wayland-session@sway.target and named in neither table is
+# reported by --list as unclassified rather than silently offered or silently
+# hidden, so a component added later has to be thought about once.
+
+OPTIONAL = {
+    "waybar": (
+        "the bar: clock, tray, workspaces, click actions",
+        "no bar. Every click action has a keybinding, and $mod+Shift+s and "
+        "friends are unaffected",
+    ),
+    "autotiling": (
+        "picks the sway split direction to suit the window shape",
+        "new windows split the way sway would on its own. The manual split "
+        "bindings are unchanged",
+    ),
+    "greeting": (
+        "opens a greeting terminal on an empty workspace",
+        "empty workspaces stay empty. $mod+Return still opens a terminal",
+    ),
+    "mako": (
+        "notification popups",
+        "notifications are not shown. Nothing else depends on it",
+    ),
+    "swayidle": (
+        "blanks and locks the screen when idle",
+        "the screen never blanks or locks itself. Note the direction of that "
+        "risk: an unattended session stays unlocked. swaylock by hand is "
+        "unaffected",
+    ),
+}
+
+NOT_OFFERED = {
+    "polkit-agent": (
+        "Its absence is invisible. Without an agent a graphical privilege "
+        "prompt does not appear and the operation quietly does nothing - the "
+        "exact failure mode this setup keeps hitting, and sudo in a terminal "
+        "still working is what stops you noticing. It costs about 6M, less "
+        "than a quarter of the bar."
+    ),
+    "wayland-session-waitenv": (
+        "uwsm's own plumbing, not a feature. It is what makes the session "
+        "target wait until the compositor's environment has been exported, so "
+        "switching it off would start every other component against an empty "
+        "environment. It exits as soon as that is done and costs nothing."
+    ),
+}
+
+# Things the ticket also asked about, answered here so the answer is findable.
+#
+#   NetworkManager - a system unit. Switching it off needs root, and on a
+#   machine on wifi it is exactly the "cannot get back" case the ticket rules
+#   out. Out of scope for a user-session tool.
+#
+#   pipewire / pipewire-pulse / wireplumber - genuinely optional and genuinely
+#   user scope, but socket-activated and not part of this target, so "off"
+#   means the sockets too and anything that touches audio turns them back on.
+#   A different mechanism with a different failure mode; it needs its own
+#   decision rather than being smuggled in here.
+
+TARGET = "wayland-session@sway.target"
+UNIT_DIR = pathlib.Path.home() / ".config" / "systemd" / "user"
+DROPIN = "50-startup-off.conf"
+MARKERS = pathlib.Path(
+    os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+) / "startup"
+
+
+def die(message):
+    print(f"startup: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def systemctl(*args, check=True):
+    return subprocess.run(
+        ["systemctl", "--user", *args],
+        capture_output=True, text=True, check=False,
+    )
+
+
+def show(unit, prop):
+    return systemctl("show", unit, "-p", prop, "--value").stdout.strip()
+
+
+# ----------------------------------------------------------------------
+# State
+# ----------------------------------------------------------------------
+
+def unit_name(component):
+    return f"{component}.service"
+
+
+def dropin_path(component):
+    return UNIT_DIR / f"{unit_name(component)}.d" / DROPIN
+
+
+def marker_path(component):
+    return MARKERS / unit_name(component)
+
+
+def wanted_components():
+    """What the session target actually pulls in, asked of systemd.
+
+    Not a hardcoded list, because components get added - cliphist and the
+    workspace greeter both arrived after this target was first written - and a
+    tool that answers "what starts at login" from a list of its own would start
+    lying the moment one did.
+    """
+    wants = show(TARGET, "Wants").split()
+    if not wants:
+        # The target is not loaded (no graphical session). Fall back to the
+        # directory the symlinks live in, which is the same information.
+        wants = [p.name for p in (UNIT_DIR / f"{TARGET}.wants").glob("*.service")]
+    return sorted({w[: -len(".service")] for w in wants if w.endswith(".service")})
+
+
+def autostart_of(component):
+    return "off" if dropin_path(component).exists() else "on"
+
+
+def now_of(component):
+    return "on" if systemctl(
+        "is-active", "--quiet", unit_name(component)
+    ).returncode == 0 else "off"
+
+
+def memory_of(component):
+    raw = show(unit_name(component), "MemoryCurrent")
+    if not raw.isdigit():
+        return "-"
+    value = int(raw)
+    for suffix in ("K", "M", "G"):
+        value /= 1024
+        if value < 1024:
+            return f"{value:.1f}{suffix}"
+    return f"{value:.1f}T"
+
+
+def sweep_markers():
+    """Remove markers left behind by an interrupted run.
+
+    A marker only ever lives for the duration of one `systemctl start`. One
+    found at the start of a run is debris, and debris here means a component
+    switched off at login would quietly start anyway - so it is cleared, and
+    --list says so.
+    """
+    stray = []
+    if MARKERS.is_dir():
+        for path in MARKERS.iterdir():
+            stray.append(path.name)
+            path.unlink(missing_ok=True)
+    return stray
+
+
+# ----------------------------------------------------------------------
+# Changing it
+# ----------------------------------------------------------------------
+
+DROPIN_TEXT = """\
+# {component} does not start at login on this machine.
+#
+# Written by ~/.local/bin/startup - see that file for why this is a drop-in and
+# not `systemctl --user disable`. The short version: chezmoi ships the symlink
+# that enables this unit, so disabling it is undone by the next ./sync.sh, and
+# in the meantime makes `chezmoi apply` prompt on every run. chezmoi does not
+# know about this file, so nothing fights over it.
+#
+# The condition is false at login, so the unit is skipped rather than failed.
+# `startup {component} --now on` creates the marker for the length of one start
+# job, which is how it can still be started by hand while staying off at login.
+#
+# Delete this file (and `systemctl --user daemon-reload`) to undo by hand, or
+# run `startup {component} --autostart on`.
+
+[Unit]
+ConditionPathExists=%t/startup/{unit}
+"""
+
+
+def set_autostart(component, state):
+    path = dropin_path(component)
+    if state == "off":
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(DROPIN_TEXT.format(
+            component=component, unit=unit_name(component)))
+    else:
+        path.unlink(missing_ok=True)
+        # Only remove the directory if this script created it. waybar's is
+        # shipped by the repository and holds override.conf.
+        try:
+            path.parent.rmdir()
+        except OSError:
+            pass
+    result = systemctl("daemon-reload")
+    if result.returncode != 0:
+        die(f"daemon-reload failed: {result.stderr.strip()}")
+
+
+def set_now(component, state):
+    unit = unit_name(component)
+    if state == "off":
+        result = systemctl("stop", unit)
+        if result.returncode != 0:
+            die(f"could not stop {unit}: {result.stderr.strip()}")
+        return
+
+    # Starting is the case the condition gets in the way of. The marker is
+    # created only when the drop-in is actually present, and removed again
+    # whatever happens - `systemctl start` is synchronous, so by the time it
+    # returns the condition has been evaluated and the marker has done its job.
+    blocked = dropin_path(component).exists()
+    if blocked:
+        MARKERS.mkdir(parents=True, exist_ok=True)
+        marker_path(component).touch()
+    try:
+        result = systemctl("start", unit)
+    finally:
+        if blocked:
+            marker_path(component).unlink(missing_ok=True)
+    if result.returncode != 0:
+        die(f"could not start {unit}: {result.stderr.strip()}")
+    # A start that was skipped exits 0, so the return code proves nothing.
+    if now_of(component) != "on":
+        die(f"{unit} did not start; see `systemctl --user status {unit}`")
+
+
+def apply_change(component, autostart, now):
+    # Order matters in one direction only: turning something on should not have
+    # to wait for the next login to be visible, and turning it off should not
+    # leave a running process behind.
+    if autostart is not None:
+        set_autostart(component, autostart)
+    if now is not None and now != now_of(component):
+        set_now(component, now)
+
+
+# ----------------------------------------------------------------------
+# Reporting
+# ----------------------------------------------------------------------
+
+def classify():
+    wanted = wanted_components()
+    offered = [c for c in wanted if c in OPTIONAL]
+    # A component can be switched off and still be listed here, because the
+    # symlink is untouched - which is the point of the mechanism.
+    withheld = [c for c in wanted if c in NOT_OFFERED]
+    unknown = [c for c in wanted if c not in OPTIONAL and c not in NOT_OFFERED]
+    return offered, withheld, unknown
+
+
+def print_list(stray):
+    offered, withheld, unknown = classify()
+    print(f"{'COMPONENT':<12}  {'AT LOGIN':<8}  {'NOW':<3}  {'MEMORY':>6}  WHAT IT DOES")
+    for component in offered:
+        print(f"{component:<12}  {autostart_of(component):<8}  "
+              f"{now_of(component):<3}  {memory_of(component):>6}  "
+              f"{OPTIONAL[component][0]}")
+    if withheld:
+        print()
+        print("Not offered, deliberately:")
+        for component in withheld:
+            print(f"  {component} ({memory_of(component)})")
+            for line in wrap(NOT_OFFERED[component], 66):
+                print(f"      {line}")
+    if unknown:
+        print()
+        print("Wanted at login but not classified as optional or withheld.")
+        print("Someone has to decide which it is; until then it is left alone:")
+        for component in unknown:
+            print(f"  {component} ({memory_of(component)})")
+    if stray:
+        print()
+        print("Cleared a leftover start marker for: " + ", ".join(stray))
+        print("Something interrupted a previous run. Nothing is wrong now.")
+
+
+def wrap(text, width):
+    lines, line = [], ""
+    for word in text.split():
+        if line and len(line) + 1 + len(word) > width:
+            lines.append(line)
+            line = word
+        else:
+            line = f"{line} {word}".strip()
+    if line:
+        lines.append(line)
+    return lines
+
+
+def print_current():
+    offered, _, _ = classify()
+    for component in offered:
+        print(f"{component} autostart={autostart_of(component)} "
+              f"now={now_of(component)}")
+
+
+# ----------------------------------------------------------------------
+# The picker
+# ----------------------------------------------------------------------
+
+def pick():
+    """One row per component; choosing it flips the whole thing.
+
+    Flat and one keypress, because the fine-grained "off at login but on now"
+    case is rare enough to be worth typing and common enough to need to exist.
+    The rows say what will happen rather than making you work it out.
+    """
+    offered, _, _ = classify()
+    if not offered:
+        die("nothing optional is running; is the sway session up?")
+
+    rows, actions = [], []
+    for component in offered:
+        autostart, now = autostart_of(component), now_of(component)
+        on = autostart == "on" or now == "on"
+        state = f"{'starts at login' if autostart == 'on' else 'off at login'}, " \
+                f"{'running' if now == 'on' else 'not running'}"
+        rows.append(f"{component:<12}  {state:<34}  "
+                    f"{'turn off' if on else 'turn on':<8}  {memory_of(component)}")
+        actions.append((component, "off" if on else "on"))
+
+    # The total goes in the prompt, not in -mesg. This machine's config.rasi
+    # sets mainbox children to [inputbar, listview, textbox-footer] with no
+    # message widget, so rofi accepts -mesg, reports nothing, and shows
+    # nothing - which is how the first version of this looked configured and
+    # displayed an empty line's worth of nothing. Checked in a screenshot.
+    total = sum(int(raw) for raw in
+                (show(unit_name(c), "MemoryCurrent") for c in offered)
+                if raw.isdigit())
+    prompt = f"Startup ({total / 1024 / 1024:.0f}M)"
+
+    result = subprocess.run(
+        ["rofi", "-dmenu", "-i", "-replace", "-p", prompt,
+         "-format", "i", "-no-custom"],
+        input="\n".join(rows), capture_output=True, text=True,
+    )
+    choice = result.stdout.strip()
+    if not choice.isdigit():
+        return
+    component, state = actions[int(choice)]
+    apply_change(component, state, state)
+
+
+# ----------------------------------------------------------------------
+# Arguments
+# ----------------------------------------------------------------------
+
+def usage():
+    print(__doc__.split("TWO AXES")[0].strip(), file=sys.stderr)
+    sys.exit(2)
+
+
+def main():
+    stray = sweep_markers()
+    args = sys.argv[1:]
+
+    if not args:
+        if not shutil.which("rofi"):
+            die("rofi is not installed; use --list")
+        pick()
+        return
+
+    if args == ["--list"]:
+        print_list(stray)
+        return
+    if args == ["--current"]:
+        print_current()
+        return
+    if args[0].startswith("-"):
+        usage()
+
+    component, rest = args[0], args[1:]
+    if component in NOT_OFFERED:
+        print(f"startup: {component} is deliberately not switchable.",
+              file=sys.stderr)
+        for line in wrap(NOT_OFFERED[component], 70):
+            print(f"  {line}", file=sys.stderr)
+        sys.exit(1)
+    if component not in OPTIONAL:
+        die(f"unknown component {component!r}. `startup --list` shows what there is")
+    if component not in wanted_components():
+        die(f"{component} is not part of {TARGET} on this machine")
+
+    if len(rest) == 1 and rest[0] in ("on", "off"):
+        apply_change(component, rest[0], rest[0])
+    elif len(rest) == 2 and rest[0] == "--now" and rest[1] in ("on", "off"):
+        apply_change(component, None, rest[1])
+    elif len(rest) == 2 and rest[0] == "--autostart" and rest[1] in ("on", "off"):
+        apply_change(component, rest[1], None)
+    elif not rest:
+        print(f"{component} autostart={autostart_of(component)} "
+              f"now={now_of(component)}")
+        return
+    else:
+        usage()
+
+    print(f"{component} autostart={autostart_of(component)} "
+          f"now={now_of(component)}")
+
+
+if __name__ == "__main__":
+    main()

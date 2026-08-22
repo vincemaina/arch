@@ -40,6 +40,22 @@ set -euo pipefail
 if ! systemctl --user is-active --quiet waybar.service; then
     # Not running at all - the bar is as hidden as it gets, so "toggle" means
     # bring it back.
+    #
+    # THROUGH `startup`, NOT `systemctl start`, and that is not a detour.
+    # TASK-77 lets a component be turned off at login with a drop-in carrying a
+    # false ConditionPathExists. A false condition also skips a MANUAL start:
+    # `systemctl --user start` exits 0 and the unit stays inactive, silently.
+    # So with waybar off at login, this key would have exited 0 and done
+    # nothing - breaking the promise three lines above this. `startup` sets the
+    # marker the condition names for the length of one start job, which is the
+    # only thing that can actually start it.
+    #
+    # Falls back to systemctl if the helper is missing, so this still works on a
+    # machine where TASK-77's helper has not been applied yet.
+    startup="$(dirname "$(readlink -f "$0")")/startup"
+    if [[ -x "$startup" ]]; then
+        exec "$startup" waybar --now on
+    fi
     exec systemctl --user start waybar.service
 fi
 

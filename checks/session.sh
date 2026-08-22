@@ -23,6 +23,10 @@ skip() { printf '  \033[33mSKIP\033[0m  %s\n' "$*"; SKIP=$((SKIP + 1)); }
 
 section() { printf '\n==> %s\n' "$*"; }
 
+# The repository this check is running from, derived from the script rather than
+# the working directory - session.sh is meant to be runnable from anywhere.
+CHECKS_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 # ----------------------------------------------------------------------
 section "Compressed swap (TASK-9)"
 
@@ -123,7 +127,29 @@ elif ! systemctl --user is-active --quiet 'wayland-session@sway.target'; then
     echo "        Plain 'sway' gives a compositor with no bar, notifications,"
     echo "        idle handling or authentication agent, and looks fine."
 else
-    for unit in waybar mako swayidle polkit-agent; do
+    # The units the repository actually enables, read from the committed
+    # symlinks rather than listed here.
+    #
+    # This was a hardcoded four - waybar, mako, swayidle, polkit-agent - while
+    # eight were enabled. autotiling and greeting had been added and never
+    # joined it, and the cliphist watchers would have been the third and fourth
+    # to slip past. A list of things to check, maintained by hand beside the
+    # list of things that exist, drifts in exactly one direction: the check
+    # stays green while covering less.
+    #
+    # Read from the repository, not from ~/.config, so a unit that failed to
+    # apply is a missing unit rather than a shorter list.
+    mapfile -t SESSION_UNITS < <(
+        find "$CHECKS_REPO/setup/dotfiles/dot_config/systemd/user/wayland-session@sway.target.wants" \
+             -maxdepth 1 -name 'symlink_*.service' -printf '%f\n' 2>/dev/null |
+        sed 's/^symlink_//; s/\.service$//' | sort
+    )
+    # Fall back to the historical list if that directory is unreadable, so this
+    # degrades to what it used to do rather than to checking nothing.
+    [[ ${#SESSION_UNITS[@]} -gt 0 ]] ||
+        SESSION_UNITS=(waybar mako swayidle polkit-agent)
+
+    for unit in "${SESSION_UNITS[@]}"; do
         if systemctl --user is-active --quiet "$unit"; then
             restart="$(systemctl --user show "$unit" --property=Restart --value 2>/dev/null)"
             if [[ "$restart" == "on-failure" || "$restart" == "always" ]]; then
@@ -1583,10 +1609,6 @@ section "Dotfiles this repository stopped shipping (TASK-94)"
 # becoming a .tmpl, or gaining an executable_ prefix - is still managed, just
 # from a different source. So this compares against `chezmoi managed`, which
 # knows the target paths, rather than against git alone.
-# The repository this check is running from, derived from the script rather than
-# from the working directory - session.sh is meant to be runnable from anywhere.
-CHECKS_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
 if ! command -v chezmoi &>/dev/null; then
     skip "chezmoi is not installed"
 elif ! git -C "$CHECKS_REPO" rev-parse --git-dir &>/dev/null; then

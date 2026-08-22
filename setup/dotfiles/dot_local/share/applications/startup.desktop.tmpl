@@ -1,0 +1,16 @@
+# Exec is an absolute path for the same reason theme's and wallpaper's are:
+# ~/.local/bin is not on the PATH sway and rofi hand to what they spawn, so a
+# bare `Exec=startup` works when tested from a terminal and silently does
+# nothing from the launcher.
+
+[Desktop Entry]
+Type=Application
+Name=Startup
+GenericName=Session components
+Comment=Choose what the desktop starts with, and what is running right now
+Icon=preferences-system-session-services
+Exec={{ .chezmoi.homeDir }}/.local/bin/startup
+Terminal=false
+Categories=Settings;DesktopSettings;
+Keywords=startup;autostart;session;services;memory;notifications;bar;idle;
+NoDisplay=false

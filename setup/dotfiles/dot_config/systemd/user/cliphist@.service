@@ -1,0 +1,54 @@
+[Unit]
+Description=Record the %i clipboard into the history
+Documentation=https://github.com/sentriz/cliphist
+PartOf=wayland-session@sway.target
+After=wayland-session@sway.target
+Requisite=wayland-session@sway.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/wl-paste --type %i --watch %h/.local/bin/clipboard-store
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=wayland-session@sway.target
+
+# A TEMPLATE, BECAUSE ONE WATCHER CANNOT SEE BOTH.
+#
+# `wl-paste --watch` asks the compositor for one flavour of the selection, and
+# with no --type that flavour is text. So the obvious single watcher records
+# every URL you copy and silently ignores every screenshot - which is exactly
+# the invisible failure this repository keeps meeting: it looks configured,
+# it runs, and half the feature is missing with nothing to say so.
+#
+# Measured rather than assumed. With one plain `wl-paste --watch` and a PNG on
+# the clipboard, `cliphist list` showed the three text entries and nothing
+# else; adding `--watch --type image` produced
+#
+#   6  text after image
+#   5  [[ binary data 1 MiB png 1920x1080 ]]
+#
+# Hence two instances - cliphist@text.service and cliphist@image.service -
+# enabled by the two symlinks in wayland-session@sway.target.wants/. Each is
+# supervised on its own, so the image watcher dying does not take text with it.
+#
+# THE PACKAGE SHIPS ITS OWN UNIT AND IT IS THE WRONG ONE. cliphist installs
+# /usr/lib/systemd/user/cliphist.service, which is
+#
+#   PartOf/After/Requisite/WantedBy = graphical-session.target
+#   ExecStart=/usr/bin/wl-paste --watch cliphist store
+#   Restart=on-failure
+#
+# - three separate disagreements with this repository. graphical-session.target
+# is reached by every compositor, so it would start under a different desktop
+# too; the single watcher is the text-only bug above; and Restart=on-failure
+# leaves the component dead after a clean `pkill`, which is why everything here
+# uses Restart=always. Nothing enables the package's unit and nothing here
+# refers to it. It is named `cliphist.service`, this one is `cliphist@.service`,
+# so they do not collide - but if it is ever enabled by hand it will run a
+# second, text-only watcher alongside these two.
+#
+# ExecStart calls %h/.local/bin/clipboard-store rather than `cliphist store`
+# directly. That wrapper is what keeps a flagged secret out of the history;
+# see the script, and see TASK-67 for what it does and does not protect.

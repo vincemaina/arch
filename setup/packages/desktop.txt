@@ -57,6 +57,34 @@ slurp
 # Clipboard tool
 wl-clipboard
 
+# Clipboard HISTORY, which wl-clipboard on its own does not have: it copies and
+# pastes, and the moment you copy the next thing the last one is gone.
+#
+# cliphist, and the choice was between two. Both are in extra, so the AUR
+# question TASK-43 settled does not arise - though it does disqualify the
+# usual alternatives outright: clipman, clipse and greenclip are all AUR-only
+# and were not considered further.
+#
+#   cliphist  2.3 MiB, depends on glibc and wl-clipboard, which is already
+#             above. A store and a `list`/`decode` pair, no interface of its
+#             own, driven by whatever menu you point at it - which is exactly
+#             the shape this desktop wants, because the menu is rofi.
+#   copyq     8.7 MiB before its dependencies, and those are the cost: qt6-svg,
+#             knotifications, kstatusnotifieritem, kguiaddons, qca-qt6,
+#             qtkeychain-qt6 and libxtst. It draws its own Qt window, and a
+#             KDE-shaped one, next to a desktop that is GTK-dark everywhere
+#             else - and it wants a system tray, which this machine does not
+#             have (see the network-manager-applet note above for what that
+#             costs). It is also an X11-first application reaching Wayland
+#             through libxtst.
+#
+# So cliphist for being small, headless and already dependent on what is here.
+#
+# It is watched by cliphist@text.service and cliphist@image.service - two
+# instances, because one wl-paste watcher sees text only and would drop every
+# screenshot silently. See the unit, which has the measurement.
+cliphist
+
 # Standard user directories, so ~/Pictures and friends exist
 xdg-user-dirs
 

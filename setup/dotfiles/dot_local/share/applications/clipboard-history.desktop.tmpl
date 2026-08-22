@@ -1,0 +1,20 @@
+# Exec is an absolute path for the same reason notification-centre's and
+# theme's are: ~/.local/bin is not on the PATH that sway and rofi hand to what
+# they spawn, so a bare `Exec=clipboard-history` works when tested from a
+# terminal and silently does nothing from the launcher.
+#
+# This entry is what makes the history findable by *name*. It also has a
+# binding, $mod+v, which is the exception the keybinding file argues for:
+# almost everything else here is launcher-only.
+
+[Desktop Entry]
+Type=Application
+Name=Clipboard
+GenericName=Clipboard history
+Comment=Everything you have copied, text and images, ready to put back on the clipboard
+Icon=edit-paste
+Exec={{ .chezmoi.homeDir }}/.local/bin/clipboard-history
+Terminal=false
+Categories=Utility;
+Keywords=clipboard;clip;copy;paste;history;cliphist;image;screenshot;
+NoDisplay=false

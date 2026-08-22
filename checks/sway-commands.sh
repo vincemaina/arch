@@ -95,8 +95,24 @@ collect_sway_commands() {
 }
 
 collect_unit_commands() {
-    grep -hoE '^Exec(Start|Reload)=[^[:space:]]+' "$UNIT_DIR"/*.service |
-        cut -d= -f2-
+    # EVERY absolute path on the line, not just the first token.
+    #
+    # This used to take only the command itself, so a unit like
+    #
+    #   ExecStart=/usr/bin/wl-paste --watch %h/.local/bin/clipboard-store
+    #
+    # was checked as `wl-paste` and the helper named in its arguments was never
+    # resolved at all. That helper happens to exist; nothing here would have
+    # noticed if it did not, which is the same shape as every other bug this
+    # repository keeps finding - a reference that looks checked and is not.
+    #
+    # %h is systemd's specifier for the user's home. Expanded here rather than
+    # skipped, because skipping it is how the argument went unchecked before.
+    grep -hoE '^Exec(Start|Reload)=.*' "$UNIT_DIR"/*.service |
+        cut -d= -f2- |
+        tr ' ' '\n' |
+        sed -e "s|^%h|$HOME|" -e "s|^-||" |
+        grep -E '^(/|~)' || true
 }
 
 collect_declared_requirements() {
