@@ -23,7 +23,11 @@ set $term ~/.local/bin/terminal
 # The file explorer is a terminal one, so it is a terminal with a distinct
 # app_id - otherwise the window rule that floats it would float every terminal.
 set $explorer foot --app-id=explorer -e yazi
-set $browser qutebrowser
+# Not `qutebrowser` directly. The helper brings an already-open window to the
+# current workspace instead of mapping a new one - measured at 1ms against
+# 553ms for a new window in the warm process, and 942ms cold. It falls through
+# to launching qutebrowser when nothing is open.
+set $browser ~/.local/bin/browser
 # One prompt, several sources. `combi` merges the modes listed in
 # config.rasi - applications, open windows, files, calculator - so there is a
 # single thing to reach for rather than one launcher per kind of question.
