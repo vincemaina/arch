@@ -274,6 +274,13 @@
         "dynamic-len": 45,
         "player-icons": { "default": "\uf001", "mpv": "\uf03d" },
         "status-icons": { "paused": "\uf04c" },
+        // No on-click here on purpose. This module carries waybar's own
+        // defaults - left play/pause, middle previous, right next - and
+        // setting on-click replaces the first of those rather than adding to
+        // it, so the bar would lose play/pause to gain a menu it can already
+        // reach from the launcher. The three clicks are what the manual's bar
+        // table promises, and they are the reason skipping a track never
+        // needed the media keys this keyboard does not have.
         "tooltip-format": "{player}\n{title}\n{artist}"
     },
 
