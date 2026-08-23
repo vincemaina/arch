@@ -69,3 +69,32 @@ Space-flight ambient · Mission Control	https://ice1.somafm.com/missioncontrol-1
 
 # --- from a game ------------------------------------------------------------
 Minecraft soundtrack · YouTube	https://www.youtube.com/watch?v=ZUIT_rQIR5M
+
+# --- noise, not music -------------------------------------------------------
+#
+# A `noise:` target is neither a stream nor a search: it is made on this machine
+# by ~/.local/bin/focus-noise the first time it is played, cached under
+# ~/.local/share/focus-noise, and played from disk every time after. Nothing
+# audio-shaped is tracked in this repository, for the same reason no wallpaper
+# is - see DECISIONS.md.
+#
+# These loop rather than ending, so they play until you stop them.
+#
+# The first seven are generated out of nothing by ffmpeg. The last four are
+# recordings of things a filter chain cannot produce - a fire crackles in events
+# rather than in a spectrum - and are downloaded once, from a search rather than
+# a link, on the first play only.
+#
+# `focus-noise --list` describes each one; `focus-noise --clear` throws the
+# cache away, which is always safe because all of it can be made again.
+Brown noise	noise:brown
+Pink noise	noise:pink
+White noise	noise:white
+Rain	noise:rain
+Waves	noise:waves
+River	noise:river
+Wind	noise:wind
+Fire crackling	noise:fire
+Crickets at night	noise:crickets
+Forest and birdsong	noise:forest
+Distant thunder	noise:thunder

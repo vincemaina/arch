@@ -126,7 +126,7 @@ def quoted(option: str, value: str) -> str:
     return f"{option}=%{len(value.encode())}%{value}"
 
 
-def cmd_add(mode: str, url: str, title: str, finite: bool = False) -> int:
+def cmd_add(mode: str, url: str, title: str, kind: str = "infinite") -> int:
     mpv = connect()
     empty = not mpv.playlist()
 
@@ -148,11 +148,19 @@ def cmd_add(mode: str, url: str, title: str, finite: bool = False) -> int:
     # that stopped. Setting it per-file rather than globally confines the change
     # to finite tracks queued here - a film watched in the same mpv, and a radio
     # stream that blips, both keep the behaviour the config asked for.
+    #
+    # A noise is the third kind. It is a finite file that is meant never to end,
+    # so it gets loop-file=inf rather than keep-open: mpv restarts the file
+    # instead of advancing, and the queue does not move on. keep-open would
+    # instead leave it paused at EOF, which is the "music that stopped" bug one
+    # paragraph up, and plain finite would step to the next entry after a minute.
     parts = []
     if title:
         parts.append(quoted("force-media-title", title))
-    if finite:
+    if kind == "finite":
         parts.append("keep-open=no")
+    elif kind == "loop":
+        parts.append("loop-file=inf")
     options = ",".join(parts)
 
     reply = mpv.command("loadfile", url, flag, 0, options)
@@ -293,11 +301,14 @@ def main(argv: list[str]) -> int:
         if command == "add":
             mode, url = args[0], args[1]
             title = args[2] if len(args) > 2 else ""
-            finite = len(args) > 3 and args[3] == "finite"
+            kind = args[3] if len(args) > 3 else "infinite"
             if mode not in ("now", "next", "queue"):
                 print(f"unknown mode '{mode}'", file=sys.stderr)
                 return 2
-            return cmd_add(mode, url, title, finite)
+            if kind not in ("finite", "infinite", "loop"):
+                print(f"unknown kind '{kind}'", file=sys.stderr)
+                return 2
+            return cmd_add(mode, url, title, kind)
         if command == "list":
             return cmd_list()
         if command == "count":

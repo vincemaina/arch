@@ -272,6 +272,7 @@ the line, **↓** means an entry below in this document.
 | `mpv` | Plays a URL and exposes MPRIS, so the bar and playback keys control it | ↓ |
 | `mpv-mpris` | The plugin that makes `mpv` visible over MPRIS. Without it mpv plays and nothing on the desktop can see it | ↓ |
 | `yt-dlp` | Resolves a pasted YouTube/SoundCloud link for mpv to play | ↓ |
+| `ffmpeg` | Generates the focus noises - noise sources, filters, the loudness meter and the encoder | ↓ |
 | `cava` | Terminal spectrum display, reading whatever is audible from the default output's monitor | ↓ |
 | `spotify-player` | Spotify without the desktop app: a daemon that streams and exposes MPRIS, with a TUI and a CLI as remote controls | ↓ |
 | `xdg-user-dirs` | Creates `~/Pictures` and friends | ↓ |
@@ -670,6 +671,34 @@ returns 403 and 429 on exactly the browse endpoints this uses.
 **Cost.** 31.76 MiB installed, 8.51 MiB download. Nothing is resident until
 music is playing — there is no session unit and no autostart — so there is no
 row in the session-cost table above.
+
+### ffmpeg
+
+**Problem.** `~/.local/bin/focus-noise` makes rain, waves, wind and the colour
+noises on the machine rather than shipping them, because nothing audio-shaped
+is tracked here. That needs a noise source, a filter chain, a loudness meter
+and an encoder. TASK-136.
+**Choice.** `ffmpeg`, which is all four: `anoisesrc` generates white, pink and
+brown noise, `highpass`/`lowpass`/`tremolo` shape it, `ebur128` measures the
+result so every noise can be normalised to the same loudness, and `libopus`
+encodes it. It was already installed.
+**Alternatives.** `sox` is the more obvious tool for synthesising noise and was
+rejected for being a new package that buys nothing ffmpeg does not already do.
+**How it works.** Declared here rather than left as a dependency, which is the
+point of the entry. `pacman -Qi ffmpeg` reported **"Installed as a dependency
+for another package"**, required by firefox, mpv, mpv-mpris and qt6-webengine —
+exactly the state TASK-13 found `polkit` and `mesa` in. Removing whatever
+pulled it in would have taken it, and the noise generator would have stopped
+working with nothing here to explain why. Both install paths now mark declared
+packages explicit, and `checks/packages.sh` fails if one drifts back.
+
+Two noise sources with different seeds are joined to stereo rather than one
+copied to both channels: one source in both ears is mono wearing a stereo
+layout, and sits in the middle of your head instead of around you.
+**Cost.** Already present as a dependency, so declaring it adds nothing to the
+installed size. Not resident — it runs for about a second per synthesised noise,
+once, and the result is cached under `~/.local/share/focus-noise`. A synthesised
+noise is 1.1 MiB for a minute; a fetched one 11–13 MiB for ten minutes.
 
 ### cava
 

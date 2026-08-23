@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# requires: mpv rofi systemd-run yt-dlp curl python3 pgrep
+# requires: mpv rofi systemd-run yt-dlp curl python3 pgrep ffmpeg
 
 # Background music, one launcher entry away and then invisible.
 #
@@ -160,13 +160,31 @@ read_entries() {
     done
 }
 
-# A target is either a URL or search:<text>. Prints "url<TAB>finite", where
-# finite says whether the thing ends by itself - a recording does, a radio
-# stream and a live broadcast do not. mpv is told, because a finite track that
-# keeps mpv open at its end leaves the bar showing music that stopped.
+# A target is one of three forms, and prints "url<TAB>kind".
+#
+#   https://...      a radio stream, which never ends            -> infinite
+#   search:<text>    resolved through YouTube on every play      -> finite/infinite
+#   noise:<name>     rain, waves, brown noise                    -> loop
+#
+# The kind is passed to mpv rather than inferred there, because each one needs
+# something different at the end of the file. A finite track that keeps mpv open
+# leaves the bar showing music that stopped. A noise is a one-minute file that is
+# meant never to stop, so it loops rather than advancing the queue.
+#
+# A noise is made on the machine the first time it is asked for - see
+# ~/.local/bin/focus-noise - and played from disk every time after.
 resolve_target() {
-    local target="$1" query line id live
+    local target="$1" query line id live path
     case "$target" in
+        noise:*)
+            # By absolute path: ~/.local/bin is not on the PATH sway and rofi
+            # hand to what they spawn, so a bare name works from a terminal and
+            # silently fails from the launcher.
+            path="$("$HOME/.local/bin/focus-noise" --path "${target#noise:}" 2>/dev/null)" ||
+                return 1
+            [[ -s "$path" ]] || return 1
+            printf '%s\tloop' "$path"
+            ;;
         search:*)
             query="${target#search:}"
             line="$(yt-dlp --flat-playlist --no-warnings \
@@ -176,26 +194,29 @@ resolve_target() {
             IFS=$'\t' read -r id live <<<"$line"
             [[ -n "$id" && "$id" != "NA" ]] || return 1
             if [[ "$live" == "is_live" ]]; then
-                printf 'https://www.youtube.com/watch?v=%s\t0' "$id"
+                printf 'https://www.youtube.com/watch?v=%s\tinfinite' "$id"
             else
-                printf 'https://www.youtube.com/watch?v=%s\t1' "$id"
+                printf 'https://www.youtube.com/watch?v=%s\tfinite' "$id"
             fi
             ;;
         *)
             # A direct URL here is a radio stream, which never ends.
-            printf '%s\t0' "$target"
+            printf '%s\tinfinite' "$target"
             ;;
     esac
 }
 
 # label, target, mode. Resolves, makes sure mpv is up, and hands it over.
 play_target() {
-    local label="$1" target="$2" mode="$3" resolved url finite flag
+    local label="$1" target="$2" mode="$3" resolved url kind
 
-    [[ "$target" == search:* ]] && note "Finding \"$label\"..."
+    case "$target" in
+        search:*) note "Finding \"$label\"..." ;;
+        noise:*)  note "Preparing \"$label\"..." ;;
+    esac
 
     resolved="$(resolve_target "$target")" || die "nothing found for '$label'"
-    IFS=$'\t' read -r url finite <<<"$resolved"
+    IFS=$'\t' read -r url kind <<<"$resolved"
 
     ensure_mpv
 
@@ -208,10 +229,7 @@ play_target() {
         mpvq reset >/dev/null 2>&1 || true
     fi
 
-    flag="infinite"
-    [[ "$finite" == "1" ]] && flag="finite"
-
-    mpvq add "$mode" "$url" "$label" "$flag" || die "mpv would not take '$label'"
+    mpvq add "$mode" "$url" "$label" "$kind" || die "mpv would not take '$label'"
 
     case "$mode" in
         now)   note "Playing: $label" ;;
@@ -428,6 +446,19 @@ do_check() {
         detail=""
 
         case "$target" in
+            noise:*)
+                kind="noise"
+                # Deliberately NOT resolved: resolving a noise generates or
+                # downloads it, so a check would quietly make every entry it
+                # reported on. Whether the recipe exists is the question here,
+                # and focus-noise --list answers it without producing anything.
+                if "$HOME/.local/bin/focus-noise" --list 2>/dev/null |
+                        awk '{print $1}' | grep -qxF "${target#noise:}"; then
+                    detail="ok"
+                else
+                    detail="NO SUCH NOISE"
+                fi
+                ;;
             search:*)
                 kind="search"
                 if resolve_target "$target" >/dev/null 2>&1; then

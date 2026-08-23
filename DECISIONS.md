@@ -3144,6 +3144,117 @@ it: mpv's `-play` suffix means "start playback if nothing is playing", not
 next". Playing something now is an insert followed by an explicit skip. This
 was found by testing the behaviour rather than reading the flag name.
 
+## Noise is generated on the machine, and only what cannot be is fetched
+
+Focus noise - brown, pink and white noise, rain, waves, a river, wind - is a
+third kind of target in `focus-music`'s station list, written `noise:<name>`.
+It is not a second player and not a second helper's worth of integration: it
+resolves to a file and goes to the same `mpv` everything else goes to.
+
+Nothing audio-shaped is tracked. `~/.local/bin/focus-noise` holds a table of
+recipes and produces the audio on the machine, caching it under
+`~/.local/share/focus-noise`. Seven entries are synthesised by `ffmpeg` from
+`anoisesrc` through a filter chain. Four - a fire, crickets, forest birdsong,
+distant thunder - are downloaded once and played from disk afterwards.
+
+### Why
+
+**Because the integration already existed and should not have been rebuilt.**
+The bar's `mpris` module, the media keys, `~/.local/bin/media` and
+`~/.local/bin/focus-timer` all act on whatever is playing. Making noise a
+target kind rather than a player means all four work on it with no new code,
+which is the same reasoning that made Spotify a daemon rather than an
+application.
+
+**Because tracking the audio does not scale, and for exactly the reason
+wallpapers do not.** A minute of stereo audio is megabytes. Eleven noises
+committed would be most of the size of this repository and would grow every
+time one was added - which is precisely when adding one should be free. A
+recipe is a line of text.
+
+**Because the honest split is between what is a definition and what is a
+recording.** Brown noise is a definition: `anoisesrc=c=brown` *is* brown noise,
+not a sample of some. Rain, waves, a river and wind are filtered noise with a
+slow swell, and they read convincingly - but they are approximations and the
+table says so. A fire and crickets are neither: they are events in time rather
+than a spectrum, and no filter chain produces them. Downloading those four is
+not a shortcut around synthesis, it is the acknowledgement that synthesis does
+not apply.
+
+**Because levels chosen by ear cannot be checked.** Brown noise carries most of
+its energy below 500 Hz and white noise most of its above; at equal amplitude
+they are nowhere near equally loud. So each noise is generated, measured with
+ffmpeg's EBU R128 meter, and given the fixed gain that lands it on a common
+target. Measured, the seven synthesised entries came out between -22.0 and
+-22.9 LUFS, and their high-minus-low frequency balance runs monotonically from
+wind at -26.8 dB to rain at +18.2 dB - which is the evidence that the filter
+chains do what their descriptions claim.
+
+The gain is fixed rather than dynamic on purpose. A compressor would hold the
+level steady by flattening the slow swell, and the slow swell is the entire
+difference between waves and brown noise.
+
+### Trade-off
+
+**Noise cannot be layered under music.** One `mpv` plays one thing, and that is
+the price of the integration being free. Rain underneath lofi is a real thing
+people want and this cannot do it; a second player would buy it, at the cost of
+two MPRIS names for the bar to choose between.
+
+The four fetched entries depend on the network once, and on the search still
+finding something. They are stored as searches rather than links for the reason
+TASK-145 established - a channel re-uploading under a new id kills every
+recorded id at once - but a search is not a guarantee either. The synthesised
+seven need no network at all, ever.
+
+A fetched recording is cut wherever the trim lands, so it gets a two-second
+fade at each end rather than the thirty milliseconds a pure noise gets. That is
+audible as a breath at the loop point. It is preferable to a click, and a
+recording can afford it in a way flat noise cannot.
+
+Fetching downloads the whole recording and trims it locally, which looks
+wasteful and is the faster of the two. Asking for ten minutes with
+`--download-sections` makes ffmpeg read the file sequentially, and YouTube
+throttles a single sequential read to about twice real time: ten minutes of
+audio took over five minutes and had not finished. yt-dlp's own downloader
+fetches concurrent byte ranges and is not throttled that way - the same
+recording came down whole, 119 MB, in 18 seconds. The disk is transient and the
+source is deleted; the five minutes were not.
+
+Which result to take is decided by length rather than by rank. A fixed upper
+bound on duration was the first attempt and is the wrong shape: tuned to the
+two-to-twelve-hour videos a fire search returns, it excluded every result of a
+crickets search, one of which sat exactly on the boundary. There is no cap that
+suits every search, because the genre has no typical length - so the shortest
+candidate long enough to trim from is taken, which needs no constant and picks
+the smallest download by construction.
+
+### Alternatives considered
+
+**Shipping the audio.** Rejected on size, and it is the same rejection
+wallpapers got. It also fixes the quality of every noise at whatever was
+committed, where a recipe can be tuned in a line.
+
+**A separate `focus-noise` player with its own mpv.** It would allow layering,
+and it would put two MPRIS players on the bus for one desktop. The bar follows
+one player, so the bar would start being wrong about what is playing - and
+being wrong about what is playing is the failure this repository keeps finding.
+Worth revisiting only if layering turns out to be wanted.
+
+**`sox`, which is the obvious tool for synthesising noise.** It would be a new
+package. `ffmpeg` was already on the machine - as a dependency of mpv, firefox
+and qt6-webengine - and does all of it: the sources, the filters, the loudness
+meter and the encoder. So `ffmpeg` is now declared explicitly rather than
+relied on as a dependency, which is the TASK-13 lesson applied before it bit
+rather than after.
+
+**Fetching everything.** Better fidelity on the four that are already fetched,
+and worse on the seven that are not: nothing is more exactly brown noise than
+brown noise. It would also make every entry depend on a source that can rot,
+and make the whole feature useless offline.
+
+---
+
 ## Spotify as a daemon with remote controls, not an application
 
 Spotify is `spotify-player` from `extra`, arranged so that one background

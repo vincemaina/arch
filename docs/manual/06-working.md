@@ -51,6 +51,55 @@ start something else, or stop. Starting something else at that point replaces
 the finished tracks rather than stacking on top of them, so the list does not
 grow all day.
 
+### Noise instead of music
+
+The station list ends with a block of noise: brown, pink and white noise,
+rain, waves, a river, wind, a fire, crickets, forest birdsong and distant
+thunder. They are picked exactly like a station and they loop, so they play
+until you stop them rather than ending.
+
+They are not shipped with this repository. **Nothing audio-shaped is tracked
+here**, for the same reason no wallpaper is — a minute of stereo audio is
+megabytes, and a dozen of them committed would be most of the size of the
+repository, growing every time one was added. What is tracked is a recipe.
+
+The first seven are *made on your machine*, out of nothing, by `ffmpeg`: a
+noise source through a filter chain. Brown noise is a definition rather than a
+recording of anything, and rain, waves, a river and wind are filtered noise
+with a slow swell — convincing, and honestly an approximation rather than a
+recording of the sea.
+
+The last four cannot be approximated. A fire crackles and crickets chirp, and
+those are events in time rather than a spectrum, so no filter chain produces
+them. Those are **downloaded once**, the first time you play them, and played
+from your disk every time after. Nothing streams on every play.
+
+Either way the first play of a given noise takes a moment and says so; every
+play after it is instant.
+
+Every noise is normalised to the same loudness before it is cached, so
+switching from rain to brown noise does not jump in volume. That is measured
+with a loudness meter rather than chosen by ear, because brown noise carries
+its energy low and white noise carries its high, and at equal amplitude they
+are nowhere near equally loud.
+
+`~/.local/bin/focus-noise` is the generator, and it is worth knowing about for
+three things:
+
+```bash
+focus-noise --list          # every noise, and whether it is made yet
+focus-noise --check         # what is cached, how big, and how long
+focus-noise --clear         # throw the whole cache away
+```
+
+Clearing is always safe: everything in the cache can be made again, and the
+downloaded ones are found by search rather than by a link, so they do not rot.
+
+One thing it does not do is layer. Noise plays through the same `mpv` as
+everything else, which is what gets it the bar, the media keys and the focus
+timer for free — and the cost of that is you cannot have rain underneath
+music. Pick one.
+
 ### Searching YouTube
 
 The first entry in the list is **Search YouTube...**. Choose it, type
@@ -109,6 +158,15 @@ or a search, resolved through YouTube when it is played:
 ```text
 Minecraft soundtrack	search:minecraft soundtrack full album
 ```
+
+or one of the noises from the section above, made on this machine rather than
+fetched from anywhere:
+
+```text
+Rain	noise:rain
+```
+
+`focus-noise --list` is the list of names that form accepts.
 
 Comments and blank lines are ignored, and are used in the tracked file to
 group stations by mood. Prefer a direct audio stream where one exists — the

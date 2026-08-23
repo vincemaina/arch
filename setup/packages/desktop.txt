@@ -167,6 +167,21 @@ mpv
 mpv-mpris
 yt-dlp
 
+# Noise, generated on this machine rather than downloaded - TASK-136.
+#
+# ffmpeg is what ~/.local/bin/focus-noise makes rain, waves and brown noise out
+# of: `anoisesrc` through a filter chain, measured with the EBU R128 meter so
+# every noise lands on the same loudness, and encoded to opus. `ffprobe` comes
+# from the same package and is what `--check` reads durations with.
+#
+# It was already on the machine as a dependency of mpv, firefox and
+# qt6-webengine, and `pacman -Qi` reported it "installed as a dependency" -
+# which is precisely the state TASK-13 found polkit and mesa in. Removing
+# whatever pulled it in would have taken it, and the noise generator would have
+# stopped working for a reason nothing here would have explained. Declared, so
+# it is wanted in its own right.
+ffmpeg
+
 # Spotify without the desktop app or a browser tab - TASK-135.
 #
 # WHY THIS CLIENT

@@ -1,0 +1,376 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: ffmpeg ffprobe yt-dlp notify-send
+
+# The noise half of focus-music: rain, waves, brown noise, a fire.
+#
+#   focus-noise --list            every entry, its kind and whether it is cached
+#   focus-noise --path <name>     where that noise is, making it first if needed
+#   focus-noise --check           resolve everything and say what is missing
+#   focus-noise --clear [name]    delete the cache, or one entry of it
+#
+# This is a generator, not a player. focus-music plays what it produces - a
+# station line reading `noise:rain` is resolved through `--path` and handed to
+# the same mpv everything else goes to. So the bar shows it, the media keys
+# control it, `media` seeks it and the focus timer pauses it, with nothing here
+# knowing about any of them.
+#
+# NOTHING AUDIO-SHAPED IS TRACKED
+#
+# Same rule, and the same reason, as ~/.local/bin/wallpaper. A minute of stereo
+# audio is megabytes; a dozen noises committed would be most of the size of this
+# repository, and would grow every time one was added - which is exactly when
+# adding one should be free. What is tracked is a table of recipes. What is on
+# the machine is a cache, and `--clear` throws it away safely because everything
+# in it can be made again.
+#
+# checks/session.sh fails if anything audio-shaped appears under setup/dotfiles,
+# for the same reason it does for images.
+#
+# TWO KINDS OF ENTRY, AND THE HONEST DIFFERENCE BETWEEN THEM
+#
+# `synth` entries are made here, out of nothing, by ffmpeg: a noise source
+# through a filter chain. That covers the colour noises exactly - brown noise IS
+# a definition, not a recording of anything - and it covers water and wind as
+# approximations. Filtered noise with a slow swell reads convincingly as waves;
+# it is not a recording of the sea and does not claim to be.
+#
+# `fetch` entries are the ones that cannot be approximated. A fire crackles and
+# crickets chirp: those are events in time, not a spectrum, and no filter chain
+# produces them. Those are downloaded once, from a search rather than a link -
+# the same decision focus-music documents, because a video id is a link that
+# rots and a search is not - and played from disk forever after. Nothing streams
+# on every play.
+#
+# Moving an entry from one kind to the other is a one-line edit to the table
+# below, which is the point of having a table.
+#
+# WHY THE LEVELS ARE MEASURED RATHER THAN CHOSEN
+#
+# Brown noise carries most of its energy below 500 Hz and white noise carries
+# most of its above; at the same amplitude they are nowhere near the same
+# loudness, and picking gains by ear per recipe is exactly the sort of judgement
+# that cannot be checked afterwards. So each noise is generated, measured with
+# ffmpeg's EBU R128 meter, and given the fixed gain that lands it on a common
+# target. Switching from rain to brown noise does not jump in volume, and the
+# reason it does not is arithmetic rather than taste.
+#
+# The gain is fixed rather than dynamic on purpose: a compressor would flatten
+# the slow swell that makes waves sound like waves.
+
+CACHE="${XDG_DATA_HOME:-$HOME/.local/share}/focus-noise"
+
+# Long enough that a loop is not noticeable, short enough that the cache stays
+# small. Waves modulate on a ten-second cycle, so a minute is six of them.
+SYNTH_SECONDS=60
+
+# Fetched recordings are trimmed to this. Ten minutes of a fire is plenty to
+# loop, and the alternative is carrying an hour of it per entry.
+FETCH_SECONDS=600
+
+# EBU R128 integrated loudness every entry is normalised to. -23 LUFS is the
+# broadcast reference; the absolute value matters far less than every entry
+# sharing it.
+TARGET_LUFS=-23
+
+# 160k stereo opus. Noise is close to incompressible, so FLAC came out at 14 MB
+# a minute - measured, not guessed - which is not a sensible thing to keep a
+# dozen of.
+BITRATE=160k
+
+die() {
+    echo "focus-noise: $*" >&2
+    command -v notify-send >/dev/null 2>&1 &&
+        notify-send -a focus-noise "focus-noise" "$*" || true
+    exit 1
+}
+
+note() {
+    command -v notify-send >/dev/null 2>&1 &&
+        notify-send -a focus-noise -t 4000 "focus noise" "$1" || true
+}
+
+# name, kind, spec, description. Tab separated, because a description is prose
+# and a filter chain contains commas, colons and equals signs.
+#
+# A synth spec is "<colour>;<filter chain>", where the colour is one of
+# ffmpeg's anoisesrc colours and the chain may be empty. A fetch spec is the
+# search text.
+recipes() {
+    cat <<'TABLE'
+brown	synth	brown;	Deep, soft rumble. The one most people mean by noise
+pink	synth	pink;	Balanced hiss, less bass than brown and less hiss than white
+white	synth	white;	Bright, flat, the most masking and the most fatiguing
+rain	synth	white;highpass=f=250,lowpass=f=9000	Steady rain, no thunder
+waves	synth	brown;lowpass=f=1600,tremolo=f=0.1:d=0.8	Slow swell, ten seconds to a wave
+river	synth	pink;highpass=f=350,lowpass=f=7000,tremolo=f=0.9:d=0.12	Water over stones, faster and brighter than waves
+wind	synth	brown;lowpass=f=700,tremolo=f=0.13:d=0.55	Gusts through trees, felt more than heard
+fire	fetch	campfire crackling sounds	A fire, crackling. Cannot be synthesised - it is events, not a spectrum
+crickets	fetch	crickets chirping at night nature sounds	Summer night outside the window
+forest	fetch	forest ambience birdsong nature sounds	Daytime woodland, birds and leaves
+thunder	fetch	distant thunder and rain storm sounds	Rain with thunder a long way off
+TABLE
+}
+
+# One entry's fields, or nothing. Sets ENTRY_KIND, ENTRY_SPEC, ENTRY_DESC.
+ENTRY_KIND=""
+ENTRY_SPEC=""
+ENTRY_DESC=""
+lookup() {
+    local wanted="$1" name kind spec desc
+    ENTRY_KIND=""; ENTRY_SPEC=""; ENTRY_DESC=""
+    while IFS=$'\t' read -r name kind spec desc; do
+        [[ "$name" == "$wanted" ]] || continue
+        ENTRY_KIND="$kind"; ENTRY_SPEC="$spec"; ENTRY_DESC="$desc"
+        return 0
+    done < <(recipes)
+    return 1
+}
+
+path_of() { printf '%s/%s.opus' "$CACHE" "$1"; }
+
+# Integrated loudness of a file, in LUFS, as a number. ffmpeg's ebur128 prints
+# its summary to stderr, and the value wanted is the "I:" line of the block at
+# the end rather than any of the running ones - so the LAST match is taken.
+measure_lufs() {
+    local file="$1" value
+    value="$(ffmpeg -hide_banner -nostats -i "$file" -af ebur128 -f null - 2>&1 |
+        grep -E '^\s+I:\s+-?[0-9.]+ LUFS' | tail -1 |
+        sed -E 's/.*I:\s+(-?[0-9.]+) LUFS.*/\1/' || true)"
+    [[ "$value" =~ ^-?[0-9.]+$ ]] || return 1
+    printf '%s' "$value"
+}
+
+# Everything below writes to a temporary file and renames it into place, so an
+# interrupted generation leaves no half-written noise that looks cached.
+finalise() {
+    local tmp="$1" target="$2" gain
+    gain="$(python3 -c "print(round($TARGET_LUFS - float('$3'), 2))")"
+
+    # A fixed gain, then a limiter to catch the peaks it creates. Noise has a
+    # high crest factor, so a gain that is right on average can still clip.
+    ffmpeg -hide_banner -loglevel error -y -i "$tmp" \
+        -af "volume=${gain}dB,alimiter=limit=0.891" \
+        -c:a libopus -b:a "$BITRATE" "$target.tmp.opus" ||
+        die "could not normalise $target"
+
+    mv -f "$target.tmp.opus" "$target"
+    rm -f "$tmp"
+}
+
+generate_synth() {
+    local name="$1" spec="$2" target colour chain filters tmp lufs
+    target="$(path_of "$name")"
+    colour="${spec%%;*}"
+    chain="${spec#*;}"
+
+    mkdir -p "$CACHE"
+    tmp="$CACHE/.$name.raw.flac"
+
+    # Two independent noise sources joined to stereo. One source copied to both
+    # channels is mono wearing a stereo layout: it sits in the middle of your
+    # head instead of around you, which is most of what makes noise pleasant to
+    # sit inside for an hour.
+    #
+    # The seeds are fixed, so regenerating produces the same file - the same
+    # reason ~/.local/bin/wallpaper fixes its seed.
+    filters="[0:a][1:a]join=inputs=2:channel_layout=stereo"
+    [[ -n "$chain" ]] && filters="$filters,$chain"
+    # A 30 ms fade at each end. Long enough that the loop does not click on the
+    # waveform discontinuity, short enough to be inaudible as a dip.
+    filters="$filters,afade=t=in:d=0.03,afade=t=out:st=$(( SYNTH_SECONDS ))"
+    filters="${filters}:d=0.03"
+
+    ffmpeg -hide_banner -loglevel error -y \
+        -f lavfi -i "anoisesrc=c=$colour:r=48000:d=$((SYNTH_SECONDS + 1)):a=0.9:seed=1" \
+        -f lavfi -i "anoisesrc=c=$colour:r=48000:d=$((SYNTH_SECONDS + 1)):a=0.9:seed=2" \
+        -filter_complex "$filters" -t "$SYNTH_SECONDS" \
+        -c:a flac "$tmp" || die "ffmpeg could not generate '$name'"
+
+    lufs="$(measure_lufs "$tmp")" || die "could not measure '$name'"
+    finalise "$tmp" "$target" "$lufs"
+}
+
+generate_fetch() {
+    local name="$1" query="$2" target tmp raw lufs
+    target="$(path_of "$name")"
+
+    mkdir -p "$CACHE"
+    raw="$CACHE/.$name.download"
+    tmp="$CACHE/.$name.raw.flac"
+
+    note "Fetching \"$name\" once - it is played from disk afterwards"
+
+    # A search, not a link. What gets written down here is the search text, so
+    # a channel re-uploading under a new id costs nothing - the same reasoning
+    # focus-music documents at length, and the failure TASK-145 recorded.
+    #
+    # THE WHOLE FILE IS FETCHED AND TRIMMED HERE, WHICH LOOKS WASTEFUL AND IS NOT
+    #
+    # The obvious form of this was --download-sections "*0-600", which asks for
+    # ten minutes instead of two hours. Measured, it is far SLOWER: sections are
+    # downloaded by ffmpeg streaming the file sequentially, and YouTube throttles
+    # a single sequential read to about twice real time - so ten minutes of audio
+    # took over five minutes of wall clock and had not finished. yt-dlp's own
+    # downloader fetches concurrent byte ranges instead and is not throttled that
+    # way: the same recording came down whole, 119 MB of it, in 18 seconds.
+    #
+    # So the whole thing is fetched at full speed, trimmed locally where trimming
+    # is free, and the source is deleted. The disk it costs is transient; the
+    # five minutes the other way were not.
+    #
+    # -f bestaudio is also load-bearing, and leaving it out is a mistake that
+    # looks like it works: yt-dlp's default format selection is video+audio, so
+    # without it the video comes down to be thrown away. That is what a first
+    # attempt spent ten minutes doing.
+    #
+    # WHICH RESULT, AND WHY IT IS NOT SIMPLY THE FIRST
+    #
+    # Ambience recordings are hours long by nature. A search for a fire offered
+    # 2, 10 and 12 hour videos; one for crickets offered 3, 8, 10, 11 and 24. A
+    # 24 hour one is most of a gigabyte for the ten minutes actually wanted.
+    #
+    # A fixed upper bound was the first attempt and is the wrong shape: tuned to
+    # the fire results it excluded every crickets result, including one that was
+    # exactly on the boundary. There is no cap that is right for every search,
+    # because the genre has no typical length.
+    #
+    # So the candidates are listed and the SHORTEST one long enough to trim from
+    # is taken. That needs no constant, cannot exclude everything, and picks the
+    # smallest download available by construction.
+    local id best_id="" best_seconds=0 seconds
+    while IFS=$'\t' read -r id seconds; do
+        [[ "$seconds" =~ ^[0-9]+$ ]] || continue
+        (( seconds >= FETCH_SECONDS + 60 )) || continue
+        if [[ -z "$best_id" ]] || (( seconds < best_seconds )); then
+            best_id="$id"
+            best_seconds="$seconds"
+        fi
+    done < <(yt-dlp --flat-playlist --no-warnings \
+                --print $'%(id)s\t%(duration)s' \
+                "ytsearch10:$query" 2>/dev/null || true)
+
+    [[ -n "$best_id" ]] || die "nothing long enough came back for '$name'"
+
+    rm -f "$raw".*
+    yt-dlp --no-warnings --quiet --no-progress --no-playlist \
+        -f bestaudio/best --concurrent-fragments 4 \
+        -o "$raw.%(ext)s" "https://www.youtube.com/watch?v=$best_id" ||
+        die "could not fetch '$name'"
+
+    local got
+    got="$(find "$CACHE" -maxdepth 1 -name ".$name.download.*" -print -quit)"
+    [[ -n "$got" ]] || die "'$name' downloaded nothing"
+
+    # Two seconds of fade at each end rather than thirty milliseconds. A
+    # recording is cut mid-crackle wherever it happens to be cut, and a hard
+    # loop there is an obvious click; a recording can afford to breathe at the
+    # seam in a way a pure noise cannot.
+    # Started 30 seconds in rather than at 0: these recordings often open on a
+    # title card, a fade-up or someone talking over the first few seconds, and
+    # none of that is what was wanted.
+    ffmpeg -hide_banner -loglevel error -y -ss 30 -i "$got" \
+        -af "afade=t=in:d=2,afade=t=out:st=$(( FETCH_SECONDS - 2 )):d=2" \
+        -t "$FETCH_SECONDS" -c:a flac "$tmp" ||
+        die "could not trim '$name'"
+    rm -f "$got"
+
+    lufs="$(measure_lufs "$tmp")" || die "could not measure '$name'"
+    finalise "$tmp" "$target" "$lufs"
+}
+
+ensure() {
+    local name="$1" target
+    lookup "$name" || die "no noise called '$name' - try --list"
+    target="$(path_of "$name")"
+
+    [[ -s "$target" ]] && { printf '%s' "$target"; return 0; }
+
+    case "$ENTRY_KIND" in
+        synth) generate_synth "$name" "$ENTRY_SPEC" ;;
+        fetch) generate_fetch "$name" "$ENTRY_SPEC" ;;
+        *)     die "'$name' has an unknown kind '$ENTRY_KIND'" ;;
+    esac
+
+    [[ -s "$target" ]] || die "'$name' was not produced"
+    printf '%s' "$target"
+}
+
+do_list() {
+    local name kind spec desc state
+    printf '%-10s %-6s %-7s %s\n' NAME KIND CACHED DESCRIPTION
+    while IFS=$'\t' read -r name kind spec desc; do
+        if [[ -s "$(path_of "$name")" ]]; then state=yes; else state=no; fi
+        printf '%-10s %-6s %-7s %s\n' "$name" "$kind" "$state" "$desc"
+    done < <(recipes)
+}
+
+do_check() {
+    local name kind spec desc problems=0 target size seconds
+
+    printf 'Cache: %s\n\n' "$CACHE"
+    while IFS=$'\t' read -r name kind spec desc; do
+        target="$(path_of "$name")"
+        if [[ -s "$target" ]]; then
+            size="$(du -h "$target" | cut -f1)"
+            seconds="$(ffprobe -v error -show_entries format=duration \
+                -of default=nw=1:nk=1 "$target" 2>/dev/null || echo '?')"
+            printf '  %-10s %-6s cached   %6s  %ss\n' \
+                "$name" "$kind" "$size" "${seconds%%.*}"
+        else
+            printf '  %-10s %-6s not made yet\n' "$name" "$kind"
+        fi
+    done < <(recipes)
+
+    printf '\n'
+    for tool in ffmpeg ffprobe yt-dlp; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            printf '  %-8s ok\n' "$tool"
+        else
+            printf '  %-8s MISSING\n' "$tool"
+            problems=$(( problems + 1 ))
+        fi
+    done
+
+    # Nothing here needs the network unless a fetch entry has never been made,
+    # so an offline machine with a warm cache is a working machine and should
+    # not be reported as a problem.
+    printf '\nSynthesised entries need no network. Fetched ones need it once.\n'
+    (( problems == 0 ))
+}
+
+do_clear() {
+    local name="${1:-}"
+    if [[ -n "$name" ]]; then
+        lookup "$name" || die "no noise called '$name'"
+        rm -f "$(path_of "$name")"
+        printf 'Removed %s\n' "$(path_of "$name")"
+        return 0
+    fi
+    rm -rf "$CACHE"
+    printf 'Removed %s\n' "$CACHE"
+}
+
+usage() {
+    cat <<'USAGE'
+focus-noise [--list|--path <name>|--check|--clear [name]]
+
+  --list            every entry, its kind and whether it is cached
+  --path <name>     where that noise is, making it first if it is not there
+  --check           resolve everything and say what is cached and what is missing
+  --clear [name]    delete the whole cache, or one entry of it
+
+Everything here can be made again, so the cache is always safe to delete.
+Noises are played by focus-music: a station line reading `noise:rain`.
+USAGE
+}
+
+case "${1:-}" in
+    --list)  do_list ;;
+    --path)  [[ -n "${2:-}" ]] || die "--path needs a name"; ensure "$2" ;;
+    --check) do_check; exit $? ;;
+    --clear) do_clear "${2:-}" ;;
+    -h|--help|"") usage ;;
+    *) die "unknown option '$1' - try --help" ;;
+esac
