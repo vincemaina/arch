@@ -1912,6 +1912,17 @@ else
         fail "greeter sets no XDG_DATA_DIRS, so it only scans /usr/share and will miss local session entries"
     fi
 
+    # Every non-uwsm session used to be a mistake - the only reason to skip it
+    # was forgetting to reach wayland-session@sway.target, leaving a desktop
+    # with no bar, no notifications and no idle handling running as a bare
+    # process. TASK-69.3 made that pattern legitimate for the first time: the
+    # "Virtual machine" session deliberately wants NONE of those components,
+    # which is the entire point of it existing rather than just running `vm`
+    # from inside Sway. Named here explicitly rather than widening the rule to
+    # "any exec that isn't uwsm is fine" - a real future mistake should still
+    # fail loudly, and only this one entry is known to be intentional.
+    KNOWN_NON_UWSM_SESSIONS=("wayland-sessions/vm.desktop")
+
     declare -A claimed=()
     offered=0
     non_uwsm=0
@@ -1958,6 +1969,8 @@ else
                             pass "  and $ref resolves to $resolved"
                         fi
                     fi
+                elif [[ " ${KNOWN_NON_UWSM_SESSIONS[*]} " == *" $key "* ]]; then
+                    pass "offers \"$name\" -> $exec_cmd, deliberately bypassing uwsm (known: $key)"
                 else
                     non_uwsm=$((non_uwsm + 1))
                     fail "offers \"$name\" -> $exec_cmd, which bypasses uwsm and yields a session with no components"
