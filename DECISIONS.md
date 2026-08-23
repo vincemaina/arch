@@ -2237,27 +2237,26 @@ A useful property of the swap specifically: `Ctrl+Alt+F2` still needs the same t
 
 **Universal, not per-machine.** The config matches `[ids] *`, so it applies to every keyboard on every machine built from this repository. The swap is a property of the hands rather than of the hardware, and a per-machine setting would mean the modifier moving depending on which machine was in front of you - the opposite of what building muscle memory needs. An external keyboard that is already laid out differently is the one case that would need its own section, keyed by the device id `keyd -m` reports, and that is a local exception rather than a reason to make the whole setting per-machine.
 
-### The firmware underneath it, on a ThinkPad
+### What sits below keyd, and why this repository cannot reproduce it
 
-Two settings live below keyd, in the embedded controller, and neither can be reproduced by `install.sh` - nothing in this repository is copied into firmware. A machine built from this repo can therefore be perfectly configured and still behave wrongly, which is this repository's signature failure mode arriving from a direction no check can reach.
+keyd remaps at the evdev layer, which is below xkb and below the console keymap - but it is not the bottom. Laptop firmware sits under it, and firmware is the one layer `install.sh` cannot touch: nothing in this repository is copied into an embedded controller. So a machine can be built perfectly from this repo and still behave wrongly, which is this repository's signature failure mode arriving from a direction no check can reach.
 
-**FnLock decides whether the top row is media keys or `F1`-`F12`.** It is toggled by `Fn+Esc`, it is remembered by the EC rather than by the BIOS, and the two can fall out of step. When they do, the symptom is that every media key does nothing at all while `52-media-keys.conf`, `brightnessctl`, `wpctl` and keyd are all provably correct - the keys are simply emitting `F3` instead of `XF86AudioRaiseVolume`, exactly as instructed. TASK-133 is the whole investigation.
+Two firmware settings are worth knowing about, because both change what keyd receives:
 
-**The BIOS "Fn and Ctrl key swap" stays enabled, and that is a deliberate trade rather than an oversight.** A ThinkPad puts Fn in the bottom-left corner and Ctrl beside it, so the geometry the swap above argues from - Control in the corner, under the weakest finger - is not this hardware's. Enabling the BIOS swap restores it, and keyd then moves Control off the pinky exactly as intended.
+- **Which row the top keys send.** Laptops decide in firmware whether the top row is media keys or `F1`-`F12`, usually with an `Fn+Esc` lock and a matching BIOS option. If it is set the wrong way, every media binding in `52-media-keys.conf` does nothing at all - not because the binding is wrong, but because the key is sending `F3` instead of `XF86AudioRaiseVolume`, exactly as instructed.
+- **Whether Fn and Control are swapped.** Many laptops offer this, and with it enabled the key a label says is Control is not the key the hardware sends. That makes `Fn+Esc` hard to find, which matters precisely when the lock above needs toggling.
 
-Disabling it is the tidier-looking option and was tried, under TASK-133, then reverted. The two swaps do partly cancel, and with the BIOS swap off the corner key becomes Fn where its label says. What actually happened is that **nothing emitted `leftalt` any more**: `keyd monitor` showed the labelled-Alt key producing `leftcontrol` and both the corner and labelled-Ctrl keys producing nothing at all, leaving Alt unreachable. Alt under the corner finger is worth more than a layout that is easier to describe.
+**The rule this produces: measure what the hardware sends before editing anything here.** `sudo keyd monitor` shows what keyd receives and emits, live. Redirected to a file it block-buffers, so a capture killed by a timeout reads as "no events at all" - use `stdbuf -oL keyd monitor`. Every wrong guess in this area has taken longer than that command would have.
 
-The cost is real and is the reason the note above exists: **Fn ends up under a cap labelled Ctrl**, which makes `Fn+Esc` very hard to find - and `Fn+Esc` is the only way to toggle FnLock. If the media keys stop working, that is the first thing to check, and Fn is not the key in the corner.
+On Lenovo hardware these settings are readable and writable from Linux via the `think_lmi` driver, without rebooting into BIOS setup, provided no BIOS admin password is set - `/sys/class/firmware-attributes/thinklmi/`. Other vendors expose the same kind of thing through their own `firmware-attributes` classes or not at all. This is a diagnostic aid, not part of the build.
 
-Both are readable and writable from Linux without rebooting into BIOS setup, through the `think_lmi` driver, provided no BIOS admin password is set:
+### Machine-local remapping, in /etc/keyd/local
 
-```
-/sys/class/firmware-attributes/thinklmi/attributes/FnCtrlKeySwap/current_value
-/sys/class/firmware-attributes/thinklmi/attributes/FnKeyAsPrimary/current_value
-/sys/class/firmware-attributes/thinklmi/authentication/Admin/is_enabled
-```
+`default.conf` matches `[ids] *` and is installed on every machine, so it must describe hands rather than hardware. Keyboards vary in layout, in which keys exist, and occasionally in which keys still work, and a remap answering one machine's hardware has no business being installed on someone else's.
 
-`FnKeyAsPrimary=Disable` means the media keys are primary, which is what this repository's bindings expect. If it says that and the machine disagrees, the EC is holding stale FnLock state and the fix is a full power drain - shut down, unplug the charger and every peripheral, hold the power button fifteen seconds - not a configuration change. A normal reboot does not clear it, because the EC keeps running.
+`default.conf` therefore ends with `include local`, and `apply-config.sh` creates `/etc/keyd/local` as an empty commented stub if it is absent, never overwriting it. That is the same bargain as `~/.config/zsh/local.zsh` for the shell and chezmoi's config file for the selected theme: the repository owns the general case and provides a place for the specific one, rather than being edited to describe one computer.
+
+It is the last line of the file, so a local binding wins. The stub is created *before* `keyd check` runs, because a missing include would make the config unparseable - and an unparseable keyd config means no usable keyboard on the machine you would need in order to fix it. The file has no `.conf` extension deliberately: keyd loads every `.conf` in `/etc/keyd/` as a config in its own right, which would make it a second competing config needing its own `[ids]` block, rather than an extension of this one.
 
 ### Trade-off
 

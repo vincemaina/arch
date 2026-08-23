@@ -170,6 +170,32 @@ done
 #
 # The panic sequence, should it ever be needed: backspace+escape+enter, held
 # together, forces keyd to terminate and hands the keyboard back.
+# default.conf ends with `include local`, so /etc/keyd/local must exist or the
+# config does not parse - and a config that does not parse means no usable
+# keyboard. Created here as an empty stub, BEFORE the check below, and never
+# overwritten: it is machine-local and untracked, the place a remap answering
+# one computer's hardware belongs instead of the repository. Same bargain as
+# ~/.config/zsh/local.zsh for the shell.
+if [[ ! -e /etc/keyd/local ]]; then
+    mkdir -p /etc/keyd
+    cat > /etc/keyd/local <<'KEYD_LOCAL'
+# Machine-local keyd bindings. Untracked, and never overwritten once created.
+#
+# The repository owns the general case in default.conf, which includes this
+# file as its last line. Put anything that answers THIS computer's hardware
+# here - a layout quirk, a key that does not exist, a key that has stopped
+# working - rather than editing a file every other machine also receives.
+#
+# Sections merge with the ones above, so naming an existing layer extends it.
+# Bindings here are read last and therefore win.
+#
+# Run `sudo keyd check` after editing, then `sudo keyd reload`. An unparseable
+# config leaves the machine without a usable keyboard; keyd's panic sequence is
+# backspace+escape+enter held together.
+KEYD_LOCAL
+    chmod 0644 /etc/keyd/local
+fi
+
 if command -v keyd &>/dev/null; then
     if ! keyd check /etc/keyd/default.conf; then
         echo "Refusing to enable keyd: /etc/keyd/default.conf does not parse." >&2

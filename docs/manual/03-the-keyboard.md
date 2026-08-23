@@ -76,11 +76,12 @@ press the key labelled Ctrl in the bottom-left corner and the system
 receives Alt; press the key labelled Alt next to it and the system receives
 Control.
 
-On this laptop that sentence is literally true, but only because the firmware
-is set up to make it true. A ThinkPad normally puts **Fn** in the bottom-left
-corner; this machine enables the BIOS "Fn and Ctrl key swap" so the corner is
-Control again, which is what keyd then turns into Alt. The key displaced by
-that is Fn, which now sits under the cap labelled **Ctrl**.
+On a laptop, check that against the keyboard in front of you. Many laptop
+keyboards — ThinkPads among them — put **Fn** in the bottom-left corner and
+Control beside it, so the key that receives Alt is one in from the corner
+rather than at it. Firmware can move it again: a BIOS option to swap Fn and
+Control exists on many machines and sits below keyd, where no file here can
+see it.
 
 So wherever this manual, or any program's own help, says "Ctrl", the key to
 reach for is physically the one labelled Alt - and vice versa. This is done
@@ -161,28 +162,41 @@ no upper bound unless one is given.
 
 ### If they do nothing at all, on a laptop
 
-On a ThinkPad the top row is shared between the media keys and `F1`-`F12`, and
-which one you get is decided by **FnLock**, in the laptop's firmware, below
-Linux entirely. If FnLock is on, every media key silently becomes a plain
-function key and nothing in this repository can change that - the bindings, the
-tools they call and keyd are all still correct, and the key is doing exactly
-what the firmware told it to.
+Laptops decide **in firmware** whether the top row sends the media keys or
+`F1`-`F12`. If it is set the wrong way every one of these bindings does
+nothing, and nothing in this repository can change that — the key really is
+sending `F3` rather than a volume key, exactly as the firmware instructed. The
+bindings, the tools they call and keyd are all still correct.
 
-Look at the **Esc** key: a small lit padlock means FnLock is on. `Fn+Esc` turns
-it off. If that does nothing, two things are worth checking before touching any
-configuration, and both bit this setup on a ThinkPad X280:
+The toggle is usually **`Fn+Esc`**, and on many laptops a small padlock on the
+Esc key lights when it is on. If pressing it appears to do nothing, the usual
+cause is that Fn is not the key you think: some laptops offer a BIOS setting
+that swaps Fn and Control, and with it enabled the Fn key is the one whose cap
+says Ctrl. Find the real one before changing any configuration.
 
-- **Fn is not the key in the corner.** This machine enables the BIOS "Fn and
-  Ctrl key swap", so Fn is the key *labelled Ctrl*, one in from the corner.
-  That is deliberate - it is what puts Alt under the corner finger - but it
-  means `Fn+Esc` is pressed with a key whose cap says something else, which is
-  the single most confusing thing about this keyboard.
-- **If `Fn+Esc` still will not toggle it,** the firmware is holding stale state.
-  Shut down, unplug the charger and every peripheral, and hold the power button
-  for fifteen seconds. A normal reboot does not clear it.
+To see what the keyboard is actually sending, rather than what it ought to:
 
-[DECISIONS.md](../../DECISIONS.md) has the full account, including how to read
-and write both firmware settings from Linux without rebooting into BIOS setup.
+```bash
+sudo stdbuf -oL keyd monitor
+```
+
+`stdbuf -oL` matters — redirected to a file the output is block-buffered, so a
+short capture can look completely empty when it is not.
+
+[DECISIONS.md](../../DECISIONS.md) has the longer account of what sits below
+keyd and why the build cannot reproduce it.
+
+### When a key is missing, broken, or somewhere else
+
+`/etc/keyd/local` is yours. It is machine-local, untracked, created empty on
+first install and never overwritten, and it is included as the **last** line of
+the shared keyd config so anything in it wins.
+
+That is where a remap belonging to one computer goes — a layout quirk, a key
+that does not exist on your model, a key that has stopped working — instead of
+editing a file every other machine also receives. Run `sudo keyd check` after
+editing and `sudo keyd reload` to apply it. The same escape hatch exists for
+the shell in `~/.config/zsh/local.zsh`.
 
 ## The Caps Lock scroll layer
 
