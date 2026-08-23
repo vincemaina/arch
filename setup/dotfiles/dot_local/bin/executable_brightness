@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: brightnessctl awk readlink dirname
+
+# The brightness keys, with a sound when there is nothing left to give.
+#
+#     brightness up
+#     brightness down
+#     brightness --current   percent, as brightnessctl reports it
+#
+# The same argument as ~/.local/bin/volume, and it is here so that the two
+# behave alike. TASK-85 asked for a sound "when a limit is reached, e.g. trying
+# to turn the volume up past 100%" - volume is the example, not the whole of
+# it, and a brightness key that goes quiet at the top while the volume key
+# bonks would read as a bug in one of them rather than a decision about either.
+#
+# `brightnessctl -m` prints device,class,current,percent,max in one line, so
+# both ends of the range come from a single call.
+
+STEP=5
+
+here="$(dirname "$(readlink -f "$0")")"
+
+state() {
+    brightnessctl -m 2>/dev/null | head -n 1
+}
+
+bump() {
+    [[ -x "$here/play-sound" ]] && "$here/play-sound" limit
+}
+
+case "${1:-}" in
+    up)
+        if awk -F, '{ exit !($3 >= $5) }' <<< "$(state)"; then
+            bump
+            exit 0
+        fi
+        brightnessctl set "${STEP}%+" >/dev/null
+        ;;
+    down)
+        # Zero, not one. The floor this hits is whatever brightnessctl's own
+        # floor is, which on this panel is a genuinely black screen - that is
+        # existing behaviour and changing it is a different decision from
+        # making a noise about it.
+        if awk -F, '{ exit !($3 <= 0) }' <<< "$(state)"; then
+            bump
+            exit 0
+        fi
+        brightnessctl set "${STEP}%-" >/dev/null
+        ;;
+    --current)
+        awk -F, '{ print $4 }' <<< "$(state)"
+        ;;
+    *)
+        echo "usage: brightness <up|down|--current>" >&2
+        exit 2
+        ;;
+esac

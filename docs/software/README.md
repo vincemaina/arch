@@ -249,6 +249,7 @@ the line, **↓** means an entry below in this document.
 | --- | --- | --- |
 | `pipewire` | Audio server | D: PipeWire |
 | `pipewire-pulse` | PulseAudio compatibility layer | D: PipeWire |
+| `pipewire-audio` | `pw-play`, which is what makes the desktop's four sounds audible. Declared rather than inherited — it arrives as a dependency of `pipewire-pulse` above, and was marked "installed as a dependency", which is the state that lets a graph change remove it silently. Same reasoning as `polkit` and `mesa`. | D: The desktop's sounds are generated, not shipped |
 | `wireplumber` | PipeWire's session manager — routing policy | D: WirePlumber |
 | `pavucontrol` | Graphical mixer; opened by the bar's audio module | ↓ |
 | `bluez` | `bluetoothd`, and a `bluetooth.service` this repository deliberately never enables | ↓ |
@@ -471,11 +472,42 @@ change to whoever owns the active session. So it depends on being run from
 inside a real session, and a `sudo brightnessctl` or a run from a detached
 context is the case that behaves differently.
 
-Bound in `config.d/52-media-keys.conf` and listed by `~/.local/bin/shortcuts`.
+Bound in `config.d/52-media-keys.conf` — through `~/.local/bin/brightness`
+rather than directly, so that a key which would change nothing plays the
+`limit` sound instead of failing silently — and listed by
+`~/.local/bin/shortcuts`.
 **On this VM `/sys/class/backlight/` is empty**, so the binding does nothing
 here and only means anything on a laptop — worth knowing before debugging it,
 since it is precisely the shape of failure this repository keeps hitting.
 **Cost.** 28.4 KiB installed. Nothing resident.
+
+### pipewire-audio — the sounds
+
+**Problem.** The desktop had no sounds at all: a notification arrived silently,
+a password prompt appeared silently, and a volume key at its ceiling did nothing
+in a way indistinguishable from a broken key.
+
+**Choice.** `pw-play`, from `pipewire-audio`, which was already installed as a
+dependency of the declared `pipewire-pulse`. Nothing new is installed; the
+package is declared so that a dependency-graph change cannot silence the desktop
+quietly, the same reasoning `polkit` and `mesa` are declared under.
+
+**How it works.** `~/.local/bin/sounds` computes four short WAVs from a table of
+frequencies and envelopes and caches them in `~/.local/share/sounds/`; nothing
+audio-shaped is tracked, and `checks/session.sh` fails if anything ever is.
+`~/.local/bin/play-sound` is what mako, sway and the volume and brightness
+helpers actually call — a shell script rather than part of the generator,
+because it runs on every notification and starting a Python interpreter to make
+a noise measured 30 ms against about 2. It rate-limits to one sound per event
+per quarter second, so a burst of notifications does not sound like a fault, and
+it is silent while mako is in do-not-disturb.
+
+See *The desktop's sounds are generated, not shipped* in `DECISIONS.md` for why
+they are generated rather than taken from `sound-theme-freedesktop`, which is
+also already on the machine.
+
+**Cost.** 6.79 MiB installed, already present. Nothing resident: `pw-play` runs
+for the length of a sound and exits. The four cached sounds are about 175 KiB.
 
 ### network-manager-applet — removed, kept as history
 

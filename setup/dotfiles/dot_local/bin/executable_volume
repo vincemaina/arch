@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: wpctl awk readlink dirname
+
+# The volume keys, with a sound when there is nothing left to give.
+#
+#     volume up
+#     volume down
+#     volume mute      toggle
+#     volume --current  the level, as wpctl reports it
+#
+# WHY THIS EXISTS RATHER THAN CALLING wpctl FROM THE BINDING
+#
+# It used to, and the binding was correct. `wpctl set-volume -l 1.0` clamps at
+# 100%, which is what TASK-41 was about: pactl has no upper bound, this machine
+# was found sitting at 105%, and above 100% is digital amplification that clips
+# the waveform rather than making anything louder.
+#
+# The clamp works. What it does not do is SAY anything. Holding the key at 100%
+# is indistinguishable from holding it while the audio is routed somewhere
+# else, or while the keyboard has stopped responding - the bar reads 100 and
+# nothing changes, and there is no way to tell "at the limit" from "broken".
+# TASK-85 asked for exactly that difference.
+#
+# So the level is read first, and a step that would change nothing plays the
+# `limit` sound instead - one low, short, blunt note. See ~/.local/bin/sounds.
+
+STEP=5
+
+here="$(dirname "$(readlink -f "$0")")"
+
+level() {
+    # `wpctl get-volume @DEFAULT_AUDIO_SINK@` prints "Volume: 0.70", and
+    # "Volume: 0.70 [MUTED]" when muted. The number is always field two.
+    wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '{print $2}'
+}
+
+bump() {
+    # Backgrounded is not needed - play-sound detaches on its own - but the
+    # guard is, because a machine part-way through an install has the binding
+    # before it has the script.
+    [[ -x "$here/play-sound" ]] && "$here/play-sound" limit
+}
+
+case "${1:-}" in
+    up)
+        # At or above the ceiling already. The wpctl call still runs, because
+        # `-l 1.0` is also what walks an over-loud machine back DOWN to 100 -
+        # so skipping it here would leave a machine stuck at 105% with a sound
+        # and no correction.
+        if awk -v v="$(level)" 'BEGIN { exit !(v >= 1.0) }'; then
+            bump
+        fi
+        wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${STEP}%+"
+        ;;
+    down)
+        if awk -v v="$(level)" 'BEGIN { exit !(v <= 0.0) }'; then
+            bump
+            exit 0
+        fi
+        wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${STEP}%-"
+        ;;
+    mute)
+        # No limit sound here, and that is deliberate: mute has no ceiling to
+        # hit. Both states are reachable and pressing it always does something.
+        wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+        ;;
+    --current)
+        level
+        ;;
+    *)
+        echo "usage: volume <up|down|mute|--current>" >&2
+        exit 2
+        ;;
+esac

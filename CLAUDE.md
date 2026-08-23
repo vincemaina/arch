@@ -277,6 +277,42 @@ a scripted `replace` whose match string contains a pasted glyph matches nothing
 and reports nothing, so assert every replacement and match on the key rather than
 the value. See the `scripting-traps` skill.
 
+## The desktop makes four sounds, and they are generated
+
+`~/.local/bin/sounds` computes `notify`, `alert`, `complete` and `limit` from a
+table of frequencies and envelopes and caches them in `~/.local/share/sounds/`.
+**Nothing audio-shaped is tracked**, for the same reason no wallpaper is, and
+`checks/session.sh` fails if anything ever is. `~/.local/bin/play-sound` is the
+only thing that makes a noise; it is shell rather than Python because it runs on
+every notification.
+
+Three callers, and each one is somewhere different:
+
+| Sound | Fired by | Where |
+| --- | --- | --- |
+| `notify` / `alert` / `complete` | mako `on-notify=exec`, by urgency and app-name | `mako/config.tmpl` |
+| `alert` | `for_window [app_id="polkit-gnome-authentication-agent-1"] exec` | `sway/config.d/40-window-rules.conf` |
+| `complete` | zsh rings the bell → foot notifies when unfocused → mako | `dot_zshrc`, `foot.ini.tmpl`, `mako/config.tmpl` |
+| `limit` | `~/.local/bin/volume` and `~/.local/bin/brightness` | `sway/config.d/52-media-keys.conf` |
+
+Four things that will silently break it, all covered by `checks/session.sh`:
+
+- **mako's PATH is not your PATH.** Same trap as waybar — it is a systemd user
+  service, so `on-notify` must name an absolute path. That is why the mako
+  config is a template.
+- **The event lists must agree.** `play-sound` validates its argument against a
+  `case`, the generator holds a separate table, and a name in one and not the
+  other fails on stderr nobody reads.
+- **`mako` cannot see notification hints.** foot already sends `sound-name` and
+  `suppress-sound`, and `makoctl list -j` returns neither, nor are they criteria
+  fields. Measured. So urgency and app-name are what the sounds are chosen by;
+  do not write code that expects the hint to arrive.
+- **Do not disturb is checked in `play-sound`, not in mako.** Two of the three
+  callers never touch mako, so the rule lives in one place on purpose.
+
+`sounds --preview` plays them; `sounds set <event> <file>` substitutes one of
+your own. **A sound cannot be reviewed by reading the diff** — listen to it.
+
 ## The bar is clickable
 
 Every module in `waybar/config.jsonc.tmpl` does something when clicked, and the

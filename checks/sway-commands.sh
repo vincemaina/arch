@@ -63,13 +63,22 @@ echo "==> ${#DECLARED[@]} packages declared"
 # nothing we declare is still caught.
 echo "==> Resolving dependency closure"
 
+# The sed is load-bearing. pactree prints a versioned dependency as the
+# constraint it was written as - `pipewire-audio=1:1.6.8-1`, not
+# `pipewire-audio` - so a package reached only that way never matched the plain
+# name and was reported as unreachable. pw-play found this: pipewire-audio is
+# required by the declared pipewire-pulse, was in this list the whole time
+# under a name nothing would ever compare equal to, and the check said nothing
+# in setup/packages/ declares or depends on it.
+#
+# Also strips >= and <= constraints, which pactree emits in the same position.
 ALLOWED="$(
     {
         printf '%s\n' "${DECLARED[@]}"
         for pkg in "${DECLARED[@]}"; do
             pactree -lu "$pkg" 2>/dev/null || true
         done
-    } | sort -u
+    } | sed -E 's/[<>]?=.*$//' | sort -u
 )"
 
 echo "    $(printf '%s\n' "$ALLOWED" | grep -c .) packages reachable from the manifests"
@@ -80,8 +89,21 @@ echo "    $(printf '%s\n' "$ALLOWED" | grep -c .) packages reachable from the ma
 
 collect_sway_commands() {
     # Expand `set $var value` definitions, then take the word after `exec`.
+    #
+    # COMMENTS ARE DROPPED FIRST, and that is not tidiness. This reads the
+    # config as text, so a sentence in a comment that happens to contain the
+    # word exec followed by another word was collected as a command: the note
+    # explaining that "sway accepts exec in a command list" produced a demand
+    # for a program called `in`, which no package owns, and the check failed
+    # on its own documentation.
+    #
+    # Full-line comments only. Sway configs carry colours like #285577 in the
+    # middle of a line, and cutting at the first # anywhere would truncate
+    # those - harmlessly here, since no such line contains exec, but it is a
+    # sharper knife than the job needs. A commented-out binding is not invoked
+    # either, so ignoring it is correct rather than merely convenient.
     local config
-    config="$(cat "$SWAY_DIR/config" "$SWAY_DIR"/config.d/*.conf)"
+    config="$(cat "$SWAY_DIR/config" "$SWAY_DIR"/config.d/*.conf | grep -vE '^[[:space:]]*#')"
 
     local expanded="$config"
     while IFS= read -r line; do
