@@ -1,0 +1,16 @@
+# Exec is an absolute path for the same reason theme's, wallpaper's and
+# glow's are: ~/.local/bin is not on the PATH that sway and rofi hand to what
+# they spawn, so a bare `Exec=bar-size` works when tested from a terminal and
+# silently does nothing from the launcher.
+
+[Desktop Entry]
+Type=Application
+Name=Bar Size
+GenericName=Waybar size
+Comment=Scale the bar's font and geometry together - small, medium or large
+Icon=preferences-desktop-theme
+Exec={{ .chezmoi.homeDir }}/.local/bin/bar-size
+Terminal=false
+Categories=Settings;DesktopSettings;
+Keywords=bar;waybar;size;font;scale;zoom;bigger;appearance;
+NoDisplay=false

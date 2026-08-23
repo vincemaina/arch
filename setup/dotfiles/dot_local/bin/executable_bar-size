@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+# requires: python3 rofi chezmoi
+
+"""Switch the bar's size: font and geometry scale together.
+
+    bar-size              pick a size from the launcher
+    bar-size medium       switch directly to a named size
+    bar-size --list       every size, and which is current
+    bar-size --current    just the current name
+
+WHAT THIS CHANGES
+
+Waybar's font and every pixel that gives it shape - the outer padding, each
+pill's padding, margin and radius, the workspace dots, the module spacing -
+move together, scaled from one number per size in
+.chezmoidata/barsize.toml. `small` is a scale of 1.0 and is exactly today's
+bar; `medium` and `large` are around 1.4x and 1.8x that. They move together
+on purpose: a bigger font sitting in unchanged padding would look cramped
+rather than bigger, which is what happens if only font.bar is raised by hand.
+
+WHERE THE ANSWER LIVES
+
+In chezmoi's own configuration under `barSize`, exactly as the theme is -
+deliberately not in the repository, so switching leaves no diff, and two
+machines syncing the same repository can disagree about it. Written through
+~/.local/lib/desktop_config.py, which is the only thing that writes that
+file - see its own docstring for why there used to be two writers and why
+that broke every apply.
+"""
+
+import pathlib
+import subprocess
+import sys
+
+# The machine-local config has exactly one writer, shared with ~/.local/bin/theme,
+# ~/.local/bin/wallpaper and ~/.local/bin/glow.
+sys.path.insert(0, str(pathlib.Path.home() / ".local" / "lib"))
+import desktop_config                                        # noqa: E402
+
+
+def die(message):
+    print(f"bar-size: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def data():
+    try:
+        return desktop_config.data()
+    except desktop_config.NotFound as error:
+        die(str(error))
+
+
+def sizes():
+    return data()["barsizes"]
+
+
+def current():
+    return data()["barSize"]
+
+
+def labelled(sizes_dict, current_name):
+    """One line per size, name padded, description alongside - the current one
+    marked with `*`, so --list and the rofi menu agree on what they show."""
+    width = max(len(name) for name in sizes_dict)
+    for name, info in sizes_dict.items():
+        mark = "*" if name == current_name else " "
+        yield f"{mark} {name:<{width}}   {info.get('description', '')}"
+
+
+def main():
+    argument = sys.argv[1] if len(sys.argv) > 1 else ""
+
+    if argument in ("-h", "--help"):
+        print(__doc__.split("WHAT THIS CHANGES")[0].strip())
+        return
+
+    if argument == "--current":
+        print(current())
+        return
+
+    if argument == "--list":
+        for line in labelled(sizes(), current()):
+            print(line.rstrip())
+        return
+
+    wanted = argument
+
+    if not wanted:
+        # Same idiom as ~/.local/bin/theme: labelled in the menu, bare
+        # everywhere else, so the mark and description never reach the
+        # validation below.
+        menu = "\n".join(labelled(sizes(), current()))
+        result = subprocess.run(
+            ["rofi", "-dmenu", "-i", "-p", "Bar size", "-no-custom",
+             "-select", current()],
+            input=menu, capture_output=True, text=True)
+        chosen = result.stdout.strip()
+        if not chosen:
+            return
+        # The mark is a fixed-width column of its own; the name is the field
+        # after it.
+        wanted = chosen.split(None, 2)[1]
+
+    if wanted not in sizes():
+        die(f"no size called '{wanted}'. Available: {', '.join(sizes())}")
+
+    if wanted == current():
+        print(f"Already using {wanted}.")
+        return
+
+    print(f"Switching to {wanted}")
+    desktop_config.set_value("data.barSize", wanted)
+
+    # --force is inside apply(): the target files were written by chezmoi and
+    # are being rewritten by chezmoi, and a prompt here would block a command
+    # launched from a menu, where nothing can answer it. The restart that makes
+    # it visible happens in run_onchange_after_reload-theme.sh, which this
+    # apply triggers because the rendered script embeds barSize.
+    desktop_config.apply()
+
+
+if __name__ == "__main__":
+    main()

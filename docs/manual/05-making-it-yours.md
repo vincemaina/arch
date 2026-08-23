@@ -9,13 +9,14 @@ you change it:
   bar's configuration. Changing these means editing a file and running
   `./sync.sh`, and every machine built from this repository gets the change.
 - **Machine-local, in `~/.config/chezmoi/chezmoi.toml`:** *which* theme is
-  selected, which wallpaper style is chosen for each theme, and whether the
-  bar glows for each theme. Changing these leaves no `git diff` at all — that
-  is deliberate, so two machines syncing the same repository can legitimately
-  disagree about which theme they are wearing.
+  selected, which wallpaper style is chosen for each theme, whether the
+  bar glows for each theme, and which of the three bar sizes is in use.
+  Changing these leaves no `git diff` at all — that is deliberate, so two
+  machines syncing the same repository can legitimately disagree about which
+  theme they are wearing, or how big their bar is.
 
 One file writes the machine-local half: `~/.local/lib/desktop_config.py`.
-`theme`, `wallpaper` and `glow` all call into it rather than editing
+`theme`, `wallpaper`, `glow` and `bar-size` all call into it rather than editing
 `~/.config/chezmoi/chezmoi.toml` themselves — two of them used to each carry
 their own copy of that logic, and the copies disagreed about nested TOML
 tables, which is the kind of bug that corrupts a config file rather than
@@ -60,10 +61,10 @@ runtime; every consumer holds a rendered copy, so a render alone would leave
 the running session still showing the old colours until each piece reloads.
 That reload is a separate script
 (`run_onchange_after_reload-theme.sh.tmpl`) that chezmoi runs automatically
-whenever the rendered theme name, wallpaper style, glow setting, or a hash of
-the selected palette changes — which is also why editing a colour directly in
-`themes.toml` and running `sync.sh` reloads everything too, not only a named
-`theme` switch. It, in order:
+whenever the rendered theme name, wallpaper style, glow setting, bar size, or a
+hash of the selected palette changes — which is also why editing a colour
+directly in `themes.toml` and running `sync.sh` reloads everything too, not
+only a named `theme` switch. It, in order:
 
 1. Generates the new wallpaper first if it is not already cached (see below),
    so the reload below does not show a black desktop while it renders.
@@ -124,6 +125,29 @@ that one machine, and leaves no `git diff`.
 
 Changing it re-renders the waybar stylesheet and restarts waybar through the
 same reload script a theme switch uses, so it takes effect immediately.
+
+## Bar size
+
+The bar comes in three sizes — `small`, `medium` and `large` — and switching
+moves the font, the padding, the pill margins and radius, the workspace dots
+and the spacing between modules all together, so a bigger bar is bigger
+everywhere rather than a bigger font sitting cramped in unchanged padding.
+`small` is exactly the bar this desktop ships with; `medium` is about 1.4x
+that and `large` about 1.8x.
+
+- `bar-size` opens a picker in the launcher, showing each size's description.
+- `bar-size medium` (or `small` / `large`) switches directly.
+- `bar-size --list` shows every size with the current one marked.
+- `bar-size --current` prints just the name.
+- The "Bar Size" entry from `$mod+space` opens the same picker.
+
+**Unlike the theme, wallpaper style and glow, the bar size is not remembered
+per theme** — it is one setting for the whole desktop, because there is no
+reason a theme switch should also resize the bar. Changing it writes
+`barSize` to `chezmoi.toml`, exactly as switching a theme writes `theme`, and
+leaves no `git diff`. It reaches the screen through the same reload script a
+theme switch uses, restarting waybar so the new size takes effect
+immediately.
 
 ## Wallpapers
 

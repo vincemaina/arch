@@ -5,6 +5,24 @@
        file at all (the installer's chroot) still renders. `dig` is what makes
        the missing-key case the theme's own answer rather than an error. */ -}}
 {{- $glow := eq (dig "glow" .theme $palette.glow .) "on" -}}
+{{- /* The bar's size. ~/.local/bin/bar-size writes `barSize` in chezmoi's own
+       config, merged over .chezmoidata/barsize.toml the same way the theme is -
+       so a machine with no config file at all (the installer's chroot) still
+       renders, at `small`. One scale multiplies every pixel below that gives
+       the bar its shape, computed once here rather than at each use, so the
+       relationship between them cannot drift the way a table of independently
+       chosen pixels per size would. round()'s second argument is decimal
+       places, not a size - 0 rounds to a whole pixel. */ -}}
+{{- $scale := (index .barsizes .barSize).scale -}}
+{{- $barFont      := round (mulf (float64 .font.bar) $scale) 0 -}}
+{{- $boxPadding    := round (mulf 10.0 $scale) 0 -}}
+{{- $pillPadding   := round (mulf 7.0  $scale) 0 -}}
+{{- $pillMarginV   := round (mulf 4.0  $scale) 0 -}}
+{{- $pillRadius    := round (mulf 14.0 $scale) 0 -}}
+{{- $wsSize        := round (mulf 22.0 $scale) 0 -}}
+{{- $wsMarginV     := round (mulf 3.0  $scale) 0 -}}
+{{- $wsMarginH     := round (mulf 6.0  $scale) 0 -}}
+{{- $modeRadius    := round (mulf 6.0  $scale) 0 -}}
 /* Waybar. Colours from the selected theme in .chezmoidata/themes.toml — edit
  * them there, not here.
  *
@@ -35,7 +53,7 @@
 
 * {
     font-family: "{{ .font.family }}", monospace;
-    font-size: {{ .font.bar }}px;
+    font-size: {{ $barFont }}px;
     min-height: 0;
 }
 
@@ -123,7 +141,7 @@ window#waybar > box {
      * screen while nothing inside them sits flush against the edge. Doing it
      * with module margins instead would mean remembering to move it every time
      * the first or last module changes. */
-    padding: 0 10px;
+    padding: 0 {{ $boxPadding }}px;
 }
 
 /* The shared pill shape. Dark text on a saturated background reads better at
@@ -155,9 +173,9 @@ window#waybar > box {
      * between readings is the bar's spacing plus this; wider padding made the
      * hover pill look inflated without making the resting bar any easier to
      * read. */
-    padding: 0 7px;
-    margin: 4px 0;
-    border-radius: 14px;
+    padding: 0 {{ $pillPadding }}px;
+    margin: {{ $pillMarginV }}px 0;
+    border-radius: {{ $pillRadius }}px;
 }
 
 /* The colour moves from the pill to the text. Each module keeps the hue it
@@ -320,7 +338,7 @@ window#waybar > box {
 /* Workspaces are the exception: they are navigation, not a readout, so only
  * the one you are on is filled in. */
 #workspaces {
-    margin: 3px 6px;
+    margin: {{ $wsMarginV }}px {{ $wsMarginH }}px;
 }
 
 /* Workspaces are marked by COLOUR, not by a filled shape.
@@ -344,9 +362,9 @@ window#waybar > box {
     background: transparent;
     font-weight: bold;
     padding: 0;
-    margin: 0 3px;
-    min-width: 22px;
-    min-height: 22px;
+    margin: 0 {{ $wsMarginV }}px;
+    min-width: {{ $wsSize }}px;
+    min-height: {{ $wsSize }}px;
     border: none;
     border-radius: 50%;
 }
@@ -376,9 +394,9 @@ window#waybar > box {
 #mode {
     color: @bg;
     background: @warning;
-    padding: 0 10px;
-    margin: 4px 3px;
-    border-radius: 6px;
+    padding: 0 {{ $boxPadding }}px;
+    margin: {{ $pillMarginV }}px {{ $wsMarginV }}px;
+    border-radius: {{ $modeRadius }}px;
 }
 
 /* State escalation. These override the resting colour above. */

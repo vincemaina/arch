@@ -511,16 +511,62 @@ fi
 
 # The reload script is what makes a switch visible rather than merely written,
 # and run_onchange_ decides to re-run it by comparing the rendered script. The
-# four lines carrying the theme name, the wallpaper style, the glow setting and
-# the palette hash are therefore what triggers it at all - they read like
-# comments and are not.
+# five lines carrying the theme name, the wallpaper style, the glow setting, the
+# bar size and the palette hash are therefore what triggers it at all - they
+# read like comments and are not.
 reload_template="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/setup/dotfiles/run_onchange_after_reload-theme.sh.tmpl"
 if [[ ! -f "$reload_template" ]]; then
     fail "nothing reloads the session after a theme change"
-elif [[ "$(grep -c '{{ .theme }}\|dig "wallpaper"\|dig "glow"\|sha256sum' "$reload_template")" -lt 4 ]]; then
-    fail "$(basename "$reload_template") no longer embeds the theme name, the wallpaper style, the glow setting and the palette hash, so chezmoi will not re-run it in every case that needs it"
+elif [[ "$(grep -c '{{ .theme }}\|dig "wallpaper"\|dig "glow"\|{{ .barSize }}\|sha256sum' "$reload_template")" -lt 5 ]]; then
+    fail "$(basename "$reload_template") no longer embeds the theme name, the wallpaper style, the glow setting, the bar size and the palette hash, so chezmoi will not re-run it in every case that needs it"
 else
-    pass "the reload script re-runs on a theme switch, a wallpaper change, a glow change and a colour edit"
+    pass "the reload script re-runs on a theme switch, a wallpaper change, a glow change, a bar-size change and a colour edit"
+fi
+
+# ----------------------------------------------------------------------
+section "Bar size (TASK-155)"
+
+# barsize.toml lives beside themes.toml and is checked the same way: ask
+# chezmoi for the merged view rather than reading the TOML directly, so what
+# is checked is what waybar's templates will actually see. The JSON goes via a
+# file rather than a pipe, for the same reason the theme check above does -
+# `python3 -` reads its program from stdin, and a heredoc is stdin too.
+if ! command -v chezmoi &>/dev/null; then
+    skip "chezmoi is not installed, so the bar size cannot be checked"
+elif ! barsize_data="$(chezmoi --source "$THEME_SOURCE" data 2>/dev/null)"; then
+    fail "chezmoi could not read $THEME_SOURCE, so no template can render"
+else
+    barsize_json="$(mktemp)"
+    printf '%s' "$barsize_data" > "$barsize_json"
+
+    while IFS='|' read -r verdict message; do
+        case "$verdict" in
+            pass) pass "$message" ;;
+            fail) fail "$message" ;;
+        esac
+    done < <(python3 - "$barsize_json" <<'PYEOF'
+import json, sys
+
+with open(sys.argv[1]) as fh:
+    data = json.load(fh)
+sizes = data.get("barsizes") or {}
+selected = data.get("barSize")
+
+if not sizes:
+    print("fail|barsize.toml defines no sizes")
+elif selected not in sizes:
+    print(f"fail|the selected bar size {selected!r} is not one of: {', '.join(sizes)}")
+else:
+    scales = {name: info.get("scale") for name, info in sizes.items()}
+    bad = [name for name, scale in scales.items()
+           if not isinstance(scale, (int, float)) or scale <= 0]
+    if bad:
+        print(f"fail|these sizes have no usable scale: {', '.join(bad)}")
+    else:
+        summary = ", ".join(f"{name} ({scale}x)" for name, scale in scales.items())
+        print(f"pass|selected bar size {selected!r} is one of {len(sizes)}: {summary}")
+PYEOF
+    )
 fi
 
 # GTK follows the theme's mode, and there is exactly one line that can silently

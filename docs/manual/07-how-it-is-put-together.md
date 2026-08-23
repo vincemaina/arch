@@ -147,10 +147,11 @@ colours.
 
 A file named `run_onchange_*` is a script, not a config file, and chezmoi
 re-runs it exactly when its *rendered* content changes — which is why the
-theme reload script embeds the theme name, the wallpaper style and a hash of
-the palette as comments near its top: those three lines are what changing a
-colour or switching a theme actually invalidates, and deleting one of them
-silently stops the script from re-running in the case it exists to cover.
+theme reload script embeds the theme name, the wallpaper style, the glow
+setting, the bar size and a hash of the palette as comments near its top:
+those five lines are what changing a colour, switching a theme, or resizing
+the bar actually invalidates, and deleting one of them silently stops the
+script from re-running in the case it exists to cover.
 
 ## The package manifests, and their two parsers
 
