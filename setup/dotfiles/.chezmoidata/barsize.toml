@@ -1,0 +1,31 @@
+# Waybar's overall size: font and geometry scale together, from one number per
+# size, so the font can never end up bigger than the pills it sits in.
+#
+# TRACKED DEFAULT, MACHINE-LOCAL OVERRIDE, the same shape as [[theme]] and
+# glow: ~/.local/bin/bar-size writes `barSize` in chezmoi's own config under
+# [data], which chezmoi merges OVER this file. The value below is what a
+# machine that has never chosen renders with - the installer's chroot among
+# them - and it is also what reproduces today's bar exactly, so this file
+# changes nothing for anyone who does not run bar-size.
+barSize = "small"
+
+# Three named sizes rather than a raw multiplier: bar-size only ever offers
+# these three, so a machine cannot end up with, say, the font scaled but the
+# padding left behind. `scale` is applied to every pixel that gives the bar its
+# shape - font.bar, padding, margins, the pill radius, the workspace dots - in
+# waybar/style.css.tmpl and config.jsonc.tmpl. It is deliberately a single
+# number rather than one entry per property: the point of a size mode is that
+# everything moves together, and a table of independently-tuned pixels per size
+# is exactly the shape of config that drifts out of proportion the first time
+# only one of them is edited.
+[barsizes.small]
+description = "today's bar"
+scale = 1.0
+
+[barsizes.medium]
+description = "about 1.4x"
+scale = 1.4
+
+[barsizes.large]
+description = "about 1.8x"
+scale = 1.8

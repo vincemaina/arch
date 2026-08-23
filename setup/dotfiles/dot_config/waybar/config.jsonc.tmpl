@@ -43,10 +43,14 @@
 // displayed at all - mpd, a media widget, a power menu, keyboard state, a
 // second battery, power profiles - which made the file look far busier than
 // the bar ever was.
+{{/* The bar's size - see style.css.tmpl for the full explanation. Spacing is
+     the one geometry value that lives in this file rather than the
+     stylesheet, so it gets the same scale computed the same way. */}}
+{{- $scale := (index .barsizes .barSize).scale }}
 {
     "layer": "top",
     "position": "top",
-    "spacing": 4,
+    "spacing": {{ round (mulf 4.0 $scale) 0 }},
 
     "modules-left": ["sway/workspaces", "sway/mode", "sway/scratchpad", "custom/notifications", "custom/focus-timer"],
     "modules-center": ["clock", "mpris"],
