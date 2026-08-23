@@ -219,9 +219,18 @@ machine-local value through that helper, not by hand.
 
 Three things worth holding onto before touching a theme:
 
-- **Every theme must be a dark theme.** GTK reads `GTK_THEME` once at session
-  start and stays Adwaita dark, so a light theme would leave every dialog looking
-  like a different computer. See `DECISIONS.md`.
+- **A theme declares `mode`, light or dark, and it is load-bearing.** It picks
+  the GTK theme and icon set, neovim's `background`, and which section foot
+  writes its colours into. `checks/session.sh` fails if a theme's declared mode
+  disagrees with the measured luminance of its own `bg`.
+- **This used to read "every theme must be a dark theme", and the reason was
+  wrong.** The claim was that GTK reads `GTK_THEME` once at session start, so a
+  light theme would leave every dialog dark. `GTK_THEME` is only the loudest
+  lever: `gtk-3.0/settings.ini` is read by each GTK process as it starts, so with
+  that variable *unset* — which is now the point of the comment where it used to
+  live in `environment.d` — GTK follows the theme with no re-login. Setting it
+  again would silently pin GTK to one mode, so `checks/session.sh` checks it
+  stays unset. See TASK-152 and `DECISIONS.md`.
 - **Every theme must define every key every other theme defines**, or selecting it
   fails at render. `checks/session.sh` checks this, along with two contrast floors
   that were both learned by breaking them.

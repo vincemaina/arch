@@ -77,6 +77,30 @@ if systemctl --user is-active --quiet waybar.service; then
         echo "    waybar did not restart; run 'systemctl --user restart waybar'" >&2
 fi
 
+# GTK, which follows the theme's `mode` rather than its colours.
+#
+# gtk-3.0/settings.ini was rendered moments ago and every GTK process reads it
+# when it starts, so anything launched from here on is already correct and needs
+# nothing - pavucontrol, and any dialog rofi or a file manager opens.
+#
+# Two do not get that chance, because they are started once and stay: the polkit
+# authentication dialog is drawn by the agent, and the GTK file chooser is drawn
+# by the portal. Both would keep the old mode until the next login, which is
+# most of a session, and both are ordinary user units - so they are restarted
+# here for exactly the reason waybar is.
+#
+# Restarting them is cheap and they are re-activated on demand, so nothing is
+# lost by doing it on a dark-to-dark switch where GTK did not actually change.
+# What it costs, in the rare case it lands at the wrong moment, is an open file
+# chooser or a pending password prompt closing - which is a dialog to reopen,
+# not work to redo.
+for unit in polkit-agent.service xdg-desktop-portal-gtk.service; do
+    if systemctl --user is-active --quiet "$unit"; then
+        systemctl --user restart "$unit" ||
+            echo "    $unit did not restart; run 'systemctl --user restart $unit'" >&2
+    fi
+done
+
 # Neovim, which CAN be told, and for a while was assumed not to be.
 #
 # Every neovim listens on a socket whether or not it was asked to - v:servername

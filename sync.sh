@@ -246,7 +246,14 @@ else
                 add_hint "shell: open a new terminal to pick up the change."
                 ;;
             .config/environment.d/*)
-                add_hint "environment: read when the user manager starts, so this needs a fresh login."
+                # NOT "log out and back in", which is the obvious advice and
+                # does not work: environment.d is read by the *user manager*,
+                # and the user manager starts at first login and survives
+                # logging out of sway. daemon-reload re-runs the generators,
+                # which is what actually updates the set - measured in both
+                # directions, including a variable being REMOVED, which is the
+                # case that matters now that GTK_THEME is gone (TASK-152).
+                add_hint "environment: run 'systemctl --user daemon-reload' to re-read it; programs already running keep the values they started with."
                 ;;
         esac
     done
