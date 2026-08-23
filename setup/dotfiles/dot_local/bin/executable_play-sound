@@ -24,6 +24,20 @@ set -euo pipefail
 # Python interpreter measured 30ms here before importing anything; this script
 # reaches pw-play in about two. That is inaudible either way, but it is 30ms of
 # CPU per notification for nothing, and this desktop counts those (TASK-66).
+#
+# WHICH SOUND PACK - TASK-154
+#
+# ~/.local/state/soundpack holds the active pack's name, written only by
+# `sounds --pack`. Read here directly, one `read` on a one-line file, rather
+# than by asking ~/.local/lib/desktop_config.py the way the theme, wallpaper
+# and glow settings are - that would mean the interpreter start this whole
+# script exists to avoid, on every notification rather than on a deliberate
+# switch. See ~/.local/bin/sounds's own docstring for the fuller argument.
+#
+# PACKS below is a second copy of the pack list `sounds` (python) is the real
+# owner of, needed only so a hand-edited or stale state file falls back to
+# something real without starting python to ask. checks/session.sh checks that
+# the two lists agree.
 
 if [[ $# -ne 1 ]]; then
     echo "usage: play-sound <notify|alert|complete|limit>" >&2
@@ -39,6 +53,20 @@ case "$event" in
         exit 2
         ;;
 esac
+
+# PACKS: chime ps2 8bit
+pack="chime"
+pack_file="${XDG_STATE_HOME:-$HOME/.local/state}/soundpack"
+if [[ -r "$pack_file" ]]; then
+    read -r candidate < "$pack_file" || candidate=""
+    case "$candidate" in
+        chime|ps2|8bit) pack="$candidate" ;;
+        # Anything else - empty, hand-edited, a pack that no longer exists -
+        # falls back to chime, the same fallback `sounds`'s own current_pack()
+        # makes. Silent, deliberately: this runs on every notification, and a
+        # stderr line nobody is looking at would just be noise.
+    esac
+fi
 
 # DO NOT DISTURB SILENCES EVERYTHING, INCLUDING THIS.
 #
@@ -95,7 +123,7 @@ for candidate in "${XDG_CONFIG_HOME:-$HOME/.config}/sounds/$event".*; do
 done
 
 if [[ -z "$sound" ]]; then
-    sound="${XDG_DATA_HOME:-$HOME/.local/share}/sounds/$event.wav"
+    sound="${XDG_DATA_HOME:-$HOME/.local/share}/sounds/$pack/$event.wav"
 fi
 
 # Self-healing, and only ever on the first play after the cache is emptied.

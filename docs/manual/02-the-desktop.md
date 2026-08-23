@@ -258,7 +258,8 @@ rather than sitting at a permanent 0.
 
 The desktop makes four sounds, and no more. They are meant to be told apart
 with your back to the screen, so what distinguishes them is how many notes
-they have and how low they sit, rather than how loud they are.
+they have and how low they sit, rather than how loud they are. Which four
+sounds they actually are is a choice - see *Sound packs* below.
 
 | Sound | When | What it is |
 | --- | --- | --- |
@@ -310,30 +311,55 @@ The system volume is the only volume control: each sound has a fixed level
 relative to it, chosen so that they sit sensibly against each other, and the
 one slider moves all four.
 
+### Sound packs
+
+The four sounds are not one fixed set - they are a **pack**, and more than
+one exists:
+
+| Pack | What it sounds like |
+| --- | --- |
+| `chime` | the default: a struck-glass ping, one timbre, four shapes |
+| `ps2` | a soft rounded blip that lands from slightly above its pitch, with a little vibrato - a console menu rather than a game |
+| `8bit` | square and triangle waves with no pitch bend at all - a real chip could not bend a note, so quick arpeggios do the work instead, the same trick chiptunes have always used to fake a chord on one voice |
+
+Every pack defines the same four events, so switching one never leaves an
+event silent - only what it sounds like changes.
+
+```bash
+sounds --pack              # pick one from the launcher
+sounds --pack ps2          # switch to that pack directly
+sounds --packs             # what's available, and which is active
+sounds --preview --pack 8bit   # hear a pack before switching to it
+```
+
 ### Changing them
 
 Nothing audio-shaped is stored in this repository. The sounds are computed on
-the machine from a table of frequencies and envelopes, the same way the
-wallpapers are computed from a palette, and cached in
-`~/.local/share/sounds/` - which is disposable, and rebuilt on demand if you
-delete it.
+the machine from a table of frequencies and envelopes - one table per pack -
+the same way the wallpapers are computed from a palette, and cached in
+`~/.local/share/sounds/<pack>/` - which is disposable, and rebuilt on demand
+if you delete it.
 
 ```bash
-sounds                    # what they are, and which are yours
-sounds --preview          # play each one, named
+sounds                    # the active pack, then what each event is
+sounds --preview          # play the active pack, each event named
 sounds --preview alert    # just that one
-sounds --regenerate       # build them again
+sounds --regenerate       # build every event of every pack again
 ```
 
-To use a file of your own for one of them, and to change your mind later:
+To use a file of your own for one event, in any pack, and to change your mind
+later:
 
 ```bash
 sounds set complete ~/Music/ding.wav
 sounds set complete --default
 ```
 
-To change what the generated sounds *are*, edit the `SOUNDS` table in
-`~/.local/bin/sounds` in the repository and run `./sync.sh`. Each entry is a
-list of notes with their start times, a decay, a length, a peak level and a
-`colour` that decides how bright the timbre is. They are rebuilt whenever
-that file changes, so the edit takes effect on its own.
+To change what a pack's sounds *are*, edit its entry in the `PACKS` table in
+`~/.local/bin/sounds` in the repository and run `./sync.sh`. Each event is a
+list of notes with their start times, a decay, a length and a peak level;
+`chime`'s notes also carry a `colour` deciding how bright the timbre is, and
+`ps2`'s carry a pitch-bend into the note. They are rebuilt whenever that file
+changes, so the edit takes effect on its own - for every pack, not only the
+one you happen to have selected, so editing one you are not currently using
+still reaches it the next time you switch.

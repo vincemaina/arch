@@ -7,8 +7,9 @@ set -euo pipefail
 # No theme ships audio and nothing image- or audio-shaped is tracked in this
 # repository - see ~/.local/bin/sounds for the argument, which is the same one
 # ~/.local/bin/wallpaper makes about images. The sounds are computed from the
-# table in that script and cached in ~/.local/share/sounds, which is disposable:
-# delete it and the next play-sound builds it again.
+# tables in that script - one per sound pack, TASK-154 - and cached in
+# ~/.local/share/sounds/<pack>/, which is disposable: delete it and the next
+# play-sound (or `sounds --ensure`) builds it again.
 #
 # WHAT MAKES IT RE-RUN
 #
@@ -37,6 +38,11 @@ fi
 # sound has actually changed, and at that point the cached copies are the OLD
 # sounds - which --ensure would leave exactly where they are, having found the
 # files present. That is the whole bug this line exists to avoid.
+#
+# It also, unlike --ensure, covers EVERY pack rather than only the active one -
+# on purpose, so editing a pack you are not currently using does not sit stale
+# until the day you happen to switch to it. Cheap enough to always do: a dozen
+# short WAV files, well under a second even on this VM.
 if ! "$HOME/.local/bin/sounds" --regenerate >/dev/null; then
     echo "    could not generate the sounds; run 'sounds --regenerate'" >&2
 fi
