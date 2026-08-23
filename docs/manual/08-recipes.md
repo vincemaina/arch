@@ -157,12 +157,17 @@ defines is not caught until someone selects it, at which point every
 
 Two hard rules, both enforced by `checks/session.sh`:
 
-- **Every theme must be a dark theme.** GTK reads `GTK_THEME` once at session
-  start and stays Adwaita dark regardless of what this desktop's own theme
-  is, so a light theme here would leave every GTK dialog looking like it
-  belongs to a different computer.
+- **Every theme must declare `mode`**, `light` or `dark`, and it has to match
+  the background it declares — a light palette calling itself dark would send
+  GTK, neovim and foot the wrong way while looking right in the file.
 - **Every theme must define every key every other theme defines**, including
   the sixteen `term.*` ANSI colours.
+
+Writing a light one is not a matter of inverting a dark one. Two values need
+aiming at deliberately: `warning` and `info` have to go dark enough to clear
+4.5:1 against a near-white background, which the bright amber and blue of a dark
+theme do not; and `tertiary` fills the focused workspace disc with `text` on
+top, so it flips from a mid-dark colour to a light tint.
 
 There are also two contrast floors checked mechanically:
 `muted` against `bg` (the CPU/memory readouts) and `text` against `tertiary`

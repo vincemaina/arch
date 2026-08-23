@@ -387,6 +387,35 @@ else:
     else:
         say("pass", "every theme keeps its readouts above the contrast floor")
 
+    # A theme declares whether it is light or dark, and `mode` is not
+    # decoration: it picks the GTK theme, the icon set, neovim's `background`
+    # and which section foot writes its colours into. A palette whose mode
+    # disagrees with its own background is the shape of bug this repository
+    # keeps meeting - every file looks configured, and the result is light text
+    # on a light background in whichever consumer trusted the declaration.
+    #
+    # Measured rather than guessed at: 0.5 relative luminance is the midpoint,
+    # and no palette here sits anywhere near it. The darkest light theme is
+    # around 0.85 and the lightest dark theme around 0.05, so this catches a
+    # mislabelled theme without being a judgement about borderline ones.
+    mislabelled = []
+    for name, palette in sorted(themes.items()):
+        mode = palette.get("mode")
+        if mode not in ("light", "dark"):
+            mislabelled.append(f"{name} declares mode {mode!r}, not 'light' or 'dark'")
+            continue
+        measured = "light" if luminance(palette["bg"]) > 0.5 else "dark"
+        if measured != mode:
+            mislabelled.append(
+                f"{name} declares mode {mode!r} but its bg {palette['bg']} "
+                f"measures {measured} - GTK, neovim and foot would follow the "
+                f"declaration and disagree with the colours")
+    if mislabelled:
+        for problem in mislabelled:
+            say("fail", problem)
+    else:
+        say("pass", f"all {len(themes)} themes declare a mode that matches their background")
+
     # No theme ships an image any more: they are generated on the machine from
     # the palette and cached. Three themes at one image each was already 7.8M of
     # tracked PNG, and the arrangement this replaced would have grown by about
@@ -457,6 +486,56 @@ elif [[ "$(grep -c '{{ .theme }}\|dig "wallpaper"\|sha256sum' "$reload_template"
     fail "$(basename "$reload_template") no longer embeds the theme name, the wallpaper style and the palette hash, so chezmoi will not re-run it in every case that needs it"
 else
     pass "the reload script re-runs on a theme switch, a wallpaper change and a colour edit"
+fi
+
+# GTK follows the theme's mode, and there is exactly one line that can silently
+# stop it (TASK-152).
+#
+# GTK_THEME is an environment variable, so it is fixed when a process starts and
+# it beats gtk-3.0/settings.ini. While it was set in environment.d, every GTK
+# application was pinned to Adwaita:dark and no light theme could reach them -
+# which is the reason this repository gave for refusing light themes at all.
+#
+# Putting it back would not break anything loudly. The dialogs would simply stop
+# following the desktop, which is precisely the invisible failure this file
+# exists to catch, so it is worth a check of its own.
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+gtk_theme_declared="$(grep -rhs '^[[:space:]]*GTK_THEME=' \
+    "$repo_root/setup/dotfiles/dot_config/environment.d/" 2>/dev/null || true)"
+if [[ -n "$gtk_theme_declared" ]]; then
+    fail "environment.d sets ${gtk_theme_declared// /}, which overrides gtk-3.0/settings.ini and pins GTK to one mode - light themes would leave every GTK dialog dark"
+else
+    pass "environment.d does not pin GTK_THEME, so GTK follows the theme's mode"
+fi
+
+# And the file that has to be doing the deciding instead. A plain settings.ini
+# here would be a theme-independent one, which reads as configured and quietly
+# fixes GTK to whatever mode was committed.
+gtk_missing=()
+for version in 3.0 4.0; do
+    template="$repo_root/setup/dotfiles/dot_config/gtk-$version/settings.ini.tmpl"
+    if [[ ! -f "$template" ]]; then
+        gtk_missing+=("gtk-$version")
+    elif [[ "$(grep -c 'palette.mode\|\$light' "$template")" -lt 1 ]]; then
+        gtk_missing+=("gtk-$version (present but does not read the theme's mode)")
+    fi
+done
+if (( ${#gtk_missing[@]} > 0 )); then
+    fail "these GTK settings do not follow the selected theme: ${gtk_missing[*]}"
+else
+    pass "gtk-3.0 and gtk-4.0 settings are templated on the theme's mode"
+fi
+
+# The two GTK processes that would otherwise keep the old mode for a whole
+# session. Everything else GTK draws here is launched fresh and reads
+# settings.ini as it starts; the polkit agent and the GTK portal are started
+# once and stay, so the reload script restarts them the way it restarts waybar.
+if [[ -f "$reload_template" ]]; then
+    if [[ "$(grep -c 'polkit-agent.service\|xdg-desktop-portal-gtk.service' "$reload_template")" -lt 1 ]]; then
+        fail "the reload script does not restart the polkit agent or the GTK portal, so a theme switch leaves both drawing the previous mode until the next login"
+    else
+        pass "the polkit dialog and the file chooser follow a theme switch without a re-login"
+    fi
 fi
 
 # ----------------------------------------------------------------------

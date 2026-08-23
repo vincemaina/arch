@@ -30,11 +30,18 @@ what a machine is actually wearing, since git no longer tells you.
 
 Switching moves sway's borders, the bar, the terminal, the launcher,
 notifications, the lock screen, the prompt and the wallpaper together, as one
-palette. **Every theme is a dark theme, without exception.** GTK applications
-read `GTK_THEME` once at session start (set to `Adwaita:dark` in
-`environment.d`) and cannot be recoloured after that, so a light theme in
-`themes.toml` would leave every GTK dialog looking like it belonged to a
-different, lighter computer for the rest of the session. `checks/session.sh`
+palette. **Themes come in both light and dark**, and each one says which it is.
+Eight are dark; `paper`, `daylight` and `sepia` are light, `paper` being a
+near-black-on-white e-ink look with no hue in it at all.
+
+That declaration reaches further than the palette does. GTK applications — the
+password prompt, the volume mixer, the file chooser — are not recoloured from
+your palette, but they do follow it from light to dark, through
+`gtk-3.0/settings.ini`. The switch is not quite instant for them: a GTK program
+already open keeps the mode it started in, exactly as an already-open terminal
+keeps its colours, and anything opened afterwards is correct. The two that would
+otherwise stay wrong all session — the password prompt and the file chooser —
+are restarted for you when the theme changes. `checks/session.sh`
 enforces that every theme defines every colour key every other theme does, and
 two minimum-contrast floors, so a new theme fails at check time rather than
 rendering with a missing or unreadable colour.

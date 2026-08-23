@@ -301,7 +301,7 @@ the line, **↓** means an entry below in this document.
 | Package | Role | Rationale |
 | --- | --- | --- |
 | `adwaita-cursors` | The cursor theme, declared in three places | D: One cursor theme, set in three places |
-| `gnome-themes-extra` | Supplies Adwaita-dark for GTK | ↓ |
+| `gnome-themes-extra` | Supplies Adwaita-dark for GTK, which a dark theme selects | ↓ |
 | `papirus-icon-theme` | The icon set | ↓ |
 | `noto-fonts` | General-purpose coverage | D: Noto Fonts |
 | `noto-fonts-emoji` | Colour emoji | D: Noto Fonts |
@@ -521,11 +521,16 @@ present on this machine.
 name, applications with no icon theme fall back to missing-image placeholders,
 and Noto does not cover every glyph.
 **Choice.** These three supply what `DECISIONS.md` → "Applications are made to
-match" *sets*. That section explains the mechanism — `GTK_THEME`, the settings
-files, the GTK portal — but names no package, so the packages themselves are
-undocumented. `gnome-themes-extra` is what makes `GTK_THEME=Adwaita:dark`
-resolve to a real theme. `papirus-icon-theme` was chosen over Adwaita's icons
-with no recorded comparison. `ttf-dejavu` is a fallback with no recorded
+match" *sets*. That section explains the mechanism — the settings files and the
+GTK portal — but names no package, so the packages themselves are undocumented.
+`gnome-themes-extra` is what makes `Adwaita-dark` resolve to a real theme; it is
+still required, and is now required *conditionally*, since `gtk-3.0/settings.ini`
+names `Adwaita-dark` only under a dark theme and plain `Adwaita` under a light
+one (`DECISIONS.md` → "Light themes, and the reason that did not survive being
+checked"). `GTK_THEME=Adwaita:dark` used to be the lever and is deliberately no
+longer set anywhere. `papirus-icon-theme` supplies both `Papirus-Dark` and
+`Papirus`, which the same file switches between; it was chosen over Adwaita's
+icons with no recorded comparison. `ttf-dejavu` is a fallback with no recorded
 comparison either.
 **Cost.** The reason to look at them together: 4.2 + 111.5 + 9.8 = **125.5 MiB**,
 8.2% of everything declared, for appearance alone — and with the two Noto
