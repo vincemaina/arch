@@ -1,6 +1,6 @@
 # Software this setup installs
 
-One hundred packages are declared across [`setup/packages/`](../../setup/packages/).
+One hundred and seven packages are declared across [`setup/packages/`](../../setup/packages/).
 This document accounts for every one of them: what it is for, where its
 rationale lives, and what it costs on the machine.
 
@@ -283,6 +283,18 @@ the line, **↓** means an entry below in this document.
 | `rofi` | The launcher — one prompt, several sources via `combi` | M, D: rofi, reversing an earlier decision |
 | `rofi-calc` | Calculator source for that prompt, via libqalculate | M |
 | `fastfetch` | System summary, run manually | M |
+
+### desktop.txt — virtual machines
+
+| Package | Role | Rationale |
+| --- | --- | --- |
+| `qemu-system-x86` | The emulator. Runs the guest, with KVM doing the actual work | M, D: Virtual machines with qemu alone, and clones that cost nothing |
+| `qemu-img` | Creates the disks, and creates a clone as an overlay rather than a copy | ↓ |
+| `qemu-ui-gtk` | The window the guest is drawn in. GTK over SDL because `gtk3` is already installed, so the difference is `vte3` at 1.8 MiB | ↓ |
+| `qemu-hw-display-virtio-vga-gl` | The guest's graphics card, accelerated. A **separate package** from the emulator — without it qemu dies naming an unknown device | ↓ |
+| `qemu-hw-display-virtio-gpu-gl` | What actually pulls in `virglrenderer`; the `-vga-gl` package declares only `qemu-common` and would leave a GL device with nothing behind it | ↓ |
+| `qemu-audio-pipewire` | Guest audio, straight into the pipewire this desktop already runs | ↓ |
+| `edk2-ovmf` | UEFI firmware for the guest. Declared although `qemu-system-x86` depends on it, because `~/.local/bin/vm` names the firmware file directly — the same reasoning as `polkit` and `mesa` | ↓ |
 
 ### desktop.txt — appearance
 
@@ -674,6 +686,70 @@ That was already on every machine here; only the daemon was missing.
 **Cost.** 1.73 MiB (`bluez`) + 3.69 MiB (`bluez-utils`) = **5.41 MiB** installed,
 from `pacman -Qi` after installing them on 2026-08-23. Resident cost is **not measured** — see the
 gap below.
+
+### qemu-system-x86, qemu-img, qemu-ui-gtk, qemu-hw-display-virtio-vga-gl, qemu-hw-display-virtio-gpu-gl, qemu-audio-pipewire, edk2-ovmf
+
+**Problem.** Running something you do not trust, or keeping a project's tooling
+away from the machine you actually use, meant either not doing it or doing it on
+the real system. The setup could be rebuilt in a VM by hand, but that meant
+downloading an ISO and sitting through the install wizard each time, which is
+enough friction that it never happened.
+
+**Choice.** qemu on its own, driven by [`~/.local/bin/vm`](../../setup/dotfiles/dot_local/bin/executable_vm).
+The rationale in full is in `DECISIONS.md` under *Virtual machines with qemu
+alone, and clones that cost nothing*; the short version is that libvirt's
+scaffolding buys management this setup does not need, and qcow2 overlays buy
+most of what its snapshots would have.
+
+**Alternatives.** `libvirt` + `virt-manager` was the obvious answer and is
+covered in `DECISIONS.md`. `qemu-ui-sdl` was measured against `qemu-ui-gtk` and
+lost by about 2 MiB of difference — `gtk3` is already installed here, so GTK
+costs only `vte3`, while SDL would have cost `sdl2_image`. GTK also has
+`zoom-to-fit` and a menubar that can be turned off, which the full-screen login
+session in TASK-69.3 needs.
+
+**How it works.** Machines live in `~/.local/share/vm/<name>/`, one directory
+each, holding a disk, that machine's own UEFI variable store, and a `vm.conf`
+naming its memory and CPU count. A machine cloned from the bundled base image is
+a qcow2 **overlay**: an almost empty file naming the base as its backing file,
+which grows only as the guest writes. That is why a new machine is instant and
+`vm reset` is a delete rather than a reinstall — and why the base must stay
+read-only, since writing to a backing file corrupts every overlay derived from
+it.
+
+Three things about this are easy to get wrong and are worth knowing before
+debugging it:
+
+- **The virtio display devices are separate packages.** `qemu-system-x86` alone
+  does not provide `virtio-vga`. Naming a device that is not installed makes
+  qemu exit with an error about an unknown device, from configuration that looks
+  entirely correct — so `vm` asks `qemu-system-x86_64 -device help` what exists
+  and degrades to std VGA with a warning rather than asserting.
+- **The OVMF path is discovered, not hardcoded.** Arch has moved it before
+  (`/usr/share/edk2-ovmf/x64/` became `/usr/share/edk2/x64/`, and the 4m
+  variants appeared beside the originals). A stale hardcoded path would surface
+  as a guest that will not boot with nothing pointing at the cause.
+- **qemu is in `earlyoom`'s `--avoid` list**, because killing a guest is a power
+  cut to the machine inside it rather than a lost browser tab. That is only safe
+  because `vm` always passes a fixed `-m`; the cap and the avoid rule are one
+  decision, not two. The name is at the limit of what earlyoom can match: `comm`
+  truncates `qemu-system-x86_64` to the fifteen bytes `qemu-system-x86`.
+
+**Cost.** Disk, from `pacman -Si` before installation: `qemu-system-x86`
+54.97 MiB, `edk2-ovmf` 15.57 MiB, `qemu-img` 10.74 MiB, `vte3` 1.79 MiB pulled
+in by `qemu-ui-gtk`, `virglrenderer` 1.45 MiB pulled in by
+`qemu-hw-display-virtio-gpu-gl`, and the four qemu modules themselves under
+400 KiB between them. `qemu-common` adds 4.63 MiB. Roughly **90 MiB** installed.
+
+**Resident cost is nil when no guest is running** — there is no daemon, which is
+a large part of why libvirt was not chosen. A running guest costs whatever `-m`
+allows it plus a small qemu overhead, and `vm.conf` is where that number lives.
+
+*Not yet measured on this machine.* These figures are `pacman -Si` sizes rather
+than `pacman -Qi` ones, and no running guest has been measured, because the
+packages were declared before they were installed. This section should be
+re-measured on the date they land and this paragraph removed — the format above
+asks for measured numbers and these are not.
 
 ## Gaps this document does not close
 

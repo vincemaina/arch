@@ -252,3 +252,52 @@ controllable from the bar's media widget and the hardware playback keys
 SoundCloud link works as an mpv target too, resolved on the fly. mpv's own
 keybindings apply inside the terminal it runs in — space to pause, arrow keys
 to seek, `9`/`0` for volume, `q` to quit — and were not modified here.
+
+## Virtual machines
+
+For running something you do not trust, or keeping a project's tooling off the
+machine you are sitting at. `~/.local/bin/vm` is the whole interface, and with
+no arguments it opens a menu of the machines you have.
+
+```bash
+vm                    # the menu: pick a machine and start it
+vm list               # what exists, how big it is, what it is based on
+vm new scratch        # a new machine, cloned from the base image
+vm run scratch        # start it
+vm reset scratch      # throw away everything it has written
+vm rm scratch         # delete it
+vm --current          # what is running right now
+```
+
+Machines live in `~/.local/share/vm`, one directory each, holding a disk, that
+machine's own UEFI variable store, and a `vm.conf` naming how much memory and
+how many CPUs it gets. Edit that file and the next `vm run` picks it up.
+
+**A new machine costs almost nothing and appears instantly.** It is not a copy
+of the base image but an *overlay* on it — a nearly empty file that records only
+what the guest has written since it was made. That is also why `vm reset` is
+instant: it deletes the overlay and makes a fresh one, rather than reinstalling
+anything.
+
+**Surprise worth knowing:** the flip side of that is that the base image must
+never be modified. Every machine cloned from it reads through to it, so writing
+to it corrupts all of them at once — and the damage shows up in the clones,
+which is a confusing place to meet it. The image is left read-only, and
+`vm run` says something if it has stopped being so.
+
+The other thing worth knowing is that a guest is **exempt from the
+out-of-memory killer**. Everywhere else on this machine, `earlyoom` kills the
+biggest reasonable thing when memory runs short; killing a running guest would
+be a power cut to the machine inside it, so qemu is excluded. What keeps that
+safe is the memory cap in `vm.conf` — a guest cannot grow into memory the host
+is no longer allowed to reclaim. Raise that number thoughtfully.
+
+Machines that are not this setup work too:
+
+```bash
+vm new debian --blank 20G --iso ~/Downloads/debian.iso
+```
+
+That gives a machine with an empty disk and the installer attached. Clear the
+`ISO` line in its `vm.conf` once it is installed, or it boots the installer
+again every time.
