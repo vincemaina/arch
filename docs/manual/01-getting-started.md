@@ -24,7 +24,12 @@ it.
    here - see the boot entries under `setup/system/loader/` in the
    repository if you want to see what it hands the kernel.
 2. **greetd**, running **ReGreet** as the login screen, asks for your
-   username and password. Log in and it starts the graphical session.
+   username and password, and which session to start - Sway is the default,
+   and the only other one is **Virtual machine**, which skips this whole list
+   and boots straight into a guest instead. See
+   [Applications](04-applications.md) → "Virtual machines" for what that is.
+   Log in with Sway selected and it starts the graphical session described
+   below.
 3. **uwsm** launches Sway as `uwsm start -N Sway -D sway -- sway`. uwsm
    wraps the compositor in systemd units rather than running it as a bare
    process, which is what makes the next step possible.

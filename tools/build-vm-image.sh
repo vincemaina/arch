@@ -277,7 +277,23 @@ cleanup() {
     if mountpoint -q /mnt 2>/dev/null; then
         umount -R /mnt 2>/dev/null || true
     fi
-    if [[ -n "$DEVICE" ]]; then
+    # CRITICAL: disconnecting a device that is STILL MOUNTED discards
+    # whatever the filesystem had buffered and not yet flushed, and can
+    # leave the filesystem's own metadata inconsistent - this is not
+    # theoretical, it is exactly how a real base.qcow2 lost its filesystem
+    # signatures entirely on this machine, confirmed by `blkid -p` finding
+    # nothing recognisable on either partition afterwards, while `qemu-img
+    # check` still reported the qcow2 container itself as structurally
+    # sound. The corruption was findable only at the filesystem level,
+    # because that is exactly the layer this used to skip checking.
+    #
+    # So: if umount above did not actually succeed, do NOT disconnect.
+    # A connected-but-orphaned nbd device is an annoyance - `qemu-nbd
+    # --disconnect /dev/nbdN` once whatever was holding it releases - not
+    # data loss. That trade is correct every time.
+    if mountpoint -q /mnt 2>/dev/null; then
+        warn "/mnt is still mounted - NOT disconnecting $DEVICE, to avoid discarding unflushed writes and corrupting it. Once whatever is holding it releases (check with 'fuser -vm /mnt'), unmount by hand and then 'qemu-nbd --disconnect $DEVICE'."
+    elif [[ -n "$DEVICE" ]]; then
         assert_nbd "$DEVICE"
         qemu-nbd --disconnect "$DEVICE" >/dev/null 2>&1 || true
     fi
@@ -370,6 +386,79 @@ arch-chroot /mnt /opt/arch-setup/install/04-desktop.sh
 msg "[5/5] Installing user configuration"
 arch-chroot /mnt /opt/arch-setup/install/05-dotfiles.sh
 
+# shellcheck disable=SC1091
+source "$REPO_ROOT/setup/install.conf"
+
+# ----------------------------------------------------------------------
+# Guest-only: guarantee the wallpaper actually exists
+# ----------------------------------------------------------------------
+#
+# Reproduced directly, not assumed: a machine cloned from a base image built
+# without this step boots to sway's own "There are errors in your config
+# file" banner, permanently - a black screen, no waybar, no wallpaper, and it
+# does NOT self-heal. Confirmed by mounting a freshly cloned, never-booted
+# guest's disk read-only: ~/.local/share/wallpapers/ does not exist at all.
+# sway's rendered config names that exact path as the background image
+# (`output * bg .../abyss-mesh.png fill`), and a background image that does
+# not exist is what sway treats as a config error, not a runtime warning -
+# which is why the failure is total rather than just a missing picture.
+#
+# run_onchange_after_reload-theme.sh.tmpl is SUPPOSED to generate this during
+# 05-dotfiles.sh's chezmoi apply - its own comment says so explicitly
+# ("the installer runs this in a chroot where there is no sway at all...
+# getting that wrong would mean every fresh machine's first login had no
+# wallpaper") - and on this build it evidently did not, or failed silently:
+# the script backs the generation call with `|| echo ... >&2`, a warning
+# easily lost in a pacstrap-and-apply build's scrollback rather than a hard
+# stop. Whether that is a bug in the mechanism itself, one that would equally
+# affect a genuine `install.sh` run on real hardware, is being tracked
+# separately (TASK-157) - not fixed here, because this builder cannot safely
+# diagnose the chroot-vs-real-session difference on its own.
+#
+# What this step CAN do reliably is verify the outcome and refuse to ship a
+# base image that would fail this way: call --ensure explicitly, as the
+# actual user rather than root, and fail the whole build loudly if the file
+# still is not there - the same "prove it, do not assume it" standard this
+# builder already holds itself to elsewhere.
+msg "Ensuring the wallpaper exists (a missing one is a sway config error, not a missing picture)"
+arch-chroot /mnt runuser -u "$USERNAME" -- env HOME="/home/$USERNAME" \
+    "/home/$USERNAME/.local/bin/wallpaper" --ensure
+WALLPAPER_FILE="$(arch-chroot /mnt runuser -u "$USERNAME" -- env HOME="/home/$USERNAME" \
+    "/home/$USERNAME/.local/bin/wallpaper" --path)"
+if [[ ! -f "/mnt$WALLPAPER_FILE" ]]; then
+    die "wallpaper --ensure reported success but $WALLPAPER_FILE does not exist - refusing to ship a base image whose first boot would show a config-error screen. See TASK-157."
+fi
+
+# ----------------------------------------------------------------------
+# Guest-only: auto-login
+# ----------------------------------------------------------------------
+#
+# A real machine keeps its interactive login prompt - that is deliberate, see
+# DECISIONS.md's "Passwords" section, and install.sh is never touched to weaken
+# it. A GUEST is different: it has already sat behind the HOST's own login
+# (either the real desktop, or the "Virtual machine" session at the greeter),
+# so asking again inside the guest is a second password for the same person in
+# the same sitting, not a second line of defence. This block is added ONLY to
+# the guest's own config, by this builder, never to setup/system/greetd/ itself
+# - a real install is completely unaffected by it.
+#
+# greetd's `initial_session` runs once per boot, gated on a runfile under
+# /run - tmpfs, cleared on every boot - so it fires again every single time
+# `vm run` starts a fresh qemu instance, and a manual logout within that same
+# boot falls back to the normal password prompt rather than looping.
+#
+# USERNAME comes from this repository's own install.conf, the same source
+# 03-system.sh reads it from - not hardcoded, so a machine with a different
+# configured username still gets a guest that logs itself in as the right
+# person.
+msg "Configuring guest auto-login (base image only, never the repository's own config)"
+cat >> /mnt/etc/greetd/config.toml <<EOF
+
+[initial_session]
+command = "uwsm start -N Sway -D sway -- sway"
+user = "$USERNAME"
+EOF
+
 msg "Unmounting"
 # "target is busy" on the first attempt is real, observed behaviour on this
 # machine - the very first full build hit it here, after every install stage
@@ -387,17 +476,25 @@ msg "Unmounting"
 # and the success message - never ran, even though every stage had already
 # finished. The image was completely built and simply left writable and
 # unannounced. Nothing was lost, but it read like a failed build.
+#
+# 5 attempts at 1s each was not always enough - a second real build hit the
+# same busy condition and it had not cleared even after 5s, though it did
+# clear shortly after (confirmed: /mnt was freely unmountable moments later,
+# by hand). 15 attempts at 2s (up to 30s) gives real headroom without
+# changing the fundamental contract: still a bounded retry, still a hard
+# die() if it genuinely never clears - see cleanup() above for why running
+# out of patience here must never mean disconnecting a still-mounted device.
 umount_err="$(mktemp)"
-for attempt in 1 2 3 4 5; do
+for attempt in $(seq 1 15); do
     if umount -R /mnt 2>"$umount_err"; then
         break
     fi
-    if (( attempt == 5 )); then
+    if (( attempt == 15 )); then
         cat "$umount_err" >&2
         rm -f "$umount_err"
-        die "/mnt would not unmount after 5 attempts. 'fuser -vm /mnt' from another terminal shows what still has it open."
+        die "/mnt would not unmount after 15 attempts (30s). 'fuser -vm /mnt' from another terminal shows what still has it open."
     fi
-    sleep 1
+    sleep 2
 done
 rm -f "$umount_err"
 
