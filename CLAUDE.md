@@ -217,7 +217,7 @@ copy once and the copies disagreed about nested tables, which turned
 `[data.wallpaper]` into a string and broke every subsequent `apply`. Add a
 machine-local value through that helper, not by hand.
 
-Three things worth holding onto before touching a theme:
+Four things worth holding onto before touching a theme:
 
 - **A theme declares `mode`, light or dark, and it is load-bearing.** It picks
   the GTK theme and icon set, neovim's `background`, and which section foot
