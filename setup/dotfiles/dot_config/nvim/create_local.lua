@@ -1,0 +1,15 @@
+-- Neovim settings for this machine only.
+--
+-- Created once and never rewritten; nothing here is tracked. Loaded LAST from
+-- init.lua, so anything set here overrides the repository's configuration.
+--
+-- Ordinary Lua, so the whole API is available:
+--
+--     vim.opt.relativenumber = false
+--     vim.keymap.set('n', '<leader>x', ':echo "mine"<CR>')
+--
+-- Loaded through pcall, so an error in this file cannot stop Neovim starting -
+-- it will simply be skipped. That makes a mistake here quiet rather than fatal,
+-- which is the right trade for a file nobody else can see, but it does mean a
+-- typo shows up as "my setting did nothing" rather than as an error. To find
+-- out why, run :luafile ~/.config/nvim/local.lua and read the message.

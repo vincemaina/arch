@@ -1,0 +1,19 @@
+/* rofi settings for this machine only.
+ *
+ * Created once and never rewritten; nothing here is tracked. Imported LAST, and
+ * rofi takes the last definition it reads, so anything here overrides the
+ * repository's theme. That ordering was measured with `rofi -dump-theme`, not
+ * assumed.
+ *
+ *     * { background-color: #202020; }
+ *     window { width: 60%; }
+ *
+ * Ask rofi what it actually applied rather than reading this back:
+ *
+ *     rofi -dump-theme     the resolved theme, after every import
+ *     rofi -dump-config    the resolved configuration
+ *
+ * Colours come from the selected theme and are regenerated on every switch, so
+ * a colour set here will win but will also stop tracking the theme. Usually the
+ * thing you want is `theme` instead.
+ */

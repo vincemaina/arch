@@ -205,14 +205,22 @@ config reads it *last* — so whatever you put there wins.
 | Sway | `~/.config/sway/config.d/99-local.conf` |
 | The terminal | `~/.config/foot/local.ini` |
 | Git | `~/.config/git/local` |
+| Neovim | `~/.config/nvim/local.lua` |
+| The launcher | `~/.config/rofi/local.rasi` |
+| mpv | `~/.config/mpv/local.conf` |
 | Session environment | any `~/.config/environment.d/99-*.conf` |
 | keyd (system-wide remapping) | `/etc/keyd/local` |
 
 Each is created for you and then left alone forever, so anything you write in
-one stays. Notifications are the one gap: **mako has no local file**, because
-it refuses to start at all if the file is missing, and a notification daemon
-that dies silently is worse than not having the hatch. Its font and colours are
-already yours through the theme and the font settings below.
+one stays, and each is read *last* so your setting wins.
+
+Two have no local file, and both for measured reasons rather than oversight.
+**mako** refuses to start at all if the file is missing, and a notification
+daemon that dies silently is worse than not having the hatch. **Waybar** fails
+the same way on its stylesheet, and its config format gives the *including*
+file precedence — so a local file could add settings but never change one,
+which would look configured and do nothing. Both take their font and colours
+from the theme and the font settings below, which are yours already.
 
 Editing keyd's file needs `sudo`, and `sudo keyd check` before `sudo keyd
 reload` — a config keyd cannot parse leaves the machine with no working

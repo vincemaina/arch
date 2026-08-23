@@ -301,3 +301,7 @@ textbox {
     background-color: transparent;
     text-color:       inherit;
 }
+
+/* Machine-local overrides, imported last so they win. Created once by chezmoi
+ * and never rewritten; see the file itself for what belongs in it. */
+@import "{{ .chezmoi.homeDir }}/.config/rofi/local.rasi"

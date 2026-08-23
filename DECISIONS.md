@@ -2406,6 +2406,25 @@ mako is the exception and is deliberately excluded. A missing include makes it p
 
 That is the general rule this produces: **an escape hatch whose absence breaks the program is not an escape hatch.** Check the missing-file case before adding a tool to this layer.
 
+A second test turned out to matter just as much: **an override that cannot win is not an override.** Both were measured for every tool considered, and the results decided which got a local file:
+
+| Tool | Missing file | Can a local setting win? | |
+| --- | --- | --- | --- |
+| zsh | guarded, safe | yes, sourced last | yes |
+| sway | glob matches nothing | yes, `99-` sorts last | yes |
+| foot | logs an error, starts | yes, `[main]` re-opened at the end | yes |
+| git | ignored, exit 0 | yes, last value read wins | yes |
+| Neovim | `pcall` returns cleanly | yes, loaded last | yes |
+| rofi | exit 0 | yes, last `@import` wins | yes |
+| mpv | exit 0 | yes, last value wins | yes |
+| mako | **fatal**, exits before the bus | globals only, loses to criteria | no |
+| waybar (style) | **fatal**, exit 1 | — | no |
+| waybar (config) | safe, keeps running | **no** - the including file wins | no |
+
+waybar fails both tests, for different reasons in each half. A missing CSS `@import` kills it, and it is `Restart=always`, so that is mako's failure again. And its JSON `include` documents the opposite precedence to everything else here - *"in case of duplicate options, the first defined value takes precedence, i.e. including file -> first included file"* - so a local file could add keys but never change one. A file that silently ignores half of what you put in it is worse than no file, because the failure looks like your own mistake.
+
+There is a way to give waybar a real override - make the tracked config a thin wrapper that includes the local file first and the repository's real config second - but `config.jsonc` is named by seven other files here, so it is its own piece of work rather than a line.
+
 ### Why this is not the same as machine profiles
 
 Profiles - templating a laptop's battery module in and a VM's out - are a separate mechanism for a separate question, and both are wanted. A profile answers *"this machine is a laptop"*. The local layer answers *"I like this font bigger"*. Collapsing them would mean declaring a profile for every personal preference, which puts the repository back in the way of trying something quickly - exactly what the shell escape hatch was introduced to stop.

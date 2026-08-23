@@ -349,3 +349,9 @@ vim.api.nvim_create_autocmd('FileType', {
 vim.cmd.colorscheme('arch')
 
 require('lsp').setup()
+
+-- Machine-local configuration, loaded last so it can override anything above.
+-- pcall rather than a bare dofile: this file is untracked and may be missing or
+-- broken, and neither should stop the editor starting. Measured - a pcall of a
+-- missing file returns cleanly and Neovim carries on.
+pcall(dofile, vim.fn.stdpath('config') .. '/local.lua')

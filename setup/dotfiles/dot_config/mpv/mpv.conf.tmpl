@@ -26,3 +26,8 @@ stream-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_delay_max=30
 # Modest cache: enough to ride out a stall, not enough to delay a station change.
 cache=yes
 demuxer-max-bytes=8MiB
+
+# Machine-local overrides, included last so they win. Created once by chezmoi
+# and never rewritten. A missing file is harmless here - measured: mpv exits 0
+# with an include it cannot open.
+include={{ .chezmoi.homeDir }}/.config/mpv/local.conf
