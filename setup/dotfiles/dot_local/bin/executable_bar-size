@@ -59,12 +59,25 @@ def current():
 
 
 def labelled(sizes_dict, current_name):
-    """One line per size, name padded, description alongside - the current one
-    marked with `*`, so --list and the rofi menu agree on what they show."""
+    """One line per size for --list: name padded, description alongside, the
+    current one marked with `*`."""
     width = max(len(name) for name in sizes_dict)
     for name, info in sizes_dict.items():
         mark = "*" if name == current_name else " "
         yield f"{mark} {name:<{width}}   {info.get('description', '')}"
+
+
+def menu_lines(sizes_dict):
+    """The rofi menu - deliberately unmarked, unlike --list above. Marking the
+    current size the same way would put a fixed '* ' in front of one line and
+    nothing in front of the rest; parsing rofi's answer by stripping leading
+    whitespace and reading a fixed field index only lines up for the marked
+    row, and silently reads a word out of the description for every other
+    one. That is the bug this shape avoids - see the caller for what it broke
+    in practice. Same idiom as ~/.local/bin/theme's list_themes_labelled."""
+    width = max(len(name) for name in sizes_dict)
+    for name, info in sizes_dict.items():
+        yield f"{name:<{width}}   {info.get('description', '')}"
 
 
 def main():
@@ -86,10 +99,7 @@ def main():
     wanted = argument
 
     if not wanted:
-        # Same idiom as ~/.local/bin/theme: labelled in the menu, bare
-        # everywhere else, so the mark and description never reach the
-        # validation below.
-        menu = "\n".join(labelled(sizes(), current()))
+        menu = "\n".join(menu_lines(sizes()))
         result = subprocess.run(
             ["rofi", "-dmenu", "-i", "-p", "Bar size", "-no-custom",
              "-select", current()],
@@ -97,9 +107,10 @@ def main():
         chosen = result.stdout.strip()
         if not chosen:
             return
-        # The mark is a fixed-width column of its own; the name is the field
-        # after it.
-        wanted = chosen.split(None, 2)[1]
+        # The name is the first field; splitting on the first run of
+        # whitespace is safe here specifically because menu_lines() never puts
+        # anything of varying width before it.
+        wanted = chosen.split(None, 1)[0]
 
     if wanted not in sizes():
         die(f"no size called '{wanted}'. Available: {', '.join(sizes())}")
