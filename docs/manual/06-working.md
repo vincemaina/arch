@@ -45,6 +45,12 @@ playing, as history, rather than disappearing.
 When the last track ends, the music stops and the bar clears. A radio station
 never ends, so it plays until you stop it.
 
+The queue is not lost when it finishes. Open `focus-music` again and it says
+how many tracks have played out, and offers to play the queue again, open it,
+start something else, or stop. Starting something else at that point replaces
+the finished tracks rather than stacking on top of them, so the list does not
+grow all day.
+
 ### Searching YouTube
 
 The first entry in the list is **Search YouTube...**. Choose it, type
@@ -132,6 +138,41 @@ command exits non-zero.
 This is the counterweight to a list that can grow: searches look after
 themselves, and this is how the handful of real links get pruned on purpose
 rather than discovered dead halfway through a working afternoon.
+
+## Controlling whatever is playing
+
+The bar already controls playback and has since the beginning: **left click**
+the now-playing module to play or pause, **middle click** for the previous
+track, **right click** for the next one. Those are waybar's own defaults, and
+they act on whatever is playing — focus-music, a video in the browser,
+anything that speaks MPRIS. The keyboard's media keys do the same, on a
+keyboard that has them; this one is a ThinkPad, whose F row has volume and
+brightness and no play, previous or next at all.
+
+What none of that offers is seeking. "Media Controls" in the launcher, or
+`~/.local/bin/media`, opens a menu for the player that is currently going:
+
+| | |
+| --- | --- |
+| **Play/Pause**, **Next**, **Previous** | the same as the bar clicks, for when a menu is easier to find than a mouse button |
+| **Seek...** | jump around inside the current track |
+| **Choose player** | only appears when more than one thing is playing |
+| **Stop** | stop that player |
+
+**Seek** shows where you are and how long the track is, with a bar:
+
+```text
+████████████░░░░░░░░░░░░  1:23 / 3:45
+```
+
+Choose one of the jumps — back a minute, back ten seconds, forward ten
+seconds, forward a minute, or back to the start — or just type where you want
+to be and press Enter. A timestamp like `2:30` or `1:02:03` goes to that
+point; a percentage like `40%` goes proportionally through the track. That is
+the difference between usable and not on a ten-hour upload.
+
+A live radio stream has no position and no length, so there is nothing to seek
+in. The menu says so rather than appearing to work.
 
 ## The audio visualiser
 

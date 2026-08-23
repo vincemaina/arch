@@ -1,0 +1,320 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: playerctl rofi
+
+# Media controls for whatever is playing, in a menu.
+#
+# WHY THIS EXISTS WHEN MEDIA KEYS ALREADY DO IT
+#
+# XF86AudioNext and friends are bound in sway and work. This machine is a
+# ThinkPad, and its F row has volume and brightness and no play, previous or
+# next at all - so those bindings hang off keys that are not on the keyboard.
+# On a machine that has them, both routes work and neither is in the other's
+# way.
+#
+# WHY playerctl RATHER THAN focus-music's SOCKET
+#
+# This is deliberately not a focus-music feature. It acts on whatever is
+# playing - a browser tab, a video, focus-music's mpv - exactly as the hardware
+# keys would, so it goes through MPRIS. focus-music's own socket controls its
+# queue and nothing else; this controls the player that happens to be making
+# noise.
+#
+# SEEKING, AND THE MEASUREMENT THAT ALMOST WENT WRONG
+#
+# Seeking was first tested against an av://lavfi tone, which mpv reports with a
+# bogus four second duration and flatly refuses to seek backwards on. That made
+# it look as though MPRIS could only seek forwards, which would have meant
+# building this around a limitation that does not exist. Against real media -
+# a plain WAV, and anything from YouTube - absolute and relative seeks work in
+# both directions and mpris:length is accurate. Test seeking with something
+# seekable.
+#
+# A radio stream does not simply report nothing, which was the obvious guess
+# and is wrong: SomaFM comes back with a position of 6 seconds and a length of
+# 23, which belong to the track it is playing rather than to the stream. There
+# is no property to ask, so seeking checks afterwards whether the player
+# actually moved, and says so when it did not.
+
+SEEK_BAR_CELLS=24
+
+die() {
+    echo "media: $*" >&2
+    command -v notify-send >/dev/null 2>&1 &&
+        notify-send -a media "media" "$*" || true
+    exit 1
+}
+
+note() {
+    command -v notify-send >/dev/null 2>&1 &&
+        notify-send -a media -t 3000 "media" "$1" || true
+}
+
+menu() {
+    # $1 prompt, rest rows. Prints the chosen row, or nothing if cancelled.
+    local prompt="$1"
+    shift
+    printf '%s\n' "$@" |
+        rofi -dmenu -i -p "$prompt" -format s \
+             -theme-str "listview { lines: $#; }" 2>/dev/null || true
+}
+
+players() {
+    playerctl --list-all 2>/dev/null || true
+}
+
+status_of() {
+    playerctl --player="$1" status 2>/dev/null || true
+}
+
+# The player to act on. Whatever is actually playing wins; otherwise the first
+# one that exists, which is usually something paused you are coming back to.
+choose_player() {
+    local candidates=() name
+    mapfile -t candidates < <(players)
+    [[ ${#candidates[@]} -gt 0 ]] || return 1
+
+    for name in "${candidates[@]}"; do
+        if [[ "$(status_of "$name")" == "Playing" ]]; then
+            printf '%s' "$name"
+            return 0
+        fi
+    done
+    printf '%s' "${candidates[0]}"
+}
+
+pick_player_by_hand() {
+    local candidates=() rows=() name chosen
+    mapfile -t candidates < <(players)
+    [[ ${#candidates[@]} -gt 0 ]] || return 1
+    for name in "${candidates[@]}"; do
+        rows+=("$(printf '%-10s %s' "$(status_of "$name")" "$name")")
+    done
+    chosen="$(menu 'which player' "${rows[@]}")"
+    [[ -n "$chosen" ]] || return 1
+    # The name is the last field; statuses never contain a space.
+    printf '%s' "${chosen##* }"
+}
+
+fmt_time() {
+    local total="${1%%.*}"
+    [[ "$total" =~ ^[0-9]+$ ]] || { printf '%s' '--:--'; return; }
+    local h=$(( total / 3600 )) m=$(( (total % 3600) / 60 )) s=$(( total % 60 ))
+    if (( h > 0 )); then
+        printf '%d:%02d:%02d' "$h" "$m" "$s"
+    else
+        printf '%d:%02d' "$m" "$s"
+    fi
+}
+
+# Seconds into the current track, or empty when the player has no position -
+# which is what a live stream looks like.
+position_of() {
+    local raw
+    raw="$(playerctl --player="$1" position 2>/dev/null || true)"
+    [[ "$raw" =~ ^[0-9]+(\.[0-9]+)?$ ]] || return 1
+    printf '%s' "${raw%%.*}"
+}
+
+# Track length in whole seconds. mpris:length is microseconds.
+length_of() {
+    local raw
+    raw="$(playerctl --player="$1" metadata mpris:length 2>/dev/null || true)"
+    [[ "$raw" =~ ^[0-9]+$ ]] || return 1
+    (( raw > 0 )) || return 1
+    printf '%s' $(( raw / 1000000 ))
+}
+
+now_playing() {
+    playerctl --player="$1" metadata --format '{{ title }}' 2>/dev/null || true
+}
+
+# A bar drawn from block characters, built from their UTF-8 bytes rather
+# than pasted. Pasting glyphs has silently lost them in this repository
+# before, and bash's ANSI-C quoting is a second trap here: it understands
+# \uHHHH but not the \u{HHHH} brace form, which passes straight through as
+# literal text and would draw the bar as \u{2588} twenty four times over.
+# Hex bytes are unambiguous, and they keep this file pure ASCII.
+FULL_BLOCK="$(printf '\xe2\x96\x88')"    # U+2588 FULL BLOCK
+LIGHT_SHADE="$(printf '\xe2\x96\x91')"   # U+2591 LIGHT SHADE
+
+progress_bar() {
+    local position="$1" length="$2" filled i out=""
+    filled=$(( position * SEEK_BAR_CELLS / length ))
+    (( filled < 0 )) && filled=0
+    (( filled > SEEK_BAR_CELLS )) && filled=$SEEK_BAR_CELLS
+    for (( i = 0; i < SEEK_BAR_CELLS; i++ )); do
+        if (( i < filled )); then
+            out+="$FULL_BLOCK"
+        else
+            out+="$LIGHT_SHADE"
+        fi
+    done
+    printf '%s' "$out"
+}
+
+# "2:30", "1:02:03", "90" or "40%" into an absolute number of seconds.
+parse_target() {
+    local text="$1" length="$2" percent
+    text="${text//[[:space:]]/}"
+
+    if [[ "$text" =~ ^([0-9]+)%$ ]]; then
+        [[ -n "$length" ]] || return 1
+        percent="${BASH_REMATCH[1]}"
+        (( percent > 100 )) && percent=100
+        printf '%s' $(( length * percent / 100 ))
+        return 0
+    fi
+
+    if [[ "$text" =~ ^([0-9]+):([0-5][0-9])$ ]]; then
+        printf '%s' $(( 10#${BASH_REMATCH[1]} * 60 + 10#${BASH_REMATCH[2]} ))
+        return 0
+    fi
+
+    if [[ "$text" =~ ^([0-9]+):([0-5][0-9]):([0-5][0-9])$ ]]; then
+        printf '%s' $(( 10#${BASH_REMATCH[1]} * 3600 +
+                        10#${BASH_REMATCH[2]} * 60 +
+                        10#${BASH_REMATCH[3]} ))
+        return 0
+    fi
+
+    if [[ "$text" =~ ^[0-9]+$ ]]; then
+        printf '%s' "$text"
+        return 0
+    fi
+
+    return 1
+}
+
+# Seek, then check that it happened.
+#
+# Asking whether a player CAN seek turns out not to be answerable from
+# playerctl, and guessing from the metadata is worse than useless: a SomaFM
+# stream cheerfully reports a position of 6 seconds and a length of 23, which
+# are the current track's, not the stream's. So the menu cannot know in advance
+# whether seeking means anything - but it can look afterwards. A seek that did
+# not move says so, rather than leaving a bar that appears to have worked.
+seek_to() {
+    local player="$1" target="$2" length="$3" landed
+
+    (( target < 0 )) && target=0
+    if [[ -n "$length" ]] && (( target > length )); then
+        target=$(( length > 1 ? length - 1 : 0 ))
+    fi
+
+    playerctl --player="$player" position "$target" 2>/dev/null || {
+        note "that player will not seek"
+        return 1
+    }
+
+    landed="$(position_of "$player" || true)"
+    if [[ -z "$landed" ]]; then
+        note "that player will not say where it is"
+        return 1
+    fi
+
+    # Three seconds of slack: the track keeps moving while this is measured,
+    # and a player may land on a keyframe rather than exactly where it was
+    # asked to.
+    if (( landed > target + 3 || landed < target - 3 )); then
+        note "that player did not move - a live stream cannot be seeked"
+        return 1
+    fi
+}
+
+seek_menu() {
+    local player="$1" position length bar prompt choice target
+
+    if ! position="$(position_of "$player")"; then
+        note "$(now_playing "$player") has no position to seek in - a live stream usually does not"
+        return 0
+    fi
+    length="$(length_of "$player" || true)"
+
+    while true; do
+        position="$(position_of "$player")" || return 0
+        if [[ -n "$length" ]]; then
+            bar="$(progress_bar "$position" "$length")"
+            prompt="$bar  $(fmt_time "$position") / $(fmt_time "$length")"
+        else
+            prompt="$(fmt_time "$position") (length unknown)"
+        fi
+
+        choice="$(menu "$prompt" \
+            'Back 1 minute' \
+            'Back 10 seconds' \
+            'Forward 10 seconds' \
+            'Forward 1 minute' \
+            'Jump to the start' \
+            'Back')"
+
+        case "$choice" in
+            'Back 1 minute')      seek_to "$player" $(( position - 60 )) "$length" || true ;;
+            'Back 10 seconds')    seek_to "$player" $(( position - 10 )) "$length" || true ;;
+            'Forward 10 seconds') seek_to "$player" $(( position + 10 )) "$length" || true ;;
+            'Forward 1 minute')   seek_to "$player" $(( position + 60 )) "$length" || true ;;
+            'Jump to the start')  seek_to "$player" 0 "$length" || true ;;
+            'Back'|'')            return 0 ;;
+            *)
+                # Anything else was typed rather than chosen, which is how a
+                # specific point is reached: a timestamp or a percentage.
+                if target="$(parse_target "$choice" "$length")"; then
+                    seek_to "$player" "$target" "$length" || true
+                    return 0
+                fi
+                note "'$choice' is not a time like 2:30 or a percentage like 40%"
+                return 0
+                ;;
+        esac
+    done
+}
+
+usage() {
+    cat <<'USAGE'
+media
+
+  Controls whatever is currently playing - play/pause, next, previous, seek -
+  through MPRIS, so it works for any player, not just focus-music.
+USAGE
+}
+
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+    "") ;;
+    *) die "unknown option '$1' - try --help" ;;
+esac
+
+player="$(choose_player)" || die "nothing is playing"
+
+while true; do
+    title="$(now_playing "$player")"
+    status="$(status_of "$player")"
+    [[ -n "$status" ]] || die "$player went away"
+
+    if position="$(position_of "$player")"; then
+        if length="$(length_of "$player" || true)"; [[ -n "$length" ]]; then
+            where=" · $(fmt_time "$position") / $(fmt_time "$length")"
+        else
+            where=" · $(fmt_time "$position")"
+        fi
+    else
+        where=""
+    fi
+
+    rows=("Play/Pause" "Next" "Previous" "Seek...")
+    (( $(players | grep -c '') > 1 )) && rows+=("Choose player")
+    rows+=("Stop")
+
+    choice="$(menu "${status,,}: ${title:0:38}${where}" "${rows[@]}")"
+
+    case "$choice" in
+        "Play/Pause")    playerctl --player="$player" play-pause 2>/dev/null || true; exit 0 ;;
+        "Next")          playerctl --player="$player" next 2>/dev/null || true; exit 0 ;;
+        "Previous")      playerctl --player="$player" previous 2>/dev/null || true; exit 0 ;;
+        "Stop")          playerctl --player="$player" stop 2>/dev/null || true; exit 0 ;;
+        "Seek...")       seek_menu "$player"; exit 0 ;;
+        "Choose player") player="$(pick_player_by_hand)" || exit 0 ;;
+        *)               exit 0 ;;
+    esac
+done

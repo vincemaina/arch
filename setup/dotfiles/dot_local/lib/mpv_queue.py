@@ -163,6 +163,14 @@ def cmd_add(mode: str, url: str, title: str, finite: bool = False) -> int:
     if title:
         remember(url, title)
 
+    # pause is a property of the player, not of the file, and it survives.
+    # A queue that ended on a kept-open track leaves mpv paused on its last
+    # frame; load the next thing and it arrives paused too - the title changes,
+    # the bar lights up, and not a sound comes out. That is what "it crashed"
+    # turned out to be. Anything meant to start playing says so explicitly.
+    if empty or mode == "now":
+        mpv.command("set_property", "pause", False)
+
     if mode == "now" and not empty:
         # The new entry is directly after the current one, which is what
         # insert-next means, so advancing is the same as playing it.
@@ -210,6 +218,27 @@ def cmd_current() -> int:
     return 0
 
 
+def cmd_reset() -> int:
+    """Empty the playlist completely.
+
+    playlist-clear keeps whatever is current, which is right when tidying up
+    mid-listen and wrong when a finished queue is being replaced - there the
+    leftover entry would survive into the next one. Removing from the front
+    until nothing is left holds in both cases, and the loop is bounded by the
+    count so a playlist that refuses to shrink cannot spin forever.
+    """
+    mpv = connect()
+    for _ in range(len(mpv.playlist())):
+        if not mpv.playlist():
+            break
+        mpv.command("playlist-remove", 0)
+    remaining = len(mpv.playlist())
+    if remaining:
+        print(f"{remaining} entry/entries would not clear", file=sys.stderr)
+        return 1
+    return 0
+
+
 def simple(name: str, *args) -> int:
     reply = connect().command(name, *args)
     if reply.get("error") != "success":
@@ -230,7 +259,9 @@ USAGE = """mpv_queue.py <command> [args]
   move <from> <to>
   remove <index>
   clear                   drop everything except what is playing
+  reset                   empty the playlist completely
   next                    skip to the next entry
+  previous                back to the previous entry
   quit
 """
 
@@ -246,10 +277,19 @@ def main(argv: list[str]) -> int:
             connect()
             return 0
         if command == "playing":
-            # Running is not the same as playing: once a finite queue runs out
-            # mpv stays alive and goes idle, which is nothing playing.
+            # Running is not the same as playing, and a queue can run out in
+            # two different shapes. A finite track ends and mpv goes idle. A
+            # track mpv was told to keep open - a radio stream, or anything
+            # queued before that flag existed - ends by sitting paused on its
+            # own last frame, which is not idle and is not playing either.
+            # Both are "the music stopped", and calling the second one playing
+            # is what made a finished queue look like a crash.
             mpv = connect()
-            return 0 if not mpv.get("idle-active") else 1
+            if mpv.get("idle-active"):
+                return 1
+            if mpv.get("eof-reached") and mpv.get("pause"):
+                return 1
+            return 0
         if command == "add":
             mode, url = args[0], args[1]
             title = args[2] if len(args) > 2 else ""
@@ -265,15 +305,30 @@ def main(argv: list[str]) -> int:
         if command == "current":
             return cmd_current()
         if command == "play":
-            return simple("playlist-play-index", int(args[0]))
+            # Same reason as in add: playing an entry from a queue that ended
+            # paused must clear pause, or it silently loads and sits there.
+            mpv = connect()
+            reply = mpv.command("playlist-play-index", int(args[0]))
+            if reply.get("error") != "success":
+                print(f"mpv refused play: {reply.get('error')}", file=sys.stderr)
+                return 1
+            mpv.command("set_property", "pause", False)
+            return 0
         if command == "move":
             return simple("playlist-move", int(args[0]), int(args[1]))
         if command == "remove":
             return simple("playlist-remove", int(args[0]))
         if command == "clear":
             return simple("playlist-clear")
+        if command == "reset":
+            return cmd_reset()
         if command == "next":
-            return simple("playlist-next", "force")
+            # weak, not force: force stops playback outright when it runs off
+            # the end of the queue, so pressing skip on the last track would
+            # silence the music rather than do nothing.
+            return simple("playlist-next", "weak")
+        if command == "previous":
+            return simple("playlist-prev", "weak")
         if command == "quit":
             return simple("quit")
     except (OSError, ConnectionError):
