@@ -1,0 +1,21 @@
+# Exec is an absolute path for the same reason theme's and notification-centre's
+# are: ~/.local/bin is not on the PATH that sway and rofi hand to what they
+# spawn, so a bare `Exec=bluetooth` works when tested from a terminal and
+# silently does nothing from the launcher.
+#
+# This entry matters more than most. The bar's bluetooth module is invisible
+# while bluetoothd is not running, which is the default on every machine - so
+# when bluetooth is off there is nothing on screen to click, and the launcher is
+# the only way back to the switch.
+
+[Desktop Entry]
+Type=Application
+Name=Bluetooth
+GenericName=Bluetooth devices
+Comment=Turn bluetooth on or off for this machine, and connect or pair a device
+Icon=bluetooth
+Exec={{ .chezmoi.homeDir }}/.local/bin/bluetooth
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=bluetooth;bt;pair;headphones;headset;speaker;device;wireless;
+NoDisplay=false

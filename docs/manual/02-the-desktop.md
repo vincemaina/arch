@@ -137,6 +137,7 @@ to right as the bar itself is laid out.
 | mpris (now playing) | Track and artist for whatever is playing, hidden when nothing is | Left click: play/pause. Middle: previous track. Right: next track |
 | Caffeine (idle inhibitor) | A cup icon, muted when off and warning-coloured when on | Toggle: stop the screen locking and sleeping, or let it again |
 | Network | Ethernet or Wi-Fi icon, with signal strength on Wi-Fi | Opens `nmtui` to change connection |
+| Bluetooth | A bluetooth icon, and the connected device's name when there is one. **Absent entirely unless the bluetooth daemon is running** | Opens the bluetooth menu: connect, pair, or turn it off |
 | CPU | Usage percentage | Opens `btop` |
 | Memory | Usage percentage, tooltip shows used of total | Opens `btop` - the same window CPU opens, since `btop` already shows both |
 | Volume | Icon and percentage, "muted" when muted | Left: `pavucontrol`. Right: toggle mute. Scroll: volume up/down in 5% steps, capped at 100% |
@@ -157,6 +158,79 @@ A few things worth knowing about that table rather than assuming from it:
 - `$mod+Shift+b` hides and shows the bar entirely, giving its strip back to
   the windows. That binding lives with the rest of the keyboard bindings, not
   on the bar itself, since it is not a module.
+
+## Bluetooth
+
+Bluetooth is **off until you turn it on**, on each machine separately, and
+the bar is how you can tell which machines you have turned it on.
+
+The reason is that `bluetoothd` is a daemon. Enabled, it runs from the moment
+the machine boots to the moment it shuts down, whether or not anything is
+ever paired to it — and not every machine this setup builds even has a
+bluetooth radio. So the packages are installed everywhere and the daemon is
+started nowhere, and starting it is a decision you make per machine.
+
+Turn it on:
+
+```bash
+bluetooth on
+```
+
+That starts the daemon now and sets it to start at boot. `bluetooth off`
+stops it and unsets that. Both ask for your password through the usual
+graphical prompt, because starting a system service needs root. There is
+also `bluetooth status`, which prints one line describing where this machine
+currently stands.
+
+With no argument, `bluetooth` opens a menu — the same one the bar module
+opens when you click it, and the same one the launcher opens if you type
+"bluetooth". What it offers depends on the state: turn it on, if it is off;
+otherwise the paired devices to connect or disconnect, a way to pair
+something new, and turning it off again.
+
+### The module is the point
+
+The bluetooth module is invisible whenever the daemon is not running. That is
+deliberate rather than a gap:
+
+- On a machine with no bluetooth hardware, there is nothing on the bar to
+  explain or ignore.
+- On a machine where you have turned bluetooth off, likewise — an "off"
+  indicator would be a permanent readout telling you nothing.
+- On a machine where you have turned it on, the module is there. **So if you
+  can see it, a daemon is running.** If you can see it and you are not using
+  bluetooth, that is the reminder that you left it on, and clicking it is how
+  you turn it off.
+
+The colour carries the rest. Connected to something, the module sits in the
+same quiet colour as the other readings. Running with nothing connected, it
+turns the warning colour — not because anything is wrong, but because that
+is the state worth noticing: a radio that is up and idle. Powered down or
+blocked by rfkill while the daemon still runs, it goes muted.
+
+### Pairing something new
+
+Choose **Pair a new device** from the menu. That opens `bluetoothctl` in a
+floating terminal, with the four commands you need printed at the top:
+
+```
+scan on
+pair <mac>
+trust <mac>
+connect <mac>
+```
+
+Pairing is left to `bluetoothctl` rather than wrapped in a menu because it is
+genuinely interactive — devices ask you to confirm a passkey, and some want
+trusting before they will reconnect on their own. `trust` is the step people
+miss: without it a device pairs, connects, and then fails to come back by
+itself the next time it is switched on.
+
+Bluetooth **audio** needs nothing further. The codec support — SBC, AAC,
+aptX, LDAC and the headset ones — is part of PipeWire and is already
+installed on every machine here, so a paired pair of headphones appears as an
+output device as soon as it connects, and the volume module controls it like
+any other.
 
 ## Notifications
 

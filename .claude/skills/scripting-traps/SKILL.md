@@ -524,6 +524,32 @@ whether the window actually appeared.
 
 **Fix.** Pass `-show-icons` on the command line.
 
+## `-mesg` renders nothing, because the theme never places `message`
+
+**Symptom.** A menu passes `-mesg "$(describe_current_state)"` to give the user
+a line of context above the list. The menu appears, the rows are right, and the
+message is simply not there. rofi exits 0 and says nothing.
+
+**Cause.** This repository's rofi theme lays the window out explicitly:
+
+```rasi
+window { children: [ inputbar, listview, textbox-footer ]; }
+```
+
+`message` is not one of them. rofi accepts the argument and even applies the
+`message {}` block the theme defines — it just never puts the widget on screen.
+An element that is styled but unplaced looks configured from every angle except
+the running one.
+
+**Fix.** Either add `message` to `children` — which changes every menu, so it is
+a theme decision rather than a per-script one — or carry the state in the rows
+and the prompt, both of which are placed. `~/.local/bin/bluetooth` does the
+latter: a menu offering "Turn bluetooth off" has already said that bluetooth is
+on, and `bluetooth status` prints the long form for anyone who wants it.
+
+The general form: **a rofi option being accepted says nothing about the widget
+being displayed.** Check `children` before spending an option on a widget.
+
 ---
 
 Every one of these produced a confident-looking wrong result rather than an

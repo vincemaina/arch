@@ -136,6 +136,7 @@ window#waybar > box {
 #scratchpad,
 #custom-notifications,
 #custom-focus-timer,
+#bluetooth,
 #network {
     background: transparent;
     /* Enough to keep the hover pill off its own text, and no more. The gap
@@ -160,6 +161,32 @@ window#waybar > box {
 #pulseaudio     { color: @ok;        text-shadow: 0 0 5px @ok; }
 #battery        { color: @ok;        text-shadow: 0 0 5px @ok; }
 #network        { color: @muted;     text-shadow: 0 0 5px @muted; }
+
+/* Bluetooth, which is the one module here that says something by its mere
+ * presence - see the config for why it is invisible whenever bluetoothd is not
+ * running. Given that, the states worth telling apart are not on versus off;
+ * they are "this daemon is earning its keep" and "this daemon is running for
+ * nothing", and the palette already has a role for the second one.
+ *
+ * connected  secondary, the same weight as any other working readout
+ * on         warning: the radio is up and nothing is using it, which is the
+ *            state this whole feature exists to make visible. `warning` is the
+ *            role that means attention-nothing-wrong-yet, the same reading
+ *            sway/scratchpad relies on above, and it is legible in all eight
+ *            themes - unlike tertiary, which falls to 2.04:1 in mono.
+ * off        muted: the daemon is up but the controller is powered down, which
+ * disabled   is wasteful but quieter than an idle radio, and rfkill is usually
+ *            somebody's deliberate act rather than something to nag about.
+ *
+ * secondary rather than info because cpu two modules along is already info, and
+ * the bar is meant to be scanned by colour - two neighbours in the same hue is
+ * the one thing that defeats that. memory is also secondary but cpu sits
+ * between them. */
+#bluetooth           { color: @secondary; text-shadow: 0 0 5px @secondary; }
+#bluetooth.connected { color: @secondary; text-shadow: 0 0 5px @secondary; }
+#bluetooth.on        { color: @warning;   text-shadow: 0 0 5px @warning; }
+#bluetooth.off,
+#bluetooth.disabled  { color: @muted;     text-shadow: 0 0 5px @muted; }
 
 /* The scratchpad, in the warning colour rather than a quiet one.
  *
@@ -231,6 +258,7 @@ window#waybar > box {
 #scratchpad:hover,
 #custom-notifications:hover,
 #custom-focus-timer:hover,
+#bluetooth:hover,
 #network:hover {
     color: @bg;
     /* The glow goes on hover. Dark text on a bright pill does not want a halo
@@ -249,6 +277,13 @@ window#waybar > box {
 #custom-notifications:hover { background: @warning; }
 #mpris:hover          { background: @secondary; }
 #network:hover        { background: @surface_alt; color: @text; }
+/* The hover pill takes the resting hue, so an idle radio still reads as the
+ * warning colour under the cursor rather than losing the one thing it was
+ * saying. */
+#bluetooth:hover      { background: @secondary; }
+#bluetooth.on:hover   { background: @warning; }
+#bluetooth.off:hover,
+#bluetooth.disabled:hover { background: @surface_alt; color: @text; }
 
 /* Workspaces are the exception: they are navigation, not a readout, so only
  * the one you are on is filled in. */

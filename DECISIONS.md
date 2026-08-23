@@ -1274,6 +1274,48 @@ PipeWire needs policy and session management. WirePlumber is the standard modern
 
 ---
 
+## Bluetooth is installed everywhere and enabled nowhere
+
+**Decision:** Declare `bluez` and `bluez-utils` in the desktop manifest, leave `bluetooth.service` disabled, and make turning it on a per-machine act through `~/.local/bin/bluetooth`. The bar's bluetooth module is invisible whenever the daemon is not running.
+
+### Why
+
+Two facts pull in opposite directions. The manifests describe what *every* machine this repository builds should have, and they are deliberately not machine-dependent — that is what makes a build reproducible. But `bluetoothd` is a daemon, and not every machine has a bluetooth radio, let alone uses one. Enabling it in `apply-config.sh` would start it on every machine ever built by this setup, including desktops with no controller, for as long as they run.
+
+The way out is to notice that these are two separate decisions wearing one name. Installing a package costs disk. Enabling a service costs a process. Only the second one is worth being careful about, and `bluez` already ships its unit disabled, so the careful default is the one you get by doing nothing.
+
+So the package is declared unconditionally — 5.4 MiB, no processes — and the service is opted into on the machines that want it. `checks/session.sh` fails if anything under `setup/` ever enables it, because "enable the service you just installed" is exactly the tidy-up a later reader would make, and it would work silently and everywhere.
+
+That also settles where the state lives without inventing anywhere to put it: whether bluetooth runs is that machine's systemd state, so it leaves no diff and two machines syncing this repository can disagree — the same property the selected theme has, reached by a different mechanism.
+
+### The bar module is the readout, and it is usually absent
+
+Waybar's `bluetooth` module has a `format-no-controller` state, and here it is the empty string, which hides the module entirely. With `bluetoothd` stopped there is no controller on the system bus, so the module simply is not there.
+
+This inverts the usual relationship between a bar and a service. You do not look at the bar to find out whether bluetooth is on; the bar tells you that it is, on the machine where you had forgotten. A radio that is up with nothing connected takes the warning colour — not because anything is wrong, but because an idle daemon is the state this whole arrangement exists to make visible.
+
+The alternative — a module that reads "bluetooth: off" — was rejected as a permanent readout that says nothing, present even on machines with no bluetooth hardware to have an opinion about.
+
+### Trade-off
+
+When bluetooth is off there is nothing on the bar to click, so the way back to the switch is the launcher (or the `bluetooth` command). That is a real cost and is why the desktop entry exists and is documented in the manual; a hidden control is only acceptable when there is a second way in.
+
+There is also deliberately no "start it just for this session". It would be a state you forget you are in, and the bar cannot distinguish it from any other running daemon — so `bluetooth on` sets both the now and the at-boot answer together.
+
+### Alternatives considered
+
+**`blueman`.** The usual graphical bluetooth manager, and the obvious pick. Rejected for the reason TASK-92 removed `network-manager-applet`: it is a tray application and this desktop has no tray, so `busctl --user list` shows nothing for its icon to attach to. It would arrive with `gtk3`, `libnm`, `python-cairo` and `python-gobject` for 7.0 MiB, to be invisible.
+
+**`bluetuith`.** A TUI manager, which would suit this desktop's shape well. AUR-only, which TASK-43 ruled out.
+
+**A rofi menu that also does pairing.** The menu does connect, disconnect and turn-off; pairing opens `bluetoothctl` in a floating terminal instead. Pairing involves an agent, a passkey to compare and often a `trust` step, and a menu that drove that would be reimplementing `bluetoothctl` badly — failing silently the first time a device asked something unexpected, which is this repository's characteristic bug.
+
+**Making the manifest itself machine-dependent** — a `packages/bluetooth.txt` included conditionally. Rejected: it would make the package set differ between machines to save 5.4 MiB, and the thing actually worth varying is the daemon, which varies anyway.
+
+**Enabling `Experimental = true` in `/etc/bluetooth/main.conf`** to get device battery levels in the bar. Not done: it is a system-wide bluez setting turned on for one cosmetic readout, and the corresponding `format-connected-battery` is deliberately left out of the Waybar config rather than configured and left silently non-functional.
+
+---
+
 ## XWayland
 
 **Decision:** Install XWayland.
