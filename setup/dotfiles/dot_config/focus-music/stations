@@ -21,7 +21,24 @@
 # thing that stops working for reasons nobody can see.
 #
 # yt-dlp is still declared, so pasting a YouTube or SoundCloud link here works.
-# It is just not what the defaults depend on.
+# Exactly one station below is one - see THE ONE EXCEPTION.
+#
+# THE ONE EXCEPTION
+#
+# There is no direct audio stream of Minecraft's soundtrack anywhere. The open
+# radio directory returns nothing for that tag or that name, and both laut.fm
+# stations called "minecraft" are mislabelled - one plays chart pop, the other
+# NoCopyrightSounds. So the Minecraft entry below is a YouTube URL, resolved by
+# yt-dlp on every start, and it carries the weaknesses this file warns about: a
+# few seconds before sound, and silence if yt-dlp goes stale against YouTube.
+#
+# It is a fixed upload rather than a live stream, and that part is not taste.
+# The channel running the obvious "minecraft music 24/7" broadcast recycles its
+# video id every time it restarts - its own list carries several dead ids under
+# one title - and its /live URL was pointing at an unrelated stream on the day
+# this was written, so neither the id nor the channel is a stable thing to name.
+# A published video's id does not move. The cost is that it ends after ten
+# hours instead of never.
 #
 # SomaFM is listener-supported and serves no ads: https://somafm.com/support/
 # Their channel list, with ids for the URL pattern below, is at
@@ -43,3 +60,6 @@ Bossa nova and samba · Bossa Beyond	https://ice1.somafm.com/bossa-128-mp3
 Mellow vocal electronica · Lush	https://ice1.somafm.com/lush-128-mp3
 Music for hacking · DEF CON Radio	https://ice1.somafm.com/defcon-128-mp3
 Space-flight ambient · Mission Control	https://ice1.somafm.com/missioncontrol-128-mp3
+
+# --- from a game ------------------------------------------------------------
+Minecraft soundtrack · YouTube	https://www.youtube.com/watch?v=ZUIT_rQIR5M

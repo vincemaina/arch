@@ -557,13 +557,14 @@ mpv plays perfectly and nothing on the desktop can see it. `mpv` is started
 with `systemd-run --user --scope` so it dies with whatever launched it rather
 than surviving in an orphaned cgroup. Stations are tracked data in
 `~/.config/focus-music/stations`, reached through `~/.local/bin/focus-music`;
-`yt-dlp` is not on that default path at all — SomaFM stations are played as
-direct HTTP streams that need no resolving step — it exists for pasting an
-arbitrary YouTube or SoundCloud link.
+`yt-dlp` is on that default path for exactly one of them — the SomaFM and
+laut.fm stations are direct HTTP streams that need no resolving step, while
+Minecraft's soundtrack is carried by no radio station anywhere and is a
+YouTube URL resolved at start — and it also exists for pasting an arbitrary
+YouTube or SoundCloud link.
 **Cost.** `mpv` 6.34 MiB, `mpv-mpris` 35.18 KiB, `yt-dlp` 31.66 MiB installed
 (2026-08-22) — 31.66 MiB of that is a Python interpreter's worth of extractor
-code for a feature used only when pasting a link, not for the tracked
-stations. None of the three is resident until a station is actually playing,
+code, earned by one tracked station and by pasting a link. None of the three is resident until a station is actually playing,
 so there is no row in the session-cost table above.
 
 ### cava

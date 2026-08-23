@@ -27,12 +27,15 @@ Chilled downtempo · Groove Salad	https://ice1.somafm.com/groovesalad-128-mp3
 ```
 
 Comments and blank lines are ignored, and are used in the tracked file to
-group stations by mood. The URL has to be a direct audio stream, not a page
-to resolve — the stations shipped here were each checked returning audio
-before being written down, precisely so nothing here depends on a resolving
-step that can silently break later. (`yt-dlp` is installed and lets you point
-plain `mpv` at a YouTube or SoundCloud link directly from a terminal; that is
-a separate, manual path, not something `focus-music` itself does.) Run
+group stations by mood. Prefer a direct audio stream over a page that has to
+be resolved — the radio stations shipped here were each checked returning
+audio before being written down, precisely so nothing there depends on a
+resolving step that can silently break later. One entry breaks that rule
+deliberately: no internet radio station carries Minecraft's soundtrack, so
+that station is a YouTube URL which `yt-dlp` resolves each time it starts,
+which is why it takes a few seconds to begin and why it is the one station
+that can be broken by a change at YouTube's end. `yt-dlp` also lets you point
+plain `mpv` at any YouTube or SoundCloud link from a terminal. Run
 `./sync.sh` after editing so the change reaches the machine.
 
 ## The audio visualiser
