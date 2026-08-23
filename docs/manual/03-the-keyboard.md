@@ -242,22 +242,13 @@ knows this and prints a note about it when keyd is active and configured
 this way, which is where the description above was checked against, along
 with the config file's own comments.
 
-**Known limitation:** on a virtual machine, the physical Caps Lock LED does
-not follow this state. What gets typed is correct - tapping Caps Lock really
-does toggle caps - but the indicator light does not change. This was
-established by watching `/sys/class/leds` across real key presses rather
-than assumed: both the emulated keyboard's LED and keyd's own virtual one
-change together, so the swap and the daemon are not the cause. The machine
-is a KVM guest with an emulated keyboard, and the LED belongs to the
-*host*, which keeps its own Caps Lock state and is never told about the
-guest's.
-
-The expectation is that this disappears on real hardware, where the device
-Sway updates is the keyboard the light is attached to. Read that as an
-expectation and not a finding: nothing in this repository records the build
-ever running on physical hardware, so nobody has watched the light there. If
-you are the first to boot it on metal, look at the Caps Lock light and
-correct this paragraph either way.
+The Caps Lock light on the keyboard follows this correctly: tap the key and
+caps comes on, with the lamp lit to match. That is worth stating because it
+used to be listed here as a limitation. On a virtual machine the light does
+*not* follow — an emulated keyboard has no lamp attached, and the one on your
+desk belongs to the host, which is never told about caps state inside the
+guest. Sway sets the LED correctly in both cases; on a VM there is simply
+nothing behind it.
 
 ## Two other ways to press Escape
 

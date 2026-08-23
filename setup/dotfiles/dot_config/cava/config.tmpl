@@ -13,8 +13,9 @@
 # SomaFM stream through mpv while mpv knew nothing about it.
 
 [general]
-# 60 would be smoother and this desktop is CPU-rendered in a VM. 30 is
-# indistinguishable for bars that move this fast and costs half as much.
+# 60 would be smoother. 30 is indistinguishable for bars that move this fast
+# and costs half as much, which matters most wherever the desktop is rendered
+# in software - a virtual machine, or any host without working acceleration.
 framerate = 30
 
 # Let the terminal decide how many bars fit, rather than fixing a number that is

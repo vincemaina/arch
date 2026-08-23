@@ -151,10 +151,9 @@ A few things worth knowing about that table rather than assuming from it:
   Sway already marks the focused window with an accent border, so the title
   was rarely worth the space. The clock and now-playing module took it
   instead.
-- This machine reported "No batteries" in Waybar's own log at the time this
-  manual was checked, which is expected for a VM - the battery module has
-  nothing to show here. On real laptop hardware it will read the actual
-  charge.
+- The battery module reads the real charge on laptop hardware. On a machine
+  with no battery — a desktop, or a virtual machine — Waybar logs "No
+  batteries" and the module shows nothing at all.
 - `$mod+Shift+b` hides and shows the bar entirely, giving its strip back to
   the windows. That binding lives with the rest of the keyboard bindings, not
   on the bar itself, since it is not a module.

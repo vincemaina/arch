@@ -199,20 +199,20 @@ specifically artefacts of that environment rather than of the build itself.
 Where the outcome on real hardware has not actually been tested, this section
 says so rather than promising it will just work.
 
-**The Caps Lock LED does not follow caps state, and this is a VM artefact.**
+**The Caps Lock LED follows caps state on real hardware, but not on a VM.**
 This setup remaps Caps Lock into a scroll layer through keyd
-(`setup/system/keyd/default.conf`): tapping it briefly still toggles caps
-correctly (what gets *typed* is right), but the physical LED does not follow.
-This was confirmed by watching both `/sys/class/leds` entries — the emulated
-i8042 keyboard and keyd's own virtual one — across real Caps Lock presses:
-they flip together, so sway is setting the LED correctly on the device it
-controls. What's missing is a light to set: this machine is a KVM guest with
-an *emulated* i8042 keyboard, nothing physical is attached to that LED, and
-the light on your real keyboard belongs to the hypervisor host, which is told
-nothing about caps state inside the guest. On real hardware, the device sway
-updates *is* the keyboard with the light attached, so this is expected to
-resolve itself — but that has not actually been observed on physical
-hardware as of this writing.
+(`setup/system/keyd/default.conf`): tapping it briefly toggles caps, and on a
+physical keyboard the indicator lights to match. Both `/sys/class/leds` caps
+entries — the real i8042 keyboard's and keyd's own virtual one — flip together
+across a tap, which also shows that sway can set LED state on a device keyd
+holds an exclusive grab on. A grab blocks other readers; it does not block
+writing an LED.
+
+On a virtual machine none of that is visible, because an emulated i8042
+keyboard has no lamp attached and the light on your real keyboard belongs to
+the host, which is told nothing about caps state inside the guest. That was
+once recorded here as an unresolved limitation, with a note that real hardware
+had never been tried; it has been now, and it behaves.
 
 **GPU rendering has been an open question on this VM, and its answer changed
 during development.** Early in this repository's history the VM's virtio GPU

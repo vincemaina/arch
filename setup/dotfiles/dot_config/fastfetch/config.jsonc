@@ -18,9 +18,10 @@
 // expect. Shell and terminal are omitted: they are always zsh and foot, and
 // you are looking at the terminal already.
 //
-// GPU is kept on purpose. It reports the virtio device, which is the
-// software-rendering situation recorded in DECISIONS.md under "The VM renders
-// in software" - a standing reminder rather than a surprise later.
+// GPU is kept on purpose: it names whatever is actually doing the rendering.
+// On a virtual machine that is a virtio device driven in software - the
+// situation recorded in DECISIONS.md under "The VM renders in software" - and
+// seeing it at a glance beats discovering it later.
 {
     "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
 
