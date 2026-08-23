@@ -152,6 +152,23 @@ if ignore_file.exists():
         if line and not line.startswith("#"):
             ignored.add("~/" + line)
 
+# A path that does not exist yet because nothing has created it YET is not the
+# same as a path the manual invented, and this check could not tell them apart.
+# ~/Pictures/wallpapers is where `wallpaper` keeps an image of your own -
+# dot_local/bin/executable_wallpaper builds it, and the comment beside it
+# explains why it sits deliberately outside the disposable generated cache. It
+# is created on the first custom wallpaper and not by the install, so demanding
+# that it exist fails on every machine where nobody has added one, which is
+# most of them. That is a false alarm, and a check that cries wolf about a
+# correct manual is worse than no check: this repository's own rule is that a
+# failing check must mean something.
+#
+# Listed here rather than derived from the helper, because the helper builds
+# the path from components - home() / "Pictures" / "wallpapers" - so there is
+# no literal string in the source to match on that is not a comment.
+created_on_demand = {"~/Pictures/wallpapers"}
+ignored |= created_on_demand
+
 missing = []
 seen = set()
 for path, text in text_of.items():
@@ -172,7 +189,8 @@ if missing:
     say("fail", f"{len(missing)} path(s) named in the manual do not exist: "
         + "; ".join(missing[:5]))
 else:
-    say("pass", f"all {len(seen)} repository paths named in the manual exist")
+    say("pass", f"all {len(seen)} repository paths named in the manual exist"
+        f" ({len(created_on_demand)} created on first use, acknowledged)")
 
 
 # ---------------------------------------------------------------- helpers
