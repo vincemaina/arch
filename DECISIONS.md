@@ -757,10 +757,16 @@ desktop looked assembled from parts rather than designed. The bar had been
 carefully styled, which made the mismatch elsewhere more obvious rather than
 less.
 
-`GTK_THEME` is set as well as the settings files. The settings files are the
-correct mechanism and cover applications that read them; the environment
-variable also catches ones started outside a normal desktop session, and works
-regardless of which GTK version an application happens to use.
+The settings files are the mechanism, and they are the only one. `GTK_THEME` was
+set alongside them for a while, on the reasoning that an environment variable
+also catches applications started outside a normal desktop session and works
+regardless of which GTK version an application uses. Both of those are true, and
+they cost more than they were worth: the variable overrides the settings files,
+so it fixed every GTK application to one mode for the life of the session and
+became the stated reason this desktop could not have a light theme. It is no
+longer set, `gtk-3.0/settings.ini` is a template that follows the selected
+theme's `mode`, and `checks/session.sh` checks the variable stays unset. See
+"Light themes, and the reason that did not survive being checked".
 
 The Wayland variables are about correctness as much as appearance. An
 application falling back to XWayland renders blurry on a scaled output and loses
@@ -2485,7 +2491,7 @@ Configuration for this machine is deliberately outside version control, so it is
 
 ## Switchable themes, and what a theme is allowed to cover
 
-**Decision:** `.chezmoidata/themes.toml` holds a table per theme. Which theme is selected is machine-local, in chezmoi's own config file under `[data]`, and `~/.local/bin/theme` writes it. A theme covers the desktop's own chrome and its wallpaper. It does not cover GTK applications, which fixes every theme as a dark theme.
+**Decision:** `.chezmoidata/themes.toml` holds a table per theme. Which theme is selected is machine-local, in chezmoi's own config file under `[data]`, and `~/.local/bin/theme` writes it. A theme covers the desktop's own chrome and its wallpaper. It does not re-colour GTK applications from the palette, but it does declare `mode`, and GTK follows that from light to dark — so a theme may be light, and three are. **This last part reverses the original decision; see "Light themes, and the reason that did not survive being checked" below.**
 
 ### Why
 
@@ -2501,6 +2507,7 @@ The mechanism is the interesting part, because **nothing here reads colours at r
 | rofi, swaylock | nothing — read on every launch |
 | starship | nothing — read per prompt |
 | foot | **cannot.** Terminals already open keep their colours |
+| GTK | nothing, per application — each reads `settings.ini` as it starts. The polkit agent and the GTK portal are long-running, so they are restarted |
 
 foot deserves the emphasis because it looks like it should work. `SIGUSR1` switches between the `[colors-dark]` and `[colors-light]` sections already present in the config, which is a different thing from rereading the file, so there is no signal that helps.
 
@@ -2510,7 +2517,7 @@ Three decisions inside the decision:
 
 **What triggers the reload.** A `run_onchange_` script, not the switcher. A theme switch is not the only way the colours change: editing a value in `themes.toml` and running `sync.sh` changes them too, and a reload owned by the switcher would not happen then. The rendered script embeds the theme name *and* a hash of the selected palette, so both cases re-run it.
 
-**How far a theme reaches.** GTK applications read `GTK_THEME` once at session start and cannot be recoloured from a palette without shipping real GTK themes. They stay Adwaita dark. The price is a rule: **every theme in `themes.toml` must be a dark theme**, because a light one would leave every dialog looking like it belonged to a different computer. That rule is the whole reason the boundary is written down rather than left to be discovered.
+**How far a theme reaches.** GTK applications cannot be recoloured from a palette without shipping real GTK themes, so they get stock Adwaita either way. What they do follow is which end of it: `mode`. *This originally read that they read `GTK_THEME` once at session start and therefore stay Adwaita dark, giving the rule that every theme must be dark. The premise was wrong — see below.*
 
 The wallpaper is part of a theme, generated from it rather than chosen, and generated **on the machine** rather than committed. The bar, the borders and the glow were tuned to sit against the background; a palette swap that left the old picture behind would clash with itself. And committing the images does not scale: three themes at one image each was already 7.8M of tracked PNG, and eight themes with four styles apiece would be around 90M, growing by roughly ten megabytes per theme added. That is precisely backwards, because the whole point of the arrangement is that adding a theme should be free. `~/.local/bin/wallpaper` renders and caches them, which is why it is the one piece of the theming machinery that lives in the dotfiles rather than in `tools/`.
 
@@ -2532,11 +2539,90 @@ Generating rather than committing also means the images are not reproducible fro
 
 **Colours read at runtime instead of rendered.** Not available. None of these programs support it; the closest is foot's two-section toggle, which is a light/dark switch and not a palette.
 
-**Let a theme carry GTK too, by declaring light or dark and rewriting `GTK_THEME`.** Rejected for now. `environment.d` is read when the user manager starts, so GTK would only catch up after a re-login — a switch that is half immediate and half not is worse than one with a stated boundary. Generating a GTK theme per palette was rejected as much the largest option for the least-used surface.
+**Let a theme carry GTK too, by declaring light or dark and rewriting `GTK_THEME`.** ~~Rejected for now.~~ **Adopted, by a different mechanism — see the next decision.** The reasoning here was that `environment.d` is read when the user manager starts, so GTK would only catch up after a re-login, making the switch half immediate and half not. That is true of `GTK_THEME` and false of the thing that actually decides. Generating a GTK theme per palette is still rejected, and still the largest option for the least-used surface.
 
 **Committing the generated images anyway.** Rejected on arithmetic. It also has a subtler cost: every theme added would make the repository bigger for everyone who clones it, which turns "add a theme" into a decision rather than a whim.
 
 **Fixed terminal colours across themes.** Rejected. A theme that changes the bar and leaves the terminal in the old palette looks half-applied. The sixteen ANSI colours travel with the theme, but keep their own identities — a theme that made `blue` gold would break every program that assumes a diff is red and green.
+
+---
+
+## Light themes, and the reason that did not survive being checked
+
+**Decision:** Every theme declares `mode`, `light` or `dark`. GTK follows it
+through `gtk-3.0/settings.ini`, and `GTK_THEME` is no longer set at all. Three
+light themes ship: `paper`, `daylight` and `sepia`.
+
+### Why
+
+The previous decision fixed every theme as dark, and gave a reason: GTK reads
+`GTK_THEME` once at session start, so a light desktop would leave every GTK
+dialog dark until the next login. The reason was specific, plausible, and
+load-bearing — it is why the rule was written into `CLAUDE.md`, the manual and
+`themes.toml`'s own header rather than left to be discovered.
+
+It was also wrong, and cheap to check. `GTK_THEME` is the loudest lever, not the
+only one. `gtk-3.0/settings.ini` is read by each GTK process **as it starts**,
+and it decides whenever `GTK_THEME` is unset. Launching pavucontrol with the
+variable unset and a `settings.ini` naming `Adwaita` rendered it fully light
+immediately, on the running machine, with no re-login. So the real boundary is
+not "needs a re-login" — it is the boundary foot already has and this repository
+already documents: **processes started after the switch follow it, ones already
+running do not.**
+
+The surface is also far smaller than the rule implied. Of the declared packages
+that pull in GTK, `waybar` and `greetd-regreet` are styled by this repository's
+own templates and never consult Adwaita, which leaves three that a light theme
+could have stranded: the polkit authentication dialog, `pavucontrol`, and the
+`xdg-desktop-portal-gtk` file chooser. `pavucontrol` is launched fresh every
+time and needs nothing. The other two are drawn by long-running user units, so
+`run_onchange_after_reload-theme.sh` restarts them for exactly the reason it
+already restarts waybar — and with that, nothing is left holding the old mode.
+
+Writing a light palette is not inverting a dark one, which is the part worth
+recording for whoever adds the fourth. Two values have to be aimed at rather
+than translated: `warning` and `info` must go dark enough to clear 4.5:1 against
+a near-white background, where a dark theme's bright amber and blue measure
+around 2:1; and `tertiary` fills the focused workspace disc with `text` on top,
+so it inverts from a mid-dark colour under light text to a light tint under dark
+text. The existing contrast floors needed no change at all — they sort the two
+luminances before dividing, so they were direction-agnostic already.
+
+### Trade-off
+
+A theme switch is now slightly more disruptive than it was. Restarting the
+polkit agent and the GTK portal is cheap and both are re-activated on demand,
+but if a switch lands while a file chooser is open or a password prompt is
+waiting, that dialog closes. A dialog to reopen is a smaller cost than a session
+spent half-light, and the alternative — leaving them — is the "configured and
+does nothing" failure this repository keeps meeting.
+
+`GTK_THEME` is also now a line that must *stay* absent. Setting it again would
+pin GTK to one mode and break nothing loudly; the dialogs would simply stop
+following the desktop. `checks/session.sh` checks for it, along with the mode of
+every theme against the measured luminance of its own background.
+
+### Alternatives considered
+
+**Keep the rule and refuse light themes.** Rejected once the premise was
+checked. A constraint is only worth its cost while its reason holds, and this
+one's reason was a hypothesis that had never been tested against the running
+system — the failure mode `CLAUDE.md` names, arriving in the documentation
+rather than the configuration.
+
+**Ship real GTK themes generated per palette.** Still rejected, unchanged from
+last time: much the largest option for the least-used surface. Light-or-dark is
+the part that actually matters here, and stock Adwaita provides both.
+
+**Set `GTK_THEME` from the theme instead of removing it.** Rejected. It would
+work only after a re-login, which is the very objection that blocked light
+themes before, and it would override `settings.ini` — so the immediate mechanism
+would stop working in order to keep a variable that adds nothing.
+
+**Restart every GTK application on a switch.** Rejected. There is no list of
+them, killing a user's running programs to recolour them is far past what a
+theme switch should do, and the two that genuinely matter are units this
+repository already owns.
 
 ---
 

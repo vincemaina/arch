@@ -25,11 +25,23 @@
 # is why adding a theme below costs nothing but the colours: there is no image
 # to produce, no binary to commit, and nothing that grows the repository.
 #
-# It does not cover GTK applications. Those follow GTK_THEME, which is read once
-# at session start and cannot be re-coloured from a palette without shipping
-# real GTK themes. They stay Adwaita dark, and the price of that is a rule:
-# EVERY THEME HERE MUST BE A DARK THEME. A light one would leave every dialog
-# looking like it belonged to a different computer. See DECISIONS.md.
+# It does not re-colour GTK applications from the palette - that would mean
+# shipping real GTK themes - but it does now decide whether they are light or
+# dark. Every theme declares `mode`, and that picks Adwaita against Adwaita-dark,
+# Papirus against Papirus-Dark, neovim's `background`, and which section foot
+# writes its colours into.
+#
+# This used to be a rule instead: EVERY THEME HERE MUST BE A DARK THEME, because
+# GTK reads GTK_THEME once at session start. The premise was wrong. GTK_THEME is
+# only the loudest lever, not the only one - gtk-3.0/settings.ini is read by each
+# GTK process as it starts, so a light theme needs no re-login, and dropping
+# GTK_THEME from environment.d is what lets settings.ini decide. What remains is
+# the boundary foot already has: applications started after the switch follow it,
+# ones already running keep what they had. The two that would otherwise stay
+# behind for a whole session - the polkit dialog and the file chooser - are
+# long-running user units, and the theme-reload script restarts them.
+#
+# So a theme may be light, and three are. See DECISIONS.md.
 #
 # WRITING A NEW ONE
 #
@@ -58,6 +70,7 @@ theme = "neon"
 
 [themes.neon]
 description = "Electric cyan and magenta on near-black. The loudest of the set."
+mode        = "dark"
     bg          = "#0b0e14"  # window background
     bar         = "#000000"  # the bar's base. Black, and deliberately not
                              # tinted here: the stylesheet mixes accent and
@@ -122,6 +135,7 @@ description = "Electric cyan and magenta on near-black. The loudest of the set."
 # and keeps the ember reading.
 [themes.ember]
 description = "Warm amber and coral on brown-black. The only warm theme."
+mode        = "dark"
     bg          = "#14100d"  # window background, black with a brown cast
     bar         = "#000000"  # as neon: the stylesheet tints it
     bg_dim      = "#0c0908"  # lock screen, behind everything
@@ -173,6 +187,7 @@ description = "Warm amber and coral on brown-black. The only warm theme."
 # of the neon palette, the whole thing is lower contrast by intent.
 [themes.slate]
 description = "Muted blue-violet on cool grey. Soft, low glare."
+mode        = "dark"
     bg          = "#11151a"  # window background
     bar         = "#000000"  # as neon: the stylesheet tints it
     bg_dim      = "#0b0e12"  # lock screen, behind everything
@@ -220,6 +235,7 @@ description = "Muted blue-violet on cool grey. Soft, low glare."
 # signal, because everything is already that colour.
 [themes.verdant]
 description = "Green on deep forest black. Calm, high contrast."
+mode        = "dark"
     bg          = "#0a1210"
     bar         = "#000000"
     bg_dim      = "#060c0a"
@@ -259,6 +275,7 @@ description = "Green on deep forest black. Calm, high contrast."
 # to reach for in a dark room.
 [themes.abyss]
 description = "Cyan and indigo on deep navy. Cold and deep."
+mode        = "dark"
     bg          = "#080f16"
     bar         = "#000000"
     bg_dim      = "#050a10"
@@ -299,6 +316,7 @@ description = "Cyan and indigo on deep navy. Cold and deep."
 # the usual rose, because a rose alarm on a pink desktop says nothing.
 [themes.orchid]
 description = "Purple and pink on aubergine. Rich, unusual."
+mode        = "dark"
     bg          = "#120b16"
     bar         = "#000000"
     bg_dim      = "#0b0710"
@@ -338,6 +356,7 @@ description = "Purple and pink on aubergine. Rich, unusual."
 # theme with different numbers.
 [themes.cobalt]
 description = "Bright blue and violet on midnight. Crisp and vivid."
+mode        = "dark"
     bg          = "#0a0f1c"
     bar         = "#000000"
     bg_dim      = "#060a14"
@@ -381,6 +400,7 @@ description = "Bright blue and violet on midnight. Crisp and vivid."
 # # the few things which do speak are heard.
 [themes.mono]
 description = "Greyscale on charcoal. No hue at all - colour only for warnings."
+mode        = "dark"
     bg          = "#0e0e10"
     bar         = "#000000"
     bg_dim      = "#08080a"
@@ -414,3 +434,162 @@ description = "Greyscale on charcoal. No hue at all - colour only for warnings."
     bright_magenta = "beb0c6"
     bright_cyan    = "a8c7c9"
     bright_white   = "e4e4e8"
+
+
+# ----------------------------------------------------------------------
+# The light themes
+# ----------------------------------------------------------------------
+#
+# These exist because GTK stopped being a reason they could not. The rule used
+# to be that every theme here had to be dark, on the grounds that GTK reads
+# GTK_THEME once at session start; the actual lever is gtk-3.0/settings.ini,
+# which every GTK process reads when it starts, so a light desktop needs no
+# re-login. `mode` above is what carries that: it picks the GTK theme, the icon
+# set, neovim's `background`, and which section foot writes its colours into.
+#
+# Designing one is not "invert the dark values". Two floors that a dark palette
+# meets without trying have to be aimed at deliberately here:
+#
+#   * warning and info are the awkward pair. The bright amber and bright blue
+#     that read well on near-black measure around 2:1 on near-white, so both go
+#     dark - an amber that is nearly brown, a blue that is nearly navy. They
+#     still read as amber and blue against the paper; they simply are not the
+#     colours a dark theme would use.
+#   * tertiary inverts its job. It fills the focused workspace disc with `text`
+#     written on top, so on a dark theme it is a mid-dark colour under light
+#     text and here it is a light tint under dark text. Taking a dark theme's
+#     tertiary across would leave the number invisible rather than merely dim.
+#
+# The sixteen ANSI colours keep the conventional mapping - the black family
+# dark, the white family light - because foot sets `foreground` and `background`
+# from `text` and `bg` separately, so the two do not have to be swapped. The one
+# that does move is bright_black: it carries comments in the editor, so on a
+# light theme it is a mid grey darker than the background rather than a light
+# grey brighter than it.
+
+[themes.paper]
+description = "Near-black on paper white. No hue at all - the e-ink theme."
+mode        = "light"
+    bg          = "#f6f6f3"  # paper. Very slightly warm, because a pure #ffffff
+                             # page glares under a lamp in a way this does not
+    bar         = "#ffffff"  # the bar's base, and the lightest thing on screen.
+                             # The stylesheet mixes accent and tertiary into it
+                             # exactly as it does on the dark themes; 22% of a
+                             # near-black secondary into white is a soft grey
+                             # wash rather than the glow it makes over black
+    bg_dim      = "#fbfbf9"  # lock screen, and the wallpaper's base colour
+    surface     = "#e6e6e1"  # inactive borders, hover
+    surface_alt = "#d5d5cf"  # separators
+    muted       = "#5c5c58"  # cpu and memory. 6.2:1 against the paper
+    text        = "#16161a"  # near-black, not black: 16.7:1 is already past
+                             # anything legibility asks for, and true black on
+                             # true white is the combination that shimmers
+    text_dim    = "#55555b"  # unfocused titles
+
+    accent      = "#16161a"  # focus is black here, the way ink is. This is the
+                             # greyscale counterpart to `mono`, and the reason
+                             # the theme works: nothing competes with the text
+    secondary   = "#45454b"  # secondary emphasis
+    tertiary    = "#c9c9c2"  # the focused workspace disc, light with dark text
+    ok          = "#2c6e49"  # the semantic four are the only colour in the
+    warning     = "#8a5a00"  # theme, which is the whole idea - when something
+    urgent      = "#a02020"  # goes amber or red on this desktop it is the only
+    info        = "#1a5090"  # coloured thing on screen and impossible to miss
+
+[themes.paper.term]
+    black          = "16161a"
+    red            = "a02020"
+    green          = "2c6e49"
+    yellow         = "8a5a00"
+    blue           = "1a5090"
+    magenta        = "7a3b8f"
+    cyan           = "1f6b6e"
+    white          = "d5d5cf"
+    bright_black   = "6e6e69"  # comments. 4.7:1, dark grey rather than light
+    bright_red     = "c04040"
+    bright_green   = "3f8a5f"
+    bright_yellow  = "a67400"
+    bright_blue    = "2f6fb0"
+    bright_magenta = "96559f"
+    bright_cyan    = "2f8487"
+    bright_white   = "fbfbf9"
+
+[themes.daylight]
+description = "Indigo and violet on white. The conventional light theme."
+mode        = "light"
+    bg          = "#fbfcfe"  # white with the faintest blue cast
+    bar         = "#ffffff"
+    bg_dim      = "#ffffff"
+    surface     = "#e8ecf2"
+    surface_alt = "#d6dce6"
+    muted       = "#5a6472"
+    text        = "#141922"
+    text_dim    = "#4e5a6b"
+
+    accent      = "#2b4ec4"  # indigo. Dark enough to sit on white at 6.8:1,
+                             # which the obvious brighter blue does not
+    secondary   = "#8a3fb5"
+    tertiary    = "#b9c6e8"
+    ok          = "#1f7a4d"
+    warning     = "#8a5a00"
+    urgent      = "#b32334"
+    info        = "#1a5fb4"
+
+[themes.daylight.term]
+    black          = "141922"
+    red            = "b32334"
+    green          = "1f7a4d"
+    yellow         = "8a5a00"
+    blue           = "1a5fb4"
+    magenta        = "8a3fb5"
+    cyan           = "0f6f7a"
+    white          = "d6dce6"
+    bright_black   = "68737f"
+    bright_red     = "d1495b"
+    bright_green   = "2f9a68"
+    bright_yellow  = "a67400"
+    bright_blue    = "2b7de0"
+    bright_magenta = "a95cd0"
+    bright_cyan    = "2a8f9c"
+    bright_white   = "ffffff"
+
+[themes.sepia]
+description = "Rust and olive on warm cream. Light without being white."
+mode        = "light"
+    bg          = "#f4ece0"  # cream. The light theme for a room with the lamp
+                             # on rather than the window open
+    bar         = "#fbf5ec"
+    bg_dim      = "#f9f2e8"
+    surface     = "#e6dccc"
+    surface_alt = "#d6c9b5"
+    muted       = "#6b5b48"
+    text        = "#241d15"  # warm near-black, so the text belongs to the paper
+    text_dim    = "#5c4d3c"
+
+    accent      = "#a3521a"  # rust
+    secondary   = "#8a5a7a"
+    tertiary    = "#d3bfa4"
+    ok          = "#4a6b2f"
+    warning     = "#8a5f0a"  # 4.8:1, the tightest value in any theme here. The
+                             # cream background costs it what the white ones
+                             # keep, so this one is not free to be brightened
+    urgent      = "#a52f2a"
+    info        = "#2a5f80"
+
+[themes.sepia.term]
+    black          = "241d15"
+    red            = "a52f2a"
+    green          = "4a6b2f"
+    yellow         = "8a5f0a"
+    blue           = "2a5f80"
+    magenta        = "8a5a7a"
+    cyan           = "2f6b68"
+    white          = "d6c9b5"
+    bright_black   = "6f6050"
+    bright_red     = "c25048"
+    bright_green   = "6a8c4a"
+    bright_yellow  = "a87c1e"
+    bright_blue    = "437fa5"
+    bright_magenta = "a87a98"
+    bright_cyan    = "4a8b88"
+    bright_white   = "f9f2e8"

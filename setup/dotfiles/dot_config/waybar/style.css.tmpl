@@ -264,7 +264,11 @@ window#waybar > box {
     /* The glow goes on hover. Dark text on a bright pill does not want a halo
      * in the pill's own colour behind it. */
     text-shadow: none;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.9);
+    /* Nearly opaque black is right over a black bar and far too heavy over a
+     * white one, where it reads as a smudge under the pill rather than lift.
+     * The colour stays black either way - a shadow is an absence of light, not
+     * a palette colour - and only how much of it lands changes. */
+    box-shadow: 0 3px 8px rgba(0, 0, 0, {{ if eq $palette.mode "light" }}0.25{{ else }}0.9{{ end }});
 }
 
 #idle_inhibitor:hover { background: @surface_alt; color: @text; }

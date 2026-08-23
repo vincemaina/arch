@@ -36,7 +36,11 @@ if vim.fn.exists('syntax_on') == 1 then
   vim.cmd('syntax reset')
 end
 vim.g.colors_name = 'arch'
-vim.o.background = 'dark'
+-- Follows the theme's own declaration rather than being asserted here.
+-- 'background' is not decoration: plugins and the built-in syntax defaults
+-- branch on it, so an editor rendering a light palette while claiming to be
+-- dark gets light-on-light from anything this file does not set explicitly.
+vim.o.background = '{{ $palette.mode }}'
 
 local p = {
   bg          = '{{ $palette.bg }}',

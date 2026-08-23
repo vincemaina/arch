@@ -3,10 +3,12 @@
 font={{ .font.family }}:size={{ .font.terminal }}
 pad=16x16
 
-# Stated rather than relied upon. It is the default, but the palette here is
-# dark-only, so being explicit means a change of default cannot quietly leave
-# the terminal reading a [colors-light] section that does not exist.
-initial-color-theme=dark
+# Stated rather than relied upon, and now it has something to state. foot picks
+# between a [colors-dark] and a [colors-light] section, and this file writes
+# exactly one of them - whichever the selected theme declares. The two have to
+# agree: naming a section foot is not reading is the silent-no-op failure this
+# repository keeps meeting, and it would show up as a terminal in stock colours.
+initial-color-theme={{ $palette.mode }}
 
 # Colours from the selected theme in .chezmoidata/themes.toml, so the terminal
 # changes with the rest
@@ -16,8 +18,9 @@ initial-color-theme=dark
 # so the path resolved to nothing and foot silently used its defaults.
 #
 # foot 1.26 renamed [colors] to [colors-dark], pairing it with [colors-light],
-# and warns on every launch if the old name is used.
-[colors-dark]
+# and warns on every launch if the old name is used. Which of the two is written
+# follows the theme, and initial-color-theme above selects the same one.
+[colors-{{ $palette.mode }}]
 # Background translucency, so the wallpaper shows faintly through a terminal.
 #
 # foot's own alpha rather than sway's `opacity`, which are not the same thing.
