@@ -298,19 +298,26 @@ qemu-img
 qemu-ui-gtk
 
 # The guest's graphics card. These are SEPARATE packages from qemu-system-x86 in
-# Arch, which is worth knowing before debugging: without them qemu starts and
-# then dies saying it does not know the device, and the configuration naming it
-# looks perfectly correct.
+# Arch, which is worth knowing before debugging: without them the device simply
+# is not there, and the configuration naming it looks perfectly correct.
 #
 # virtio-vga-gl is what ~/.local/bin/vm asks for first, and it is what makes a
-# desktop guest feel like a desktop rather than a slideshow. The -gpu-gl package
-# is what actually drags in virglrenderer - the -vga-gl package declares only
-# qemu-common and would give a GL device with nothing behind it.
+# desktop guest feel like a desktop rather than a slideshow.
+#
+# ALL FOUR ARE NEEDED, which is not obvious and was found by installing two and
+# watching it not work. The -gl devices are subclasses of the plain ones, so
+# with only the -gl modules present qemu lists NEITHER: `-device help` showed no
+# virtio device at all, and nothing anywhere said why. The plain modules
+# register the base device the -gl module then extends. Separately, -gpu-gl is
+# what actually drags in virglrenderer; -vga-gl declares only qemu-common and
+# would leave a GL device with no renderer behind it.
 #
 # The script degrades on its own if these are absent, ending at std VGA with a
 # warning, so a machine that skips them still runs guests. It just runs them
 # without acceleration.
+qemu-hw-display-virtio-vga
 qemu-hw-display-virtio-vga-gl
+qemu-hw-display-virtio-gpu
 qemu-hw-display-virtio-gpu-gl
 
 # Guest audio, straight into the pipewire this desktop already runs.

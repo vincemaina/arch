@@ -1,6 +1,6 @@
 # Software this setup installs
 
-One hundred and seven packages are declared across [`setup/packages/`](../../setup/packages/).
+One hundred and nine packages are declared across [`setup/packages/`](../../setup/packages/).
 This document accounts for every one of them: what it is for, where its
 rationale lives, and what it costs on the machine.
 
@@ -291,8 +291,10 @@ the line, **↓** means an entry below in this document.
 | `qemu-system-x86` | The emulator. Runs the guest, with KVM doing the actual work | M, D: Virtual machines with qemu alone, and clones that cost nothing |
 | `qemu-img` | Creates the disks, and creates a clone as an overlay rather than a copy | ↓ |
 | `qemu-ui-gtk` | The window the guest is drawn in. GTK over SDL because `gtk3` is already installed, so the difference is `vte3` at 1.8 MiB | ↓ |
-| `qemu-hw-display-virtio-vga-gl` | The guest's graphics card, accelerated. A **separate package** from the emulator — without it qemu dies naming an unknown device | ↓ |
-| `qemu-hw-display-virtio-gpu-gl` | What actually pulls in `virglrenderer`; the `-vga-gl` package declares only `qemu-common` and would leave a GL device with nothing behind it | ↓ |
+| `qemu-hw-display-virtio-vga` | The guest's graphics card. A **separate package** from the emulator — without it the device is simply absent | ↓ |
+| `qemu-hw-display-virtio-vga-gl` | The same card with 3D acceleration. A subclass of the above, so it needs it present to register at all | ↓ |
+| `qemu-hw-display-virtio-gpu` | The base GPU device the VGA ones are built on | ↓ |
+| `qemu-hw-display-virtio-gpu-gl` | What actually pulls in `virglrenderer`; the `-vga-gl` package declares only `qemu-common` and would leave a GL device with no renderer behind it | ↓ |
 | `qemu-audio-pipewire` | Guest audio, straight into the pipewire this desktop already runs | ↓ |
 | `edk2-ovmf` | UEFI firmware for the guest. Declared although `qemu-system-x86` depends on it, because `~/.local/bin/vm` names the firmware file directly — the same reasoning as `polkit` and `mesa` | ↓ |
 
@@ -740,21 +742,35 @@ debugging it:
   decision, not two. The name is at the limit of what earlyoom can match: `comm`
   truncates `qemu-system-x86_64` to the fifteen bytes `qemu-system-x86`.
 
-**Cost.** Disk, from `pacman -Si` before installation: `qemu-system-x86`
-54.97 MiB, `edk2-ovmf` 15.57 MiB, `qemu-img` 10.74 MiB, `vte3` 1.79 MiB pulled
-in by `qemu-ui-gtk`, `virglrenderer` 1.45 MiB pulled in by
-`qemu-hw-display-virtio-gpu-gl`, and the four qemu modules themselves under
-400 KiB between them. `qemu-common` adds 4.63 MiB. Roughly **90 MiB** installed.
+**Cost.** Measured with `pacman -Qi` on **2026-08-23**, after installation:
 
-**Resident cost is nil when no guest is running** — there is no daemon, which is
+| Declared | Size |
+| --- | ---: |
+| `qemu-system-x86` | 54.97 MiB |
+| `edk2-ovmf` | 15.57 MiB |
+| `qemu-img` | 10.74 MiB |
+| `qemu-ui-gtk` | 130.52 KiB |
+| `qemu-hw-display-virtio-gpu` | 118.39 KiB |
+| `qemu-hw-display-virtio-gpu-gl` | 94.58 KiB |
+| `qemu-audio-pipewire` | 94.38 KiB |
+| `qemu-hw-display-virtio-vga` | 62.34 KiB |
+| `qemu-hw-display-virtio-vga-gl` | 62.27 KiB |
+| **declared total** | **81.8 MiB** |
+
+New dependencies pulled in alongside them — `qemu-common`,
+`qemu-system-x86-firmware`, `seabios`, `vte3`, `vte-common`, `virglrenderer`,
+`dtc`, `libcbor`, `capstone`, `libslirp`, `libxdp`, `ndctl`, `numactl`,
+`rdma-core`, `vde2`, `wolfssl`, `libaio`, `libtraceevent`, `libtracefs` and
+`qemu-ui-opengl` — come to **43.0 MiB**, for about **125 MiB** on disk in total.
+
+**Resident cost is nil when no guest is running.** There is no daemon, which is
 a large part of why libvirt was not chosen. A running guest costs whatever `-m`
-allows it plus a small qemu overhead, and `vm.conf` is where that number lives.
+allows it plus qemu's own overhead, and `vm.conf` is where that number lives —
+the default is half of host RAM, which is 3840 MiB here.
 
-*Not yet measured on this machine.* These figures are `pacman -Si` sizes rather
-than `pacman -Qi` ones, and no running guest has been measured, because the
-packages were declared before they were installed. This section should be
-re-measured on the date they land and this paragraph removed — the format above
-asks for measured numbers and these are not.
+**A machine costs almost nothing until it runs.** Measured: a clone of a 10 GiB
+base image is **196 KiB** on disk at creation. That is the overlay working as
+intended rather than an estimate.
 
 ## Gaps this document does not close
 
