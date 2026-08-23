@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-23 12:21'
-updated_date: '2026-08-23 14:27'
+updated_date: '2026-08-23 15:15'
 labels: []
 dependencies: []
 priority: medium
@@ -28,7 +28,7 @@ further more blueooth should be in the waybar if being used e.g. if connected to
 - [x] #1 bluez and bluez-utils are declared in setup/packages/desktop.txt, and nothing in the repository enables bluetooth.service - so a machine with no bluetooth runs no bluetooth process
 - [x] #2 Turning bluetooth on and off is one command, reachable from the launcher, that both starts/stops the daemon now and decides whether it starts at boot
 - [x] #3 The waybar module is entirely invisible when no controller is present - daemon stopped, or no bluetooth hardware - and visible whenever the daemon is running; both states verified by screenshot
-- [ ] #4 Daemon running with nothing connected is visually distinct from connected, so a process running unnecessarily is noticeable
+- [x] #4 Daemon running with nothing connected is visually distinct from connected, so a process running unnecessarily is noticeable
 - [x] #5 Clicking the module opens the bluetooth menu, and checks/session.sh, sway-commands.sh, packages.sh and manual.sh all pass
 - [x] #6 The manual, docs/software/README.md and DECISIONS.md record how to use it and why blueman was rejected
 <!-- AC:END -->
@@ -91,6 +91,12 @@ AC 4 IS NOT CHECKED, DELIBERATELY
 The 'daemon running, nothing connected' state is verified. The CONNECTED state is not: no bluetooth device was available to pair, so nothing has ever exercised format-connected or the .connected class. Both are documented in waybar 0.15.0's own man page and the CSS parsed without error (waybar would have died otherwise), so the risk is cosmetic - a connected device showing in the default colour rather than secondary. It needs one real device and about a minute to close.
 
 Machine left with bluetooth OFF (disabled and stopped), which is the state it was in before this task.
+
+AC 4 closed 2026-08-23 after the merge. A real speaker (DM-40BT) was paired, trusted and connected; it arrived in PipeWire as the default sink, confirming that bluetooth audio needs no extra packages because pipewire-audio already carries the bluez5 plugin and codecs. The connected state renders as the glyph plus the device alias in @secondary magenta, plainly distinct from the @warning amber of the idle .on state and the @info blue of cpu beside it. Every state the module can display has now been observed.
+
+The change was then applied to the live machine with chezmoi apply and waybar restarted: checks/session.sh went from 95/0/1 to 98 passed, 0 failed, 0 skipped, the previously skipped assertion being the one that needed the module present in the rendered config.
+
+Two pairing lessons, neither changing the code: bluez expires unpaired devices seconds after discovery stops, so pairing must happen while a scan is running and after the device has been seen in it - otherwise it fails with 'Device not available', which reads like a rejected pairing and is not one. And bluetoothctl reads stdin, so inside a 'while read' loop it eats the loop's input and the loop stops after one iteration; every call needs </dev/null. Both are reasons the helper hands pairing to an interactive bluetoothctl rather than scripting it.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
