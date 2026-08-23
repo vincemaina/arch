@@ -202,9 +202,17 @@ config reads it *last* — so whatever you put there wins.
 | Tool | Your file |
 | --- | --- |
 | The shell | `~/.config/zsh/local.zsh` |
-| Sway | any `~/.config/sway/config.d/99-*.conf` |
+| Sway | `~/.config/sway/config.d/99-local.conf` |
+| The terminal | `~/.config/foot/local.ini` |
+| Git | `~/.config/git/local` |
 | Session environment | any `~/.config/environment.d/99-*.conf` |
 | keyd (system-wide remapping) | `/etc/keyd/local` |
+
+Each is created for you and then left alone forever, so anything you write in
+one stays. Notifications are the one gap: **mako has no local file**, because
+it refuses to start at all if the file is missing, and a notification daemon
+that dies silently is worse than not having the hatch. Its font and colours are
+already yours through the theme and the font settings below.
 
 Editing keyd's file needs `sudo`, and `sudo keyd check` before `sudo keyd
 reload` — a config keyd cannot parse leaves the machine with no working

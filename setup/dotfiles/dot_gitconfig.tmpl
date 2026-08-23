@@ -73,3 +73,8 @@
 #                    A second copy here is a second thing to keep in step.
 #   commit.gpgsign - there is no signing key on a machine this repository
 #                    builds, and TASK-38 decided not to provision one.
+
+# Machine-local overrides, included last so they win. Created once by chezmoi
+# and never rewritten; see the file itself.
+[include]
+    path = ~/.config/git/local

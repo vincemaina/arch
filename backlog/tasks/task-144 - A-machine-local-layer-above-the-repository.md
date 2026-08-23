@@ -4,6 +4,7 @@ title: A machine-local layer above the repository
 status: To Do
 assignee: []
 created_date: '2026-08-23 11:40'
+updated_date: '2026-08-23 11:59'
 labels: []
 dependencies: []
 priority: high
@@ -39,3 +40,12 @@ This is deliberately NOT TASK-14. Profiles answer 'this is a laptop, so show a b
 - [ ] #3 No tracked file names a specific machine in order to make this work
 - [ ] #4 A fresh install still produces a working desktop with an empty local layer
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Subtasks 1-3 complete. Remaining before this parent can close:
+  * A fresh VM build, which is the only real test this repository has and the one thing I cannot run. AC 4 ('a fresh install still produces a working desktop with an empty local layer') is unverified until then.
+  * Tools not yet given a local file: waybar (include array, CSS @import), rofi (@import), mpv (include=), nvim (pcall dofile). Each needs its missing-file behaviour measured first - mako proved that is not a formality.
+  * starship, yazi and GTK settings.ini support no include at all and can only ever be reached by the values layer.
+<!-- SECTION:NOTES:END -->

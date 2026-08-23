@@ -1650,6 +1650,13 @@ else
     for f in "$sway_config_dir"/*.conf; do
         [[ -f "$f" ]] || continue
         base="$(basename "$f")"
+        # A create_ file is written once and then belongs to the machine, so
+        # there is nothing here for a hash to detect: chezmoi never rewrites
+        # it, and the edits that matter happen to the TARGET, which this
+        # repository does not see. Hashing it would add a line that can never
+        # change - which reads as coverage and provides none. The seeded file
+        # tells its reader to reload sway themselves.
+        [[ "$base" == create_* ]] && continue
         grep -qF "$base" "$sway_reload_tmpl" || unhashed+="$base "
     done
     if [[ -n "$unhashed" ]]; then

@@ -2400,6 +2400,12 @@ Tool support, taken from each tool's own manual rather than assumed: `foot` has 
 
 **Starship, yazi and GTK's `settings.ini` support no include at all.** Those can only be reached by the values layer, which is the other reason it exists.
 
+**A missing local file must be harmless, and that rules mako out.** The escape hatch only works if deleting the file is survivable, because the file is untracked and looks like clutter. Every mechanism used here degrades safely, and each was measured rather than assumed: `.zshrc` guards with `[[ -r ]]`, sway's `config.d/*.conf` glob matches nothing, git ignores an include it cannot open (exit 0), and foot logs an error and starts anyway - only its `--check-config` returns non-zero.
+
+mako is the exception and is deliberately excluded. A missing include makes it print `Failed to parse config` and exit *before it reaches the bus*, and `mako.service` is `Restart=always`, so the result is a crash-looping daemon and silently no notifications. It offers no conditional include to guard with. The trade was not close either way: mako only accepts `include` among the global options before the first criteria, so a local file could override globals and would still lose to the criteria blocks below - a small win against a dead daemon.
+
+That is the general rule this produces: **an escape hatch whose absence breaks the program is not an escape hatch.** Check the missing-file case before adding a tool to this layer.
+
 ### Why this is not the same as machine profiles
 
 Profiles - templating a laptop's battery module in and a VM's out - are a separate mechanism for a separate question, and both are wanted. A profile answers *"this machine is a laptop"*. The local layer answers *"I like this font bigger"*. Collapsing them would mean declaring a profile for every personal preference, which puts the repository back in the way of trying something quickly - exactly what the shell escape hatch was introduced to stop.

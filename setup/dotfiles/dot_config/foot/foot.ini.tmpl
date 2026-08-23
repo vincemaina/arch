@@ -97,3 +97,10 @@ notify=yes
 # `terminal-copy-all` here would resolve to nothing and the key would do
 # nothing, silently. This is the same trap waybar's click commands document.
 pipe-scrollback=[{{ .chezmoi.homeDir }}/.local/bin/terminal-copy-all] Control+Shift+a
+
+# Machine-local overrides, loaded last. See the file itself for what belongs
+# in it. [main] is re-opened deliberately: foot only accepts `include` in that
+# section, and this was measured - an include inside [key-bindings] is rejected
+# outright, while foot keeps parsing after an include, so last really is last.
+[main]
+include={{ .chezmoi.homeDir }}/.config/foot/local.ini

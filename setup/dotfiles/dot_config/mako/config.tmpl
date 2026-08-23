@@ -34,6 +34,28 @@ max-visible=5
 
 format=<b>%s</b>\n%b
 
+# NO MACHINE-LOCAL INCLUDE HERE, AND THAT IS DELIBERATE.
+#
+# Every other escape hatch in this setup is safe when its file is missing:
+# .zshrc guards with [[ -r ]], sway's config.d/*.conf glob simply matches
+# nothing, git ignores an include it cannot open, and foot logs a warning and
+# starts anyway. All four were measured.
+#
+# mako is the exception. A missing include is fatal - it prints "Failed to
+# parse config" and exits before it ever reaches the bus, and mako.service is
+# Restart=always, so the result is a crash-looping notification daemon and
+# silently no notifications. mako offers no conditional include to guard it
+# with.
+#
+# The trade was not close. mako only accepts `include` among the global options
+# before the first criteria, so a local file could override globals and would
+# still LOSE to the criteria blocks below - a small win, against a dead daemon
+# if the file is ever deleted. Font and colours, the two things anyone would
+# reach for, are already machine-local through .chezmoidata and the theme.
+#
+# If mako ever gains a conditional include, this is the place to revisit.
+
+
 # Quieter than normal: present, but not asking for anything.
 [urgency=low]
 border-color={{ $palette.muted }}

@@ -1,0 +1,15 @@
+# Git settings for this machine only.
+#
+# Created once and never rewritten; nothing here is tracked. Included LAST from
+# ~/.gitconfig, and git takes the last value it reads, so a setting here wins.
+#
+# The obvious use is a different identity for work on this machine:
+#
+#     [user]
+#         email = you@employer.example
+#
+# Note the repository already sets user.name and user.email from
+# setup/install.conf, so overriding them here is a machine-local decision that
+# leaves no diff - the same bargain as the selected theme.
+#
+# Check what actually applies with:  git config --list --show-origin
