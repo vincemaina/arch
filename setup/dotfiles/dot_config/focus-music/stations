@@ -1,4 +1,10 @@
-# Stations for ~/.local/bin/focus-music. One per line: a name, a TAB, a URL.
+# Stations for ~/.local/bin/focus-music. One per line: a name, a TAB, a target.
+#
+# A target is either a URL, played directly, or the word search: followed by
+# text, which is handed to YouTube and resolved to whatever it finds now. The
+# picker also offers an ad-hoc search, and anything kept from one is written as
+# the second kind - see WHAT IS KEPT IS A SEARCH, NOT A LINK in the helper.
+# `focus-music --check` resolves every line here and says what no longer answers.
 #
 # Tracked here rather than inside the helper, so adding a station is editing
 # data rather than editing a script - and so a rebuilt machine has the same

@@ -18,25 +18,93 @@ Run it again while something is already playing and it does not open a
 second stream — it asks "Stop" or "Change station" instead, because stacking
 streams is never what pressing the same launcher entry twice means.
 
-**To add a station**, edit
-`setup/dotfiles/dot_config/focus-music/stations`. Each line is a name, a tab,
-and a direct audio URL:
+### Searching YouTube
+
+The first entry in the list is **Search YouTube...**. Choose it, type
+anything — a song, an album, an artist, one of the 24/7 study streams — and
+the results come back saying how long each one is, or `LIVE` where it is a
+live broadcast rather than a recording:
+
+```text
+LIVE      lofi hip hop radio - beats to relax/study to
+10:00:00  chill music for work - lofi beats to stay productive
+1:01:14   1 A.M Study Session
+```
+
+Choosing one plays its audio exactly the way a station plays: the same
+background `mpv`, the same bar widget, the same playback keys, no window. It
+takes a second or two to start, because `yt-dlp` has to resolve the page
+first. Channels are filtered out of the results — only things that actually
+play are offered.
+
+### Keeping one, and why it keeps the search
+
+Nothing you search for is written down. To keep what is playing, run
+`focus-music` again and choose **Keep this station**. It is appended to
+`~/.config/focus-music/stations.local`, a file that exists only on this
+machine and that chezmoi does not manage — so keeping something is not a
+repository change, and `chezmoi apply` will not clobber it. Delete a line to
+forget it.
+
+What gets written there is the *search*, not the link:
+
+```text
+lofi hip hop radio	search:lofi hip hop radio
+```
+
+A video id is a link, and links rot. The video is deleted, or the channel
+restarts its 24/7 broadcast under a new id and every id anyone wrote down for
+it dies at once — which is not hypothetical, it is what the comments in the
+tracked station list describe. A search cannot rot: it is resolved again
+every time you press play, so the entry still works after the thing behind it
+has moved.
+
+The trade-off is real and worth knowing. A search can drift onto a different
+video if the original disappears. Silence would be worse.
+
+### Adding a station by hand
+
+Edit `setup/dotfiles/dot_config/focus-music/stations`. Each line is a name, a
+tab, and a target. A target is either a direct audio URL:
 
 ```text
 Chilled downtempo · Groove Salad	https://ice1.somafm.com/groovesalad-128-mp3
 ```
 
+or a search, resolved through YouTube when it is played:
+
+```text
+Minecraft soundtrack	search:minecraft soundtrack full album
+```
+
 Comments and blank lines are ignored, and are used in the tracked file to
-group stations by mood. Prefer a direct audio stream over a page that has to
-be resolved — the radio stations shipped here were each checked returning
-audio before being written down, precisely so nothing there depends on a
-resolving step that can silently break later. One entry breaks that rule
-deliberately: no internet radio station carries Minecraft's soundtrack, so
-that station is a YouTube URL which `yt-dlp` resolves each time it starts,
-which is why it takes a few seconds to begin and why it is the one station
-that can be broken by a change at YouTube's end. `yt-dlp` also lets you point
-plain `mpv` at any YouTube or SoundCloud link from a terminal. Run
-`./sync.sh` after editing so the change reaches the machine.
+group stations by mood. Prefer a direct audio stream where one exists — the
+radio stations shipped here were each checked returning audio before being
+written down, and they start instantly because nothing has to be resolved
+first. Reach for a search when no station carries what you want, which is how
+the Minecraft entry got there. Run `./sync.sh` after editing so the change
+reaches the machine.
+
+### Checking that nothing has gone dead
+
+```bash
+focus-music --check
+```
+
+resolves every entry in both files and reports what each one did: a direct
+stream is asked for a byte of audio, a YouTube link and a saved search are
+both put through `yt-dlp`. Anything that no longer answers is named, and the
+command exits non-zero.
+
+```text
+  stream   ok             Chilled downtempo · Groove Salad
+  youtube  GONE           Something that was deleted
+  search   ok             lofi hip hop radio
+```
+
+This is the counterweight to a list that can grow: searches look after
+themselves, and this is how the handful of real links get pruned on purpose
+rather than discovered dead halfway through a working afternoon.
 
 ## The audio visualiser
 

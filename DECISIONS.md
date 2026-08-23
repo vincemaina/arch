@@ -2882,6 +2882,69 @@ is one file, not a site with navigation and a search index.
 
 ---
 
+## Music is searched for, and what is remembered is the search
+
+`focus-music` began as a fixed list of direct audio URLs, on the reasoning that
+a station which needs resolving is a station that can break for reasons nobody
+can see. TASK-145 met the limit of that: Minecraft's soundtrack is carried by no
+internet radio station anywhere, so the only way to have it was a YouTube link.
+TASK-147 followed the same road to its end and made search a first-class way in
+— type anything, see durations and whether a result is live, play its audio —
+because a music feature you can only extend by editing a file and running
+`sync.sh` is not one you reach for when a particular song is in your head.
+
+That raises the obvious problem: a growing pile of YouTube ids is a growing pile
+of links waiting to rot, discovered one silence at a time. The answer is in what
+gets stored. **A kept station records the search text, never the video id it
+resolved to**, and the query is run again on every play.
+
+### Why
+
+A video id is a promise that a specific thing will still be there. It is broken
+by a deletion, and broken wholesale when a channel restarts a 24/7 broadcast
+under a new id — which is not a hypothesis, it is what the evidence in TASK-145
+showed that channel doing repeatedly. A search makes no such promise and so
+cannot break in that way. It also repairs itself across exactly the failure that
+kills ids: the live stream that came back under a new number is found again by
+the same words.
+
+Two smaller decisions fall out of it. Nothing is written down unless it is
+deliberately kept, so browsing leaves no residue at all. And what is kept goes
+in `~/.config/focus-music/stations.local`, which chezmoi does not manage, so
+keeping a station on one machine is not a commit and `chezmoi apply` cannot
+clobber it — the same machine-local escape hatch the theme selection uses.
+
+### Trade-off
+
+A search can drift. If the video behind it disappears, the next play resolves to
+whatever now ranks first for those words, which may not be what was meant. That
+is accepted deliberately: drifting to something adjacent is a smaller failure
+than silence, and it is visible the moment it happens, which a dead id is not.
+
+Resolving also costs a second or two before sound, where a direct stream starts
+immediately. So the tracked radio stations stay direct URLs; search is what you
+reach for when nothing carries what you want.
+
+### Alternatives considered
+
+**Store the id and prune dead ones periodically.** This is the version that
+needs a chore, and a chore that only matters when it has already been skipped.
+The failure is silent and the fix is manual — the exact shape this repository
+keeps getting caught by.
+
+**Store nothing at all; search every time.** Very nearly right, and it is the
+default. But a stream you return to daily should not have to be retyped daily.
+
+**Resolve a channel's `/live` URL instead of an id, for live streams.** Tested
+during TASK-145 and rejected on evidence: the channel checked was serving an
+unrelated broadcast on that URL, so it names a slot rather than a thing.
+
+`focus-music --check` covers the remainder — the direct URLs and the one pinned
+video id that do exist — by resolving every entry and naming what no longer
+answers, so pruning is a decision rather than a discovery.
+
+---
+
 # Guiding principle
 
 When evaluating future changes, prefer the option that best preserves this balance:
