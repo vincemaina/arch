@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-23 15:58'
-updated_date: '2026-08-23 21:19'
+updated_date: '2026-08-23 22:47'
 labels: []
 dependencies:
   - TASK-69.2
@@ -40,12 +40,12 @@ Also verify: whether key passthrough actually improves. The claim is that sway g
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A Virtual machine entry appears in the login screen beside Sway
-- [ ] #2 Selecting it boots the guest full-screen with no sway, waybar, mako or swayidle running
-- [ ] #3 Exiting the guest returns to the login screen rather than a blank or broken session
-- [ ] #4 The entry reaches a running machine through sync.sh, not only through a fresh install
+- [x] #1 A Virtual machine entry appears in the login screen beside Sway
+- [x] #2 Selecting it boots the guest full-screen with no sway, waybar, mako or swayidle running
+- [x] #3 Exiting the guest returns to the login screen rather than a blank or broken session
+- [x] #4 The entry reaches a running machine through sync.sh, not only through a fresh install
 - [ ] #5 Key passthrough into the guest is measured under cage and under sway, and the result is written down
-- [ ] #6 checks/session.sh passes, and docs/manual/ describes the new session
+- [x] #6 checks/session.sh passes, and docs/manual/ describes the new session
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -93,4 +93,16 @@ STILL NEEDS, once the user is free and comfortable with root actions / a live te
   - AC3: exiting returns to the login screen - same
   - AC4: entry reaches a running machine via sync.sh, not only a fresh install - this literally IS the sync.sh run, so it and AC1 close together
   - AC5: key passthrough measurement - needs either a uinput probe (root) or a live login-screen test with a real keyboard; the structural argument (cage has no keybinding mechanism at all) is written up in DECISIONS.md, honestly marked as reasoned rather than measured
+
+User tested the real login-screen session live and found two real, reproducible bugs beyond what any of my own testing had caught:
+
+1. Sway showed 'There are errors in your config file' permanently on first login inside the guest - black screen, no waybar. Reproduced directly by mounting a fresh, never-booted clone's disk read-only: ~/.local/share/wallpapers/ does not exist, and sway's rendered config names that exact missing file as the background - a missing bg image is a CONFIG ERROR to sway, not a runtime warning, hence total and permanent failure rather than just a missing picture. Confirmed non-transient by watching a fresh boot at 8/22/40s - still stuck at 40s. Root cause is in the base image build (05-dotfiles.sh's wallpaper generation step, which its own comments already anticipated could fail this way). Fixed in tools/build-vm-image.sh: explicit 'wallpaper --ensure' after 05-dotfiles.sh, failing the whole build loudly if the file is still missing. Verified by applying the identical fix to the stuck guest (overlay edit, not a write to the base - safe) and rebooting it clean. Filed TASK-157 to check whether this also affects a real install.sh run on physical hardware, since if so it is a much bigger deal than a VM-specific issue.
+
+2. User did not want to enter a second password inside the guest having already authenticated at the host. Implemented via greetd's initial_session, added ONLY to the built guest's own config (never setup/system/greetd/ - a real machine keeps its interactive login exactly as DECISIONS.md requires). Verified live: a patched guest reaches its own desktop with no login prompt.
+
+CURRENT base.qcow2 predates BOTH fixes and would need a full rebuild through the updated builder (or the same manual overlay-patch) to benefit new clones automatically. Deferred - user asked me to stop requesting so many pkexec passwords this session, and a rebuild needs two more (root + guest user).
+
+Also found and left unresolved: after the user's VM session closed and they logged into host Sway, the host's own journal shows repeated 'Atomic commit failed: Device or resource busy' DRM errors for several minutes (22:43-22:47ish) before settling - sway itself never crashed, but the screen was very likely black/unresponsive during that window. Not reproduced or root-caused; the user did not describe experiencing this directly, and no lingering qemu/cage process was found afterward. Left as a known, unexplained finding rather than guessed at.
+
+AC5 (live key-passthrough measurement) remains unmeasured - /dev/uinput is still root-only and a live measurement was not attempted this session, consistent with the earlier decision to keep the structural argument (documented in DECISIONS.md) rather than force a root-requiring probe while password requests were explicitly being minimized.
 <!-- SECTION:NOTES:END -->
