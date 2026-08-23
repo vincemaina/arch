@@ -555,7 +555,14 @@ ruled out the AUR route in TASK-43.
 `script=/usr/lib/mpv-mpris/mpris.so` in `~/.config/mpv/mpv.conf` — without it
 mpv plays perfectly and nothing on the desktop can see it. `mpv` is started
 with `systemd-run --user --scope` so it dies with whatever launched it rather
-than surviving in an orphaned cgroup. Stations are tracked data in
+than surviving in an orphaned cgroup. It is started once, idle, listening on a
+JSON IPC socket, and everything after that — queue this, play that now,
+reorder, remove, stop — is a message to that socket, sent by
+`~/.local/lib/mpv_queue.py`, which is the only thing that speaks it. The queue
+is mpv's own playlist, so nothing here keeps a second copy of it that could
+disagree. Addressing mpv by its socket also fixed a real bug: stopping used to
+be `pkill -x mpv`, which killed every mpv the user had running, including one
+playing a film. Stations are tracked data in
 `~/.config/focus-music/stations`, reached through `~/.local/bin/focus-music`,
 alongside whatever a machine has kept in `stations.local`. `yt-dlp` is no
 longer an accessory to that path but part of it: the helper searches YouTube

@@ -15,8 +15,35 @@ widget and the hardware playback keys control it exactly as they would
 anything else the moment it starts.
 
 Run it again while something is already playing and it does not open a
-second stream — it asks "Stop" or "Change station" instead, because stacking
-streams is never what pressing the same launcher entry twice means.
+second stream. It asks what to do with what is on instead: stop it, play
+something else, look at the queue, skip to the next track, or keep the
+current one.
+
+### The queue
+
+Pick a station or a search result while something is already playing and you
+are asked where it should go:
+
+| | |
+| --- | --- |
+| **Play now** | start it immediately, and keep everything already queued behind it |
+| **Play next** | put it directly after what is playing |
+| **Add to queue** | put it at the end |
+
+With nothing playing there is no question — it just plays.
+
+**Queue (n)** in the menu opens the queue itself. The track playing is marked
+with `>`, and choosing any entry offers to play it now, move it up or down,
+or remove it. **Clear the queue** drops everything except what is currently
+playing, so the music does not stop when you tidy up.
+
+The queue is `mpv`'s own playlist rather than a list kept beside it, so there
+is no second copy that can disagree about what is lined up. One consequence
+is worth knowing: a track that has finished stays in the list above the one
+playing, as history, rather than disappearing.
+
+When the last track ends, the music stops and the bar clears. A radio station
+never ends, so it plays until you stop it.
 
 ### Searching YouTube
 
