@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-23 00:14'
-updated_date: '2026-08-23 09:57'
+updated_date: '2026-08-23 10:35'
 labels: []
 dependencies: []
 priority: medium
@@ -73,6 +73,14 @@ Documentation added (no functional repo change was needed or made):
   - setup/system/keyd/default.conf: the 'Left Control sits in the far bottom corner' premise is false on a ThinkPad, where the corner is Fn. Also a warning not to stack the BIOS Fn/Ctrl swap on keyd's swap.
   - DECISIONS.md: new subsection 'The firmware underneath it, on a ThinkPad' under the keyd decision.
   - docs/manual/03-the-keyboard.md: 'If they do nothing at all, on a laptop' under Media keys, plus a geometry correction in the swap section.
+
+REVERTED the FnCtrlKeySwap change. Setting it to Disable returned Fn to the corner but left Alt unreachable: keyd monitor showed the labelled-Alt key emitting leftcontrol and BOTH the corner and labelled-Ctrl keys emitting nothing, with zero leftalt events across a 218-event capture of ordinary typing. FnCtrlKeySwap is back to Enable.
+
+So this machine keeps BOTH swaps stacked, deliberately: the BIOS swap puts Control in the corner (which a ThinkPad does not do by default), and keyd then moves it off the pinky as designed. Alt under the corner finger is worth more than a layout that is easier to explain. The cost is that Fn sits under a cap labelled Ctrl, which is what made Fn+Esc unfindable and cost most of the investigation.
+
+Docs corrected accordingly - setup/system/keyd/default.conf, DECISIONS.md and docs/manual/03-the-keyboard.md had all been committed saying the BIOS swap should stay disabled, which was wrong for this machine.
+
+Measurement note worth keeping: keyd monitor block-buffers when redirected to a file, so a short capture killed by timeout loses everything and reads as 'no events'. Use stdbuf -oL.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

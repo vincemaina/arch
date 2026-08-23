@@ -2243,7 +2243,11 @@ Two settings live below keyd, in the embedded controller, and neither can be rep
 
 **FnLock decides whether the top row is media keys or `F1`-`F12`.** It is toggled by `Fn+Esc`, it is remembered by the EC rather than by the BIOS, and the two can fall out of step. When they do, the symptom is that every media key does nothing at all while `52-media-keys.conf`, `brightnessctl`, `wpctl` and keyd are all provably correct - the keys are simply emitting `F3` instead of `XF86AudioRaiseVolume`, exactly as instructed. TASK-133 is the whole investigation.
 
-**The BIOS "Fn and Ctrl key swap" must stay disabled.** It is redundant with the swap above - it moves Control into the corner only for keyd to move it back out - and its one lasting effect is to put Fn under a cap labelled Ctrl, which makes `Fn+Esc` unfindable and so makes FnLock unfixable.
+**The BIOS "Fn and Ctrl key swap" stays enabled, and that is a deliberate trade rather than an oversight.** A ThinkPad puts Fn in the bottom-left corner and Ctrl beside it, so the geometry the swap above argues from - Control in the corner, under the weakest finger - is not this hardware's. Enabling the BIOS swap restores it, and keyd then moves Control off the pinky exactly as intended.
+
+Disabling it is the tidier-looking option and was tried, under TASK-133, then reverted. The two swaps do partly cancel, and with the BIOS swap off the corner key becomes Fn where its label says. What actually happened is that **nothing emitted `leftalt` any more**: `keyd monitor` showed the labelled-Alt key producing `leftcontrol` and both the corner and labelled-Ctrl keys producing nothing at all, leaving Alt unreachable. Alt under the corner finger is worth more than a layout that is easier to describe.
+
+The cost is real and is the reason the note above exists: **Fn ends up under a cap labelled Ctrl**, which makes `Fn+Esc` very hard to find - and `Fn+Esc` is the only way to toggle FnLock. If the media keys stop working, that is the first thing to check, and Fn is not the key in the corner.
 
 Both are readable and writable from Linux without rebooting into BIOS setup, through the `think_lmi` driver, provided no BIOS admin password is set:
 

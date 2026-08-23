@@ -76,9 +76,11 @@ press the key labelled Ctrl in the bottom-left corner and the system
 receives Alt; press the key labelled Alt next to it and the system receives
 Control.
 
-On a laptop, check the geometry against the machine rather than the sentence
-above. A ThinkPad puts **Fn** in the bottom-left corner and Ctrl next to it, so
-the key that receives Alt is one in from the corner, not at it.
+On this laptop that sentence is literally true, but only because the firmware
+is set up to make it true. A ThinkPad normally puts **Fn** in the bottom-left
+corner; this machine enables the BIOS "Fn and Ctrl key swap" so the corner is
+Control again, which is what keyd then turns into Alt. The key displaced by
+that is Fn, which now sits under the cap labelled **Ctrl**.
 
 So wherever this manual, or any program's own help, says "Ctrl", the key to
 reach for is physically the one labelled Alt - and vice versa. This is done
@@ -170,10 +172,11 @@ Look at the **Esc** key: a small lit padlock means FnLock is on. `Fn+Esc` turns
 it off. If that does nothing, two things are worth checking before touching any
 configuration, and both bit this setup on a ThinkPad X280:
 
-- **Find the real Fn key first.** If the BIOS "Fn and Ctrl key swap" is enabled,
-  Fn is not the corner key its label suggests. That setting should be left
-  *disabled* here, because keyd already swaps Control and Alt and stacking the
-  two only hides Fn.
+- **Fn is not the key in the corner.** This machine enables the BIOS "Fn and
+  Ctrl key swap", so Fn is the key *labelled Ctrl*, one in from the corner.
+  That is deliberate - it is what puts Alt under the corner finger - but it
+  means `Fn+Esc` is pressed with a key whose cap says something else, which is
+  the single most confusing thing about this keyboard.
 - **If `Fn+Esc` still will not toggle it,** the firmware is holding stale state.
   Shut down, unplug the charger and every peripheral, and hold the power button
   for fifteen seconds. A normal reboot does not clear it.
