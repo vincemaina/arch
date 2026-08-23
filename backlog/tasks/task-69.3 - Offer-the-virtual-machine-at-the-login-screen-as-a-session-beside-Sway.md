@@ -1,11 +1,11 @@
 ---
 id: TASK-69.3
 title: 'Offer the virtual machine at the login screen, as a session beside Sway'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-23 15:58'
-updated_date: '2026-08-23 22:47'
+updated_date: '2026-08-23 23:46'
 labels: []
 dependencies:
   - TASK-69.2
@@ -105,4 +105,38 @@ CURRENT base.qcow2 predates BOTH fixes and would need a full rebuild through the
 Also found and left unresolved: after the user's VM session closed and they logged into host Sway, the host's own journal shows repeated 'Atomic commit failed: Device or resource busy' DRM errors for several minutes (22:43-22:47ish) before settling - sway itself never crashed, but the screen was very likely black/unresponsive during that window. Not reproduced or root-caused; the user did not describe experiencing this directly, and no lingering qemu/cage process was found afterward. Left as a known, unexplained finding rather than guessed at.
 
 AC5 (live key-passthrough measurement) remains unmeasured - /dev/uinput is still root-only and a live measurement was not attempted this session, consistent with the earlier decision to keep the structural argument (documented in DECISIONS.md) rather than force a root-requiring probe while password requests were explicitly being minimized.
+
+Rebuild completed successfully on the third attempt, after finding and fixing a real, serious bug along the way.
+
+WHAT HAPPENED: the first rebuild (with auto-login + wallpaper-ensure fixes) completed every stage successfully but hit 'unmount busy' on cleanup. The original cleanup() trap unconditionally disconnected the nbd device regardless of whether the unmount had actually succeeded - disconnecting a still-mounted device discards buffered writes and can corrupt the mounted filesystem's own metadata. This happened for real: the resulting base.qcow2's config.toml write was lost, and a later direct inspection found NO recognisable filesystem on either partition via a fresh blkid -p probe, while qemu-img check still reported the qcow2 container as structurally sound (the corruption is invisible at that layer). My own manual patching attempts, done under time pressure without the partprobe/udevadm settle steps the real script always uses, hit the same class of issue independently.
+
+FIXED: cleanup() now refuses to disconnect if /mnt is still mounted after its own umount attempt - it warns loudly and leaves the device connected instead, which is annoying but never destructive. Retry budget widened from 5x1s to 15x2s (30s), since two separate real builds outlasted the old window. Both findings recorded in .claude/skills/scripting-traps/SKILL.md, including a second, separate trap discovered while diagnosing the first: reusing the same nbd device number for a rapid connect/disconnect/reconnect cycle can leave the kernel's own nbd driver confused independent of the file's actual state - a failed re-check on a just-used device number is not evidence of corruption until retried on a fresh one. This cost real diagnostic time before being understood.
+
+SECOND rebuild (same fixed script) hit the SAME busy condition on unmount, but this time correctly refused to disconnect and left /dev/nbd1 safely connected with a clear warning. Verified directly: mounted it (read-write, on the same device number - genuinely fine, config.toml showed the auto-login block correctly, present and correct) - confirming the fix works and no data was lost this time. Completed cleanly by hand: unmount, qemu-img check (clean), blkid -p on a FRESH device number (nbd2, to avoid the reuse trap just learned) confirmed genuine filesystem presence, chmod a-w.
+
+FINAL VERIFICATION, on the correctly-rebuilt base: cloned a fresh machine, booted on a throwaway headless output. Screenshot shows: genuinely fullscreen (no title bar - the separate GTK client-side-decoration fix from user feedback), waybar visible and working, wallpaper rendering correctly (neon theme), and NO login prompt - auto-login fired correctly. All three fixes (wallpaper-ensure, auto-login, fullscreen) confirmed together on the real, persistent base.qcow2.
+
+Additional fix this session, from direct user feedback: qemu's GTK window showed a title bar despite show-menubar=off, because a title bar is a GTK client-side decoration drawn by the client itself - no compositor can strip it, cage's own lack of chrome was never going to touch it. Added full-screen=on to the display options in ~/.local/bin/vm, applying to `vm run` from anywhere (inside Sway or the login-screen session).
+
+Store is clean - no test clones left behind. Base image is read-only, 5.5 GiB, genuinely correct.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Adds a "Virtual machine" session to the login screen, beside Sway, via setup/system/wayland-sessions/vm.desktop and setup/system/bin/vm-session - reached through both install.sh and sync.sh via apply-config.sh's existing arrays.
+
+The original design (reusing ~/.local/bin/vm's interactive rofi menu under cage) does not work: cage implements no wlr-layer-shell, confirmed by the actual error rofi gives. Redesigned around cage's real model - "runs a single, maximized application" - so vm-session boots one fixed machine ("login"), cloning it from the base image on first use.
+
+Real, live user testing found two genuine defects beyond anything my own testing had caught, both fixed and verified:
+  1. A missing wallpaper file made sway show a permanent, unrecoverable config-error screen on the guest's first boot (a missing background image is a sway CONFIG error, not a runtime warning). Root-caused to the base image's own build step; tools/build-vm-image.sh now guarantees the file exists and fails the build loudly if it does not.
+  2. Wanting one password, not two - fixed with greetd's initial_session, added only to the built guest's own config, never the repository's real-machine config.
+
+Rebuilding the base image to carry both fixes then found a THIRD, more serious bug: the build script's cleanup trap disconnected the virtual disk while it was still mounted, which is destructive - it corrupted the first rebuilt image's filesystem (invisible to qemu-img check, confirmed real via a fresh blkid -p probe finding no filesystem at all). Fixed properly: cleanup() now refuses to disconnect anything still mounted, warning instead of guessing. A second rebuild, and a bug discovered while diagnosing the first (reusing an nbd device number too quickly gives false negatives, independent of file corruption) are both written up in .claude/skills/scripting-traps/SKILL.md for the next session.
+
+Also fixed from direct user feedback: the guest showed a GTK title bar despite show-menubar=off, because a title bar is a client-side decoration no compositor can suppress - full-screen=on sidesteps the question entirely, genuinely fullscreen now in both contexts (login-screen session and running `vm` from inside Sway).
+
+Verified end to end on the correctly-rebuilt, read-only base image: a fresh clone, booted on a throwaway headless output, reaches its own desktop directly - no login prompt, waybar working, wallpaper rendering, genuinely fullscreen. checks/session.sh 124/0, checks/manual.sh 8/0, checks/sway-commands.sh clean throughout.
+
+Not measured: AC5's live key-passthrough measurement remains reasoned (cage implements no keybinding mechanism at all, confirmed via its own --help/man) rather than observed with a real uinput probe, since /dev/uinput stayed root-only this session and a live measurement was not attempted - written up honestly in DECISIONS.md as such.
+<!-- SECTION:FINAL_SUMMARY:END -->
