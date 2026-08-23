@@ -199,6 +199,15 @@ play_target() {
 
     ensure_mpv
 
+    # A queue that has played out leaves its entries in mpv's playlist with
+    # nothing current. Starting something new on top of that would pile onto
+    # the dead ones and the list would grow for as long as mpv lives, so the
+    # finished queue is cleared first. With something actually playing this
+    # does not run, and the queue is left alone.
+    if ! mpv_playing; then
+        mpvq reset >/dev/null 2>&1 || true
+    fi
+
     flag="infinite"
     [[ "$finite" == "1" ]] && flag="finite"
 
@@ -521,6 +530,29 @@ if mpv_playing; then
     mode="$(ask_mode)" || exit 0
     play_target "$PICK_LABEL" "$PICK_TARGET" "$mode"
     exit 0
+fi
+
+# Nothing playing, but mpv is up and still holding a queue: that queue played
+# out. Without this branch the only thing on offer is a bare station picker,
+# which is indistinguishable from having crashed and lost everything - and is
+# exactly how it was reported.
+if mpv_running; then
+    finished="$(mpvq count 2>/dev/null || echo 0)"
+    [[ "$finished" =~ ^[0-9]+$ ]] || finished=0
+
+    if (( finished > 0 )); then
+        menu=("Play something else" "Play the queue again" "Queue ($finished)" "Stop")
+        choice="$(printf '%s\n' "${menu[@]}" |
+            rofi -dmenu -i -p "finished: $finished track(s)" -format s \
+                 -theme-str "listview { lines: ${#menu[@]}; }" 2>/dev/null || true)"
+        case "$choice" in
+            "Play the queue again") mpvq play 0 || true; exit 0 ;;
+            "Queue "*)              queue_menu; exit 0 ;;
+            Stop)                   mpvq quit || true; exit 0 ;;
+            "Play something else")  : ;;               # fall through
+            *) exit 0 ;;
+        esac
+    fi
 fi
 
 # Nothing playing: pick one and start it, with nothing else to ask.

@@ -45,6 +45,12 @@ playing, as history, rather than disappearing.
 When the last track ends, the music stops and the bar clears. A radio station
 never ends, so it plays until you stop it.
 
+The queue is not lost when it finishes. Open `focus-music` again and it says
+how many tracks have played out, and offers to play the queue again, open it,
+start something else, or stop. Starting something else at that point replaces
+the finished tracks rather than stacking on top of them, so the list does not
+grow all day.
+
 ### Searching YouTube
 
 The first entry in the list is **Search YouTube...**. Choose it, type
