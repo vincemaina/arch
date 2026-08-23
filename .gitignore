@@ -20,3 +20,5 @@ docs/manual/build/
 # repository, so committing one embeds a git repo inside a git repo - clones
 # do not get the contents and git warns about a submodule you did not mean.
 .claude/worktrees/
+
+node_modules/

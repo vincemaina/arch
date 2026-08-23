@@ -1,0 +1,25 @@
+{
+  "name": "arch",
+  "version": "1.0.0",
+  "description": "my arch build setup tool",
+  "homepage": "https://github.com/vincemaina/arch#readme",
+  "bugs": {
+    "url": "https://github.com/vincemaina/arch/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vincemaina/arch.git"
+  },
+  "author": "Vince Maina",
+  "type": "commonjs",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "backlog.md": "^1.50.1"
+  }
+}
