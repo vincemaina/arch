@@ -1,0 +1,277 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: bluetoothctl systemctl rofi foot sed cut grep readlink dirname
+
+# Bluetooth, per machine.
+#
+#   bluetooth            the menu: what to connect, and how to turn it off
+#   bluetooth on         use bluetooth on this machine, now and at boot
+#   bluetooth off        stop the daemon and leave it off at boot
+#   bluetooth status     one line: what state this machine is in
+#   bluetooth --current  just the state word, for scripting
+#
+# WHY THIS EXISTS
+#
+# Not every machine running this setup has a bluetooth radio, and a machine that
+# has one is not necessarily using it. bluetoothd is a daemon: left enabled it
+# runs from boot to shutdown on a laptop that has never paired anything.
+#
+# So the packages are declared for every machine and the SERVICE is the thing
+# that is opted into. `bluez` ships bluetooth.service disabled and nothing in
+# the repository enables it - see setup/packages/desktop.txt, and
+# checks/session.sh, which fails if that ever changes. This script is the one
+# place that turns it on, and it is per machine by construction because it edits
+# that machine's systemd state rather than anything tracked in git.
+#
+# The bar tells you which state you are in without being asked: waybar's
+# bluetooth module is invisible when there is no controller, which is exactly
+# the case where the daemon is not running. If you can see it, something is
+# running - and if you can see it and are not using it, that is the signal to
+# come back here and turn it off. That is the whole design, and it is why the
+# module has no "bluetooth is off" state to display: an off switch you can see
+# is a process you are paying for.
+#
+# WHY NOT A GUI
+#
+# blueman is the obvious answer and is the wrong one here: it is a tray
+# application, and this desktop has no tray - the same reason TASK-92 removed
+# network-manager-applet. Pairing a new device opens bluetoothctl in a terminal
+# instead, which is the same answer nmtui is for the network, and it keeps the
+# genuinely fiddly part (agents, passkey confirmation) in the tool built for it
+# rather than half-reimplemented in a menu.
+
+SERVICE="bluetooth.service"
+
+# The pairing window's app_id is written out literally at both of its use sites
+# below rather than held in a variable, and that is deliberate. It ties three
+# things together - the toggle that finds the window, the foot invocation that
+# sets it, and the for_window rule in 40-window-rules.conf that floats it - and
+# checks/session.sh enforces the agreement by reading this file as text. A
+# variable is invisible to that check, so it would take the guarantee away in
+# exchange for tidiness. The app_id is `bluetooth-tui`.
+
+die() { echo "bluetooth: $*" >&2; exit 1; }
+
+# A sibling helper called by bare name would fail from the bar, where
+# ~/.local/bin is not on PATH - .zshrc puts it there and applies to interactive
+# shells only. Resolve it against this script's own location instead.
+HERE="$(dirname "$(readlink -f "$0")")"
+
+# ----------------------------------------------------------------------
+# State
+# ----------------------------------------------------------------------
+#
+# Four states:
+#
+#   absent     no bluetooth hardware, or bluez is not installed
+#   off        the daemon is not running
+#   on         the daemon is running, nothing connected
+#   connected  the daemon is running and at least one device is connected
+#
+# `systemctl is-active` exits non-zero when inactive, which is information
+# rather than an error, so every call site captures it with `|| true` instead of
+# letting set -e act on it.
+
+daemon_running() {
+    [[ "$(systemctl is-active "$SERVICE" 2>/dev/null || true)" == "active" ]]
+}
+
+daemon_enabled() {
+    [[ "$(systemctl is-enabled "$SERVICE" 2>/dev/null || true)" == "enabled" ]]
+}
+
+# Is there a radio at all? Asked of the kernel rather than of bluez, because
+# bluez cannot answer while it is stopped - which is most of the time here, and
+# is exactly when this question gets asked.
+#
+# /sys/class/bluetooth holds an entry per controller and exists whether or not
+# bluetoothd is running, so this works in every state including "bluez is not
+# installed". compgen rather than `ls`, which writes to stderr and exits
+# non-zero on an empty directory.
+has_controller() {
+    compgen -G '/sys/class/bluetooth/hci*' >/dev/null
+}
+
+# Devices bluez knows about, as "MAC<TAB>alias" lines. Only meaningful while the
+# daemon is running; empty otherwise, which every caller handles.
+#
+# `devices Paired` rather than bare `devices`: the unqualified form also lists
+# whatever the last scan happened to see, so a menu built on it fills up with
+# strangers' headphones. The sed matches MAC-shaped lines only, so a bluez old
+# enough to print a usage message here degrades to an empty list rather than to
+# nonsense rows.
+devices_matching() {
+    bluetoothctl devices "$1" 2>/dev/null |
+        sed -n 's/^Device \([0-9A-F:]\{17\}\) \(.*\)$/\1\t\2/p'
+}
+
+# Every call below captures a list once and reuses it. Asking bluetoothctl the
+# same question inside a loop would be both slow and racy, and the obvious
+# spelling of the membership test - `... | grep -qx "$mac"` - is the trap this
+# repository has already been bitten by: under `set -o pipefail`, grep -q exits
+# at the first match, SIGPIPEs the writer, and the pipeline reports 141. So the
+# list is held in a variable and matched with bash's own `==`, which cannot
+# SIGPIPE anything.
+
+connected_macs() {
+    devices_matching Connected | cut -f1
+}
+
+state() {
+    if ! has_controller; then
+        echo absent
+    elif ! daemon_running; then
+        echo off
+    elif [[ -n "$(connected_macs)" ]]; then
+        echo connected
+    else
+        echo on
+    fi
+}
+
+describe() {
+    case "$(state)" in
+        absent)
+            echo "No bluetooth controller on this machine."
+            ;;
+        off)
+            echo "Bluetooth is off. The daemon is not running."
+            ;;
+        on)
+            if daemon_enabled; then
+                echo "Bluetooth is on, nothing connected. Starts at boot."
+            else
+                echo "Bluetooth is on, nothing connected. Will not start at boot."
+            fi
+            ;;
+        connected)
+            local names
+            names="$(devices_matching Connected | cut -f2 | tr '\n' ',' | sed 's/,$//; s/,/, /g')"
+            echo "Bluetooth is on. Connected: $names"
+            ;;
+    esac
+}
+
+# ----------------------------------------------------------------------
+# Turning it on and off
+# ----------------------------------------------------------------------
+#
+# `enable --now` and `disable --now` rather than start/stop, because the
+# question this answers is "does this machine use bluetooth", which outlives the
+# current boot. There is deliberately no way to start it for one session only:
+# that is a state you would forget you were in, and the bar cannot distinguish
+# it from any other running daemon.
+#
+# This needs root and gets it through polkit rather than sudo - systemctl talks
+# to systemd over D-Bus and systemd asks polkit itself, so the polkit-gnome
+# agent this desktop already runs puts up the password prompt. That matters
+# here: this is normally launched from a menu, where a sudo prompt on a terminal
+# nobody is looking at would simply hang.
+
+turn_on() {
+    has_controller || die "no bluetooth controller on this machine."
+    systemctl enable --now "$SERVICE"
+    echo "Bluetooth on."
+}
+
+turn_off() {
+    systemctl disable --now "$SERVICE"
+    echo "Bluetooth off."
+}
+
+# ----------------------------------------------------------------------
+# Pairing
+# ----------------------------------------------------------------------
+#
+# In a terminal, through the same toggle every other window-opening click on the
+# bar uses, so clicking twice puts it away rather than leaving a second one
+# behind.
+#
+# bluetoothctl's interactive REPL, not a scripted sequence. Pairing involves an
+# agent, a passkey to compare and sometimes a prompt to trust - a menu that
+# tried to drive that would be reimplementing bluetoothctl badly, and would
+# fail silently the first time a device asked something unexpected. The hint is
+# printed first because the three commands are not guessable, and `exec` hands
+# the terminal over so there is no shell left underneath.
+pair_window() {
+    exec "$HERE/sway-toggle-window" bluetooth-tui \
+        foot --app-id=bluetooth-tui --title=bluetoothctl \
+        -e sh -c 'printf "Put the device into pairing mode, then:\n\n  scan on\n  pair <mac>\n  trust <mac>\n  connect <mac>\n\nscan off when you are done, and exit to close.\n\n"; exec bluetoothctl'
+}
+
+# ----------------------------------------------------------------------
+# The menu
+# ----------------------------------------------------------------------
+#
+# -replace because this is reachable from rofi itself, through the launcher
+# entry, and rofi refuses to start twice without it.
+#
+# The action is decided by matching the chosen label back rather than by
+# attaching data to the row: rofi's per-row data protocol needs a literal NUL,
+# which a bash variable cannot hold - it is dropped silently and the marker text
+# renders as visible junk. Devices are the one case that needs data attached,
+# and they carry it as a trailing MAC in parentheses, cut back off after
+# selection.
+
+menu() {
+    local rows=() choice connected
+
+    case "$(state)" in
+        absent)
+            # Nothing to offer. Say so rather than showing an empty menu, which
+            # reads like the command failed.
+            rofi -e "No bluetooth controller on this machine." -replace
+            return 0
+            ;;
+        off)
+            rows+=("Turn bluetooth on")
+            ;;
+        on|connected)
+            connected="$(connected_macs)"
+            while IFS=$'\t' read -r mac alias; do
+                [[ -n "$mac" ]] || continue
+                if [[ $'\n'"$connected"$'\n' == *$'\n'"$mac"$'\n'* ]]; then
+                    rows+=("Disconnect $alias ($mac)")
+                else
+                    rows+=("Connect $alias ($mac)")
+                fi
+            done < <(devices_matching Paired)
+
+            rows+=("Pair a new device")
+            rows+=("Turn bluetooth off")
+            ;;
+    esac
+
+    choice="$(printf '%s\n' "${rows[@]}" |
+        rofi -dmenu -i -p "Bluetooth" -no-custom -replace \
+             -mesg "$(describe)" || true)"
+    [[ -n "$choice" ]] || return 0
+
+    case "$choice" in
+        "Turn bluetooth on")  turn_on ;;
+        "Turn bluetooth off") turn_off ;;
+        "Pair a new device")  pair_window ;;
+        "Connect "*)          bluetoothctl connect "$(mac_of "$choice")" ;;
+        "Disconnect "*)       bluetoothctl disconnect "$(mac_of "$choice")" ;;
+    esac
+}
+
+# The MAC is the last parenthesised field of the row. Matched as a MAC rather
+# than by position, so a device whose own name contains brackets cannot confuse
+# it.
+mac_of() {
+    sed -n 's/.*(\([0-9A-F:]\{17\}\))$/\1/p' <<<"$1"
+}
+
+# ----------------------------------------------------------------------
+
+case "${1:-}" in
+    "")          menu ;;
+    on)          turn_on ;;
+    off)         turn_off ;;
+    status)      describe ;;
+    --current)   state ;;
+    -h|--help)   sed -n '7,13p' "$0" | sed 's/^# \?//' ;;
+    *)           die "unknown argument '$1'. Try --help." ;;
+esac

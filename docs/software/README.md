@@ -233,6 +233,8 @@ the line, **↓** means an entry below in this document.
 | `pipewire-pulse` | PulseAudio compatibility layer | D: PipeWire |
 | `wireplumber` | PipeWire's session manager — routing policy | D: WirePlumber |
 | `pavucontrol` | Graphical mixer; opened by the bar's audio module | ↓ |
+| `bluez` | `bluetoothd`, and a `bluetooth.service` this repository deliberately never enables | ↓ |
+| `bluez-utils` | `bluetoothctl`: the pairing interface, and what the menu asks about devices | ↓ |
 | `xdg-desktop-portal` | The portal front end | D: xdg-desktop-portal and xdg-desktop-portal-wlr |
 | `xdg-desktop-portal-wlr` | Screencast/screenshot backend for wlroots | D: same |
 | `xdg-desktop-portal-gtk` | File chooser dialogs that match everything else | D: Applications are made to match |
@@ -603,6 +605,58 @@ the visualiser while open: **~3.27% of one core, ~20 MiB**, and that is a floor
 rather than a total — it does not include what sway itself pays to composite a
 window that repaints every frame.
 
+### bluez, bluez-utils
+
+**Problem.** Connecting a bluetooth device — headphones, a keyboard, a mouse —
+needs `bluetoothd`, and nothing else in this setup provides it. But the setup
+runs on machines that have no bluetooth radio at all, and on machines that have
+one and never use it. A daemon enabled once in the manifest would run on every
+one of them, from boot to shutdown, forever.
+
+**Choice.** Split the two decisions apart. The *packages* are declared for every
+machine, because 5.4 MiB of disk that costs no processes is not worth making
+the manifest machine-dependent for. The *service* is opted into per machine,
+with `bluetooth on`, and `bluez` ships `bluetooth.service` disabled so the
+default on a fresh install is off. `checks/session.sh` fails if anything in
+`setup/` ever enables it.
+
+`bluez-utils` is separate from `bluez` in Arch and supplies `bluetoothctl`,
+which is both how a device gets paired and how the menu asks what is connected.
+
+**Alternatives.** `blueman` (7.0 MiB plus `gtk3`, `libnm`, `python-cairo` and
+`python-gobject`) is the usual graphical answer and was rejected for the reason
+`network-manager-applet` was removed in TASK-92: it is a tray application and
+this desktop has no tray, so its icon would have nowhere to go. `bluetuith` is
+the TUI alternative and is AUR-only, which TASK-43 ruled out. That leaves
+`bluetoothctl` in a terminal, which is the same answer `nmtui` already is for
+the network.
+
+Not considered further: leaving bluetooth out entirely. It was the previous
+state and the reason this ticket exists.
+
+**How it works.** `bluetoothd` exposes controllers and devices on the system
+bus under `org.bluez`. That is what makes the bar module work the way it does:
+with the daemon stopped there is no controller on the bus at all, so Waybar's
+`bluetooth` module renders `format-no-controller` — set to the empty string
+here, which hides the module outright. A visible module therefore means a
+running daemon, which is the whole design and is why that empty string has a
+check of its own.
+
+`~/.local/bin/bluetooth` is the switch. It calls `systemctl enable --now` /
+`disable --now`, which reaches root through polkit rather than sudo — systemd
+asks polkit itself over D-Bus, so the `polkit-gnome` agent already running here
+draws the prompt. That matters because the command is normally launched from a
+menu, where a sudo prompt on a terminal nobody is looking at would just hang.
+
+Audio needs nothing more. `pipewire-audio` — already installed, as a dependency
+of the declared `pipewire-pulse` — itself depends on `bluez-libs` and ships
+`/usr/lib/spa-0.2/bluez5/` with SBC, AAC, aptX, LDAC, LC3 and the HFP codecs.
+That was already on every machine here; only the daemon was missing.
+
+**Cost.** 1.73 MiB (`bluez`) + 3.69 MiB (`bluez-utils`) = **5.42 MiB** installed,
+from `pacman -Si` on 2026-08-23. Resident cost is **not measured** — see the
+gap below.
+
 ## Gaps this document does not close
 
 Named rather than left silent, because a gap that is written down can be filled.
@@ -624,6 +678,14 @@ Named rather than left silent, because a gap that is written down can be filled.
   That is the honest state, not a placeholder to be filled with a
   plausible-sounding reason later — see "The entry format" above for why that
   matters.
+- **`bluetoothd` has no measured resident cost.** The entry above gives disk
+  only. The machine TASK-146 was written on had no `bluez` installed and no way
+  to install it during that session, so the figure that actually matters — what
+  the daemon costs while running, which is the entire reason it is opted into
+  rather than enabled everywhere — is missing. Take it on the first machine
+  where `bluetooth on` is used: `systemd-cgtop -1 --raw` for the unit and
+  `ps -o rss= -C bluetoothd` while a device is connected, since an idle
+  controller and a connected headset are not the same measurement.
 - **Package cost is disk and, where resident, memory/CPU — nothing about
   network egress.** `yt-dlp` and `firefox` are the two packages here that talk
   to the internet on their own initiative (a video-info fetch, an update

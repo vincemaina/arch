@@ -1320,6 +1320,93 @@ else
     fi
 fi
 
+# ----------------------------------------------------------------------
+section "Bluetooth (TASK-146)"
+
+# Bluetooth here is opt-in per machine, and the entire design rests on two
+# things staying true. Neither is visible on the machine you are sitting at, and
+# breaking either would look like an improvement in a diff.
+#
+# FIRST: the repository declares bluez and enables it nowhere. That is what lets
+# the manifest be the same on a laptop with a radio and a desktop without one -
+# the package costs disk, the daemon costs a process, and only the second is
+# opted into. Someone adding `systemctl enable bluetooth` to apply-config.sh
+# would be doing the obvious tidy-up and would silently start a daemon on every
+# machine this setup has ever built. Nothing else would notice: it would simply
+# work, everywhere, forever.
+#
+# SECOND: format-no-controller is empty. That is the line that hides the bar
+# module when the daemon is not running, which is what makes a visible module
+# mean "something is running". Give it an icon - which looks like filling in an
+# obvious blank - and every machine grows a permanent readout saying nothing,
+# including the ones with no bluetooth hardware at all.
+#
+# The machine's own state is reported rather than judged. Both answers are
+# correct; which one is right is the user's decision, and this is where to find
+# out what it currently is.
+
+# Read the repository, not the machine, for the first two.
+if [[ ! -d "$CHECKS_REPO/setup" ]]; then
+    skip "no setup/ directory to inspect"
+else
+    # Whole comment lines are not instructions - the manifest explains at
+    # length why the service is NOT enabled, and matching that prose would fail
+    # this check for saying the right thing. Same trap the bar's app_id scan
+    # already hit, one layer up.
+    enablers="$(
+        grep -rn --include='*.sh' --include='*.conf' --include='*.txt' \
+             -E '(systemctl[^|]*enable|^[[:space:]]*Also=|^[[:space:]]*WantedBy=)[^#]*bluetooth' \
+             "$CHECKS_REPO/setup" 2>/dev/null |
+        grep -vE '^[^:]*:[0-9]+:[[:space:]]*#' || true
+    )"
+    if [[ -n "$enablers" ]]; then
+        fail "the repository enables bluetooth.service, which it must not - bluetooth is opted into per machine:"
+        sed 's/^/          /' <<<"$enablers"
+    else
+        pass "nothing in setup/ enables bluetooth.service (it is opted into per machine)"
+    fi
+
+    # Anchored to a whole line, because the manifest talks about bluez at
+    # length in a comment right above the declaration - and an unanchored match
+    # found that prose and passed with the packages deleted. Caught by breaking
+    # this on purpose, which is the only way that class of bug shows up.
+    if ! grep -rqs -E '^bluez$' "$CHECKS_REPO/setup/packages/"; then
+        fail "bluez is not declared in setup/packages/ - the bluetooth helper and bar module have nothing to talk to"
+    else
+        pass "bluez is declared, so turning bluetooth on needs no installation step"
+    fi
+fi
+
+# The bar module, read from the live rendered config rather than the template,
+# because it is the rendered one waybar actually loads.
+BAR_CONFIG="$HOME/.config/waybar/config.jsonc"
+if [[ ! -f "$BAR_CONFIG" ]]; then
+    skip "waybar is not configured on this machine"
+elif ! grep -q '"bluetooth"' "$BAR_CONFIG"; then
+    skip "the bar has no bluetooth module"
+else
+    # Matched on the key and required to be empty. Written as a grep for the
+    # exact empty-string spelling: any icon at all, including a space, fails.
+    if grep -Eq '"format-no-controller"[[:space:]]*:[[:space:]]*""' "$BAR_CONFIG"; then
+        pass "the bar's bluetooth module is empty with no controller, so it is invisible while the daemon is off"
+    else
+        fail "format-no-controller is not empty - the bluetooth module will show on every machine, including those with no radio"
+    fi
+fi
+
+# What this machine has actually chosen. Reported, never failed.
+if ! compgen -G '/sys/class/bluetooth/hci*' >/dev/null; then
+    skip "no bluetooth controller on this machine, so nothing to run"
+else
+    bt_active="$(systemctl is-active bluetooth.service 2>/dev/null || true)"
+    bt_enabled="$(systemctl is-enabled bluetooth.service 2>/dev/null || true)"
+    if [[ "$bt_active" == "active" ]]; then
+        pass "this machine has a controller and bluetoothd is running (${bt_enabled:-unknown} at boot) - it should be visible in the bar"
+    else
+        pass "this machine has a controller and bluetoothd is not running - nothing in the bar, and nothing costing anything"
+    fi
+fi
+
 section "Key remapping (TASK-40)"
 
 # keyd remaps below xkb and below the console keymap, so this one check covers

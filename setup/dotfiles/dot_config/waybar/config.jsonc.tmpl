@@ -23,6 +23,7 @@
 //   mpris         play/pause; middle goes back, right skips forward
 //   idle_inhibitor  stop the screen locking, or let it again
 //   network       nmtui, to change connection
+//   bluetooth     the bluetooth menu: connect, pair, or turn it off
 //   cpu, memory   btop
 //   pulseaudio    pavucontrol; right-click mutes; scroll changes the volume
 //   battery       swap between the charge and the time left on it
@@ -49,7 +50,10 @@
 
     "modules-left": ["sway/workspaces", "sway/mode", "sway/scratchpad", "custom/notifications", "custom/focus-timer"],
     "modules-center": ["clock", "mpris"],
-    "modules-right": ["idle_inhibitor", "network", "cpu", "memory", "pulseaudio", "battery"],
+    // bluetooth sits next to network because they are the two radios, and it is
+    // the only module here that is usually absent entirely - see its own block
+    // at the end of this file for why that is the point rather than a quirk.
+    "modules-right": ["idle_inhibitor", "network", "bluetooth", "cpu", "memory", "pulseaudio", "battery"],
 
     "sway/workspaces": {
         "disable-scroll": true,
@@ -288,5 +292,48 @@
         "tooltip-format": "{ifname} · {ipaddr}",
         "interval": 5,
         "on-click": "{{ .chezmoi.homeDir }}/.local/bin/sway-toggle-window network-tui foot --app-id=network-tui --title=nmtui -e nmtui"
+    },
+
+    // Bluetooth - TASK-146.
+    //
+    // THE EMPTY format-no-controller IS THE FEATURE. It is the one line in this
+    // file whose purpose is to make a module disappear, so it is worth saying
+    // why rather than leaving it to look like an oversight.
+    //
+    // bluetoothd is opted into per machine and is off by default - see
+    // ~/.local/bin/bluetooth. While it is stopped there is no controller on the
+    // bus, and a module that rendered "bluetooth: off" in that state would be a
+    // permanent readout on every machine, including the ones with no radio at
+    // all, saying nothing. Empty text hides the module outright: waybar hides a
+    // module whose label is empty, the same idiom sway/scratchpad and
+    // custom/notifications use above.
+    //
+    // So the bar's rule is: if you can see this, a daemon is running. That
+    // inverts the usual relationship between a bar and a service - you are not
+    // looking to find out whether bluetooth is on, you are being told that it
+    // is, on the machine where you had forgotten. Verified by screenshot in
+    // both directions, because "a module that is not there" and "a module that
+    // is broken" look identical.
+    //
+    // Icons are Font Awesome \u escapes, matching every other module here, and
+    // both codepoints were checked against the font's charset rather than
+    // assumed: U+F293 and U+F294 fall inside JetBrains Mono Nerd Font's
+    // f000-f385 range. Never pasted - pasting has silently lost glyphs here.
+    //
+    // No format-connected-battery. waybar can show a connected device's battery
+    // level, but only through bluez's experimental interface, which needs
+    // Experimental=true in /etc/bluetooth/main.conf. Configuring the format
+    // without that would be a line that looks meaningful and never renders,
+    // which is the exact failure this repository keeps finding.
+    "bluetooth": {
+        "format-no-controller": "",
+        "format-disabled": "\uf294",
+        "format-off": "\uf294",
+        "format-on": "\uf293",
+        "format-connected": "\uf293 {device_alias}",
+        "tooltip-format": "{controller_alias}\nbluetoothd is running",
+        "tooltip-format-connected": "{controller_alias}\n{num_connections} connected:\n{device_enumerate}",
+        "tooltip-format-enumerate-connected": "{device_alias}",
+        "on-click": "{{ .chezmoi.homeDir }}/.local/bin/bluetooth"
     }
 }

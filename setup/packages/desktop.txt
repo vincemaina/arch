@@ -112,6 +112,36 @@ pavucontrol
 # openssh. See TASK-38, which declared openssh in base.txt precisely so that
 # removing this could not take ssh with it.
 
+# Bluetooth - TASK-146.
+#
+# DECLARED HERE, ENABLED NOWHERE. This is the whole shape of the feature, so it
+# is worth being explicit: `bluez` ships `bluetooth.service` disabled, and
+# nothing in this repository enables it - not apply-config.sh, not a stage, not
+# sync.sh. checks/session.sh fails if that ever stops being true.
+#
+# So a machine with no bluetooth radio pays 5.5 MiB of disk and runs no
+# bluetooth process at all, which is what makes it safe to declare for every
+# machine rather than making the manifest itself machine-dependent. Turning it
+# on is `bluetooth on`, one command, per machine - see ~/.local/bin/bluetooth.
+#
+#   bluez        bluetoothd, and the service unit that is deliberately left off
+#   bluez-utils  bluetoothctl, which is both the pairing interface and what the
+#                menu asks about devices
+#
+# NOT blueman, and for the reason directly above: it draws a tray icon, and this
+# desktop still has no tray to draw it into. It would arrive 7.0 MiB plus gtk3,
+# libnm, python-cairo and python-gobject to be invisible in exactly the way
+# TASK-92 removed network-manager-applet for. Pairing goes through bluetoothctl
+# in a terminal instead, which is the same answer nmtui is for the network.
+#
+# Bluetooth AUDIO needs nothing here. pipewire-audio - already installed, as a
+# dependency of the pipewire-pulse declared above - itself depends on bluez-libs
+# and ships /usr/lib/spa-0.2/bluez5/ complete with SBC, AAC, aptX, LDAC, LC3 and
+# the HFP codecs. That is on every machine whether or not bluetooth is ever
+# switched on; only the daemon is missing, and these two supply it.
+bluez
+bluez-utils
+
 # Notifications
 mako
 libnotify

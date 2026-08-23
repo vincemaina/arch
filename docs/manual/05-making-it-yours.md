@@ -195,6 +195,13 @@ So each machine has a layer of its own, above the repository, that sync never
 touches. There are two kinds, and which one you want depends on what you are
 changing.
 
+Two things are machine-local without being files you edit at all. Which
+**theme** is selected lives in this machine's chezmoi config, described above.
+And whether **bluetooth** runs is this machine's systemd state — `bluetooth
+on` and `bluetooth off`, covered in
+[chapter 2](02-the-desktop.md) — which is why turning it on leaves no diff
+and two machines syncing this repository can disagree about it.
+
 **A setting you want to add or override** goes in that tool's local file. It
 is created for you on first install, it is never rewritten, and the tracked
 config reads it *last* — so whatever you put there wins.
