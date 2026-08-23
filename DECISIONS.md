@@ -2237,6 +2237,24 @@ A useful property of the swap specifically: `Ctrl+Alt+F2` still needs the same t
 
 **Universal, not per-machine.** The config matches `[ids] *`, so it applies to every keyboard on every machine built from this repository. The swap is a property of the hands rather than of the hardware, and a per-machine setting would mean the modifier moving depending on which machine was in front of you - the opposite of what building muscle memory needs. An external keyboard that is already laid out differently is the one case that would need its own section, keyed by the device id `keyd -m` reports, and that is a local exception rather than a reason to make the whole setting per-machine.
 
+### The firmware underneath it, on a ThinkPad
+
+Two settings live below keyd, in the embedded controller, and neither can be reproduced by `install.sh` - nothing in this repository is copied into firmware. A machine built from this repo can therefore be perfectly configured and still behave wrongly, which is this repository's signature failure mode arriving from a direction no check can reach.
+
+**FnLock decides whether the top row is media keys or `F1`-`F12`.** It is toggled by `Fn+Esc`, it is remembered by the EC rather than by the BIOS, and the two can fall out of step. When they do, the symptom is that every media key does nothing at all while `52-media-keys.conf`, `brightnessctl`, `wpctl` and keyd are all provably correct - the keys are simply emitting `F3` instead of `XF86AudioRaiseVolume`, exactly as instructed. TASK-133 is the whole investigation.
+
+**The BIOS "Fn and Ctrl key swap" must stay disabled.** It is redundant with the swap above - it moves Control into the corner only for keyd to move it back out - and its one lasting effect is to put Fn under a cap labelled Ctrl, which makes `Fn+Esc` unfindable and so makes FnLock unfixable.
+
+Both are readable and writable from Linux without rebooting into BIOS setup, through the `think_lmi` driver, provided no BIOS admin password is set:
+
+```
+/sys/class/firmware-attributes/thinklmi/attributes/FnCtrlKeySwap/current_value
+/sys/class/firmware-attributes/thinklmi/attributes/FnKeyAsPrimary/current_value
+/sys/class/firmware-attributes/thinklmi/authentication/Admin/is_enabled
+```
+
+`FnKeyAsPrimary=Disable` means the media keys are primary, which is what this repository's bindings expect. If it says that and the machine disagrees, the EC is holding stale FnLock state and the fix is a full power drain - shut down, unplug the charger and every peripheral, hold the power button fifteen seconds - not a configuration change. A normal reboot does not clear it, because the EC keeps running.
+
 ### Trade-off
 
 A daemon running as root with an exclusive grab on every keyboard. A config it cannot parse means no usable keyboard on the machine you would need in order to fix it, so `apply-config.sh` runs `keyd check` and refuses to enable the unit rather than starting a daemon that would lock the machine out. keyd documents a panic sequence - `backspace+escape+enter` held together - which terminates it and hands the keyboard back.

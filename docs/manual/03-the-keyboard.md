@@ -76,6 +76,10 @@ press the key labelled Ctrl in the bottom-left corner and the system
 receives Alt; press the key labelled Alt next to it and the system receives
 Control.
 
+On a laptop, check the geometry against the machine rather than the sentence
+above. A ThinkPad puts **Fn** in the bottom-left corner and Ctrl next to it, so
+the key that receives Alt is one in from the corner, not at it.
+
 So wherever this manual, or any program's own help, says "Ctrl", the key to
 reach for is physically the one labelled Alt - and vice versa. This is done
 below the compositor deliberately, because four separate things on this
@@ -152,6 +156,30 @@ putting them on dedicated keys rather than a chord. Volume is capped at
 100% deliberately - raising it further is digital amplification that clips
 the waveform rather than making anything louder, and the tool used here has
 no upper bound unless one is given.
+
+### If they do nothing at all, on a laptop
+
+On a ThinkPad the top row is shared between the media keys and `F1`-`F12`, and
+which one you get is decided by **FnLock**, in the laptop's firmware, below
+Linux entirely. If FnLock is on, every media key silently becomes a plain
+function key and nothing in this repository can change that - the bindings, the
+tools they call and keyd are all still correct, and the key is doing exactly
+what the firmware told it to.
+
+Look at the **Esc** key: a small lit padlock means FnLock is on. `Fn+Esc` turns
+it off. If that does nothing, two things are worth checking before touching any
+configuration, and both bit this setup on a ThinkPad X280:
+
+- **Find the real Fn key first.** If the BIOS "Fn and Ctrl key swap" is enabled,
+  Fn is not the corner key its label suggests. That setting should be left
+  *disabled* here, because keyd already swaps Control and Alt and stacking the
+  two only hides Fn.
+- **If `Fn+Esc` still will not toggle it,** the firmware is holding stale state.
+  Shut down, unplug the charger and every peripheral, and hold the power button
+  for fifteen seconds. A normal reboot does not clear it.
+
+[DECISIONS.md](../../DECISIONS.md) has the full account, including how to read
+and write both firmware settings from Linux without rebooting into BIOS setup.
 
 ## The Caps Lock scroll layer
 
