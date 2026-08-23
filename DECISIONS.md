@@ -3500,6 +3500,132 @@ needs.
 
 ---
 
+## Building the base image with the repository's own installer, not a copy of it
+
+**Decision:** `tools/build-vm-image.sh` builds the bundled base image by
+running `setup/install/01-05` — the same numbered stages `install.sh` runs —
+against a qcow2 attached over `qemu-nbd`, rather than by writing a parallel
+build path or calling `install.sh` itself.
+
+### Why
+
+The alternative to "use the real installer" is a second script that installs
+Arch and this repository's configuration by some other means — and a second
+implementation is a second thing to keep in sync. Every fix to `03-system.sh`
+or every package added to `desktop.txt` would need to be re-learned by
+whatever built the image, or the base and a fresh install would quietly
+diverge. Running the actual stage scripts means the base image *is* what a
+fresh install produces, not an approximation of it, and it doubles as the
+scripted fresh-install reproducibility test `DECISIONS.md` already wanted (see
+"Prefer fresh-install tests over modifying the reference VM") and had no cheap
+way to run.
+
+**Why not `install.sh` itself.** It was the first design, and reading it
+closely found two reasons it cannot be pointed at a qcow2 on a running desktop,
+only at a live ISO:
+
+- it ends with `poweroff` — right when the whole machine *is* the disposable
+  ISO environment, wrong when it is someone's desktop.
+- stage 3 runs `bootctl install` inside `arch-chroot`, which — in its default
+  mode, confirmed by reading `/usr/bin/arch-chroot` — mounts a **fresh sysfs**
+  inside the target (a live kernel view, not a bind of the host's) and then
+  conditionally mounts a **real efivarfs** over
+  `$target/sys/firmware/efi/efivars` if that directory exists, which it does
+  on any UEFI-booted host. Unmitigated, `bootctl` would write real NVRAM boot
+  entries onto whichever machine ran the builder.
+
+So the builder drives the five stage scripts directly, the same relationship
+`install.sh` itself has to them, just for a different execution context.
+
+**The efivars guard.** Masking the host's `/sys/firmware/efi/efivars` before
+chrooting does nothing — a fresh `sysfs` mount inside the chroot reflects the
+kernel's live state regardless. The mask has to happen *inside* the chroot,
+after `arch-chroot`'s own setup has run and before the real stage script
+executes:
+
+```bash
+arch-chroot "$MNT" /bin/bash -c '
+    mount -t tmpfs tmpfs /sys/firmware/efi/efivars 2>/dev/null || true
+    /opt/arch-setup/install/03-system.sh; rc=$?
+    umount /sys/firmware/efi/efivars 2>/dev/null || true
+    exit $rc'
+```
+
+This shadows whatever `arch-chroot` already mounted there — legal, and how
+`systemd-nspawn` hides host EFI variables from containers by default — runs
+the completely unmodified stage script against the shadow, then unmounts it so
+`arch-chroot`'s own teardown (which tracks and unmounts the real mount it made)
+still succeeds. `03-system.sh` is never touched; only which command the
+builder hands to `arch-chroot` differs.
+
+**Passwords stay interactive**, on purpose. `03-system.sh`'s `passwd` prompts
+are exactly what a fresh install prompts for, and nothing pipes an answer into
+them — verified rather than assumed, by testing what happens with no stdin at
+all: TASK-131's five-attempt bound fails the build cleanly rather than hanging.
+Building the actual base image therefore needs a human at a real terminal.
+
+**`/dev/rtc0` gets resynced.** `03-system.sh`'s `hwclock --systohc` writes to
+the host's real hardware clock, since `arch-chroot` bind-mounts `/dev` in
+full. Accepted rather than masked: it just syncs the RTC to the
+already-correct system time, self-correcting and not worth the fragility of
+hiding a device other stage-3 commands may need.
+
+**Two bugs in the builder's own nbd handling, found by testing rather than
+assumed correct**, both confirmed on this machine:
+
+- `/sys/class/block/nbdN/size` and `/sys/block/nbdN/pid` stay at their last
+  value indefinitely after a genuine, verified disconnect. Picking a device by
+  checking either would eventually mark every nbd device on the host "busy
+  forever" after its first use. The only trustworthy signal is whether
+  `qemu-nbd --connect` itself succeeds.
+- a device can accept a connect and then serve no I/O at all — a device
+  wedged by an earlier connection that did not tear down cleanly. So a
+  candidate is proven twice, connects *and* serves a real read, before being
+  accepted; one that fails the read is disconnected and skipped exactly like
+  one that never connected.
+
+**Two more, found by the first real build rather than a test one.** Every
+stage completed correctly — both passwords, the full package set, dotfiles —
+and it still went wrong, in a way no scratch test with a discarded image could
+have caught:
+
+- `$HOME` under plain `sudo` (no `-E`) is root's, not the operator's. The
+  entire base image was written to `/root/.local/share/vm/base.qcow2`,
+  invisible to `~/.local/bin/vm`, which reads the real user's home. The image
+  itself was completely correct; only its location was wrong, and nothing
+  said so. Fixed with `invoking_home()`, which checks `SUDO_USER` (`sudo`)
+  then `PKEXEC_UID` resolved through `getent` (`pkexec`) before ever trusting
+  `$HOME` directly — and the resolved output path is now printed plainly and
+  early, with an explicit warning if it still lands under `/root`, so the same
+  mistake would announce itself in the first line rather than twenty minutes
+  later.
+- the final `umount -R /mnt` hit a transient "target is busy" — something,
+  unconfirmed, held a handle into `/mnt` for a moment after the last stage
+  returned, and let go almost immediately on its own. Under `set -e` that
+  aborted the *entire remaining script*, including `chmod a-w` and the success
+  message, even though the build had genuinely finished. A bounded five-attempt
+  retry replaces the bare call; a real, non-transient failure still stops the
+  script loudly.
+
+Both were recovered rather than rebuilt: the already-complete image was
+copied to the right path (plain `cp`, so it genuinely inherits `nodatacow`
+from the destination directory rather than carrying the attribute
+literally), checksum-verified byte-identical against the original, and fixed
+up in place. Twenty-some minutes of `pacstrap` and two typed passwords were
+not spent twice.
+
+### Trade-off
+
+**Every clone starts from the machine that built the base image's
+`install.conf`** — same hostname, same locale, same git identity. Accepted for
+a first version rather than solved: nothing currently gives a clone its own
+identity at `vm new` time. A natural follow-up is templating the hostname (and
+perhaps the machine ID) into the overlay at clone time, the way `dot_gitconfig.tmpl`
+already resolves `install.conf` per machine — not implemented here, and named
+rather than silently decided.
+
+---
+
 # Guiding principle
 
 When evaluating future changes, prefer the option that best preserves this balance:
