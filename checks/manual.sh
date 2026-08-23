@@ -169,8 +169,14 @@ if ignore_file.exists():
 # ~/.config/focus-music/stations.local is the same shape of thing: focus-music
 # writes it the first time something found by search is kept, and a machine
 # where nobody has kept anything is not a machine with a broken manual.
+# ~/.local/share/vm is made by ~/.local/bin/vm the first time it is asked for
+# anything, with nodatacow set on it before any disk image lands inside - which
+# is the whole reason the directory is created deliberately rather than by a
+# stray mkdir -p. A machine where nobody has made a virtual machine yet is not
+# a machine with a broken manual.
 created_on_demand = {"~/Pictures/wallpapers",
-                     "~/.config/focus-music/stations.local"}
+                     "~/.config/focus-music/stations.local",
+                     "~/.local/share/vm"}
 ignored |= created_on_demand
 
 missing = []

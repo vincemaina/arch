@@ -1,0 +1,581 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: qemu-system-x86_64 qemu-img rofi chattr pgrep nproc awk grep sed cat cp chmod readlink basename stat mkdir rm du
+
+# Virtual machines, one command.
+#
+#   vm                       the menu: pick a machine and start it
+#   vm list                  what exists, how big it is, what it is based on
+#   vm new NAME              a new machine, cloned from the bundled base image
+#   vm new NAME --blank SIZE an empty disk instead, for some other operating system
+#   vm new NAME --iso PATH   ... with an installer attached, for the same purpose
+#   vm run NAME              start it
+#   vm rm NAME               delete it, disk and all
+#   vm reset NAME            throw away everything it has written since it was cloned
+#   vm --current             the machines running right now, one per line
+#
+# WHY THIS EXISTS
+#
+# To run something dangerous, or to keep a project away from the machine you are
+# sitting at, without that meaning an ISO download and a twenty-minute install
+# wizard every time. See TASK-69.
+#
+# WHY QEMU ON ITS OWN, AND NOT LIBVIRT
+#
+# Both run the same qemu process with the same guest RAM, so a 2-4 GiB guest
+# costs the same either way and the whole difference is scaffolding. The reason
+# is fewer moving parts - no daemon, no XML domain definitions, no libvirt group
+# - and skipping the SPICE round trip, since qemu presents straight to a Wayland
+# surface. The rationale in full, including the numbers, is in DECISIONS.md.
+#
+# WHY CLONES ARE FREE
+#
+# Every machine cloned from the base is a qcow2 OVERLAY: an almost empty file
+# naming the base as its backing file, which grows only as the guest writes. A
+# new machine therefore costs a few hundred KB and appears instantly, and
+# `vm reset` is deleting that overlay rather than reinstalling anything.
+#
+# The cost of that: THE BASE IMAGE MUST NEVER BE WRITTEN TO. Modifying a backing
+# file corrupts every overlay derived from it, and the damage appears in the
+# clones rather than in the base, which is a miserable thing to debug. The
+# builder leaves it read-only for that reason, and `vm run` says so if it has
+# somehow become writable.
+
+die() { echo "vm: $*" >&2; exit 1; }
+warn() { echo "vm: $*" >&2; }
+
+# A note on style, because it looks needlessly verbose in places below.
+#
+# `condition && action` is written out as a full `if` block everywhere in this
+# script, even where one line would read better. Under `set -e` that idiom is
+# fatal when it is the LAST statement of a function or of a loop body: the
+# statement's status is the failed condition's, the function returns non-zero,
+# and the script exits - silently, having printed nothing, from a line whose
+# only job was to skip something.
+#
+#     f() { false && echo never; }        # calling f exits the whole script
+#     g() { false && echo never; true; }  # fine
+#
+# It is fine anywhere else, which is what makes it dangerous: the same line is
+# correct until somebody appends a statement after it or deletes the one below
+# it. `vm rm` on a stopped machine would have been the first casualty.
+
+# ----------------------------------------------------------------------
+# Where machines live
+# ----------------------------------------------------------------------
+#
+# One directory per machine, holding its disk, its own copy of the UEFI variable
+# store, and the few settings that differ between machines:
+#
+#   ~/.local/share/vm/
+#     base.qcow2            the bundled image, read-only, built by tools/
+#     work/
+#       disk.qcow2          an overlay backed by base.qcow2 - or a whole disk
+#       OVMF_VARS.fd        this machine's UEFI variables, its boot entries among them
+#       vm.conf             MEMORY, CPUS, and an ISO if one is attached
+#
+# Nothing here is tracked by git, and nothing here may become tracked: the same
+# rule wallpapers follow, for the same reason.
+
+STORE="${XDG_DATA_HOME:-$HOME/.local/share}/vm"
+BASE="$STORE/base.qcow2"
+
+# chattr +C sets nodatacow, which a qcow2 on Btrfs badly needs: a copy-on-write
+# file inside a copy-on-write filesystem fragments until it crawls.
+#
+# It only works on a DIRECTORY, and only takes effect on files created AFTER it
+# is set - the attribute is inherited at creation, not applied retroactively.
+# Setting it on an image that already exists reports success and changes
+# nothing, so this runs when the directory is made and never afterwards.
+ensure_store() {
+    if [[ -d "$STORE" ]]; then return 0; fi
+
+    mkdir -p "$STORE"
+
+    if [[ "$(stat -f -c %T "$STORE")" == "btrfs" ]]; then
+        if chattr +C "$STORE" 2>/dev/null; then
+            echo "vm: created $STORE with nodatacow (Btrfs)" >&2
+        else
+            warn "could not set nodatacow on $STORE; images here will fragment"
+        fi
+    fi
+}
+
+vm_dir()  { printf '%s/%s' "$STORE" "$1"; }
+vm_disk() { printf '%s/%s/disk.qcow2' "$STORE" "$1"; }
+
+# A name becomes a directory name, so it may not wander out of the store or
+# collide with the base image.
+check_name() {
+    local n="${1-}"
+    [[ -n "$n" ]] || die "a machine needs a name"
+    [[ "$n" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] ||
+        die "invalid name '$n': letters, digits, dot, dash and underscore only"
+    [[ "$n" != base.qcow2 ]] || die "'base.qcow2' is the base image, not a machine"
+}
+
+exists() { [[ -f "$(vm_disk "$1")" ]]; }
+
+require_exists() {
+    exists "$1" || die "no machine called '$1'. 'vm list' shows what there is."
+}
+
+# ----------------------------------------------------------------------
+# UEFI firmware
+# ----------------------------------------------------------------------
+#
+# The disk layout this repository installs is GPT/UEFI, so a guest built from it
+# cannot boot without OVMF. qemu wants two files: the firmware, which is
+# read-only and shared between machines, and a variable store, which is writable
+# and therefore per machine - it holds that machine's boot entries.
+#
+# The path is DISCOVERED rather than hardcoded, deliberately. Arch has moved it
+# before - /usr/share/edk2-ovmf/x64/ became /usr/share/edk2/x64/, and the 4m
+# variants appeared beside the originals - and a hardcoded path that has quietly
+# stopped existing is exactly the invisible-configuration failure this
+# repository keeps finding at the bottom of a bug. It would surface here as a
+# guest that does not boot, with nothing pointing at the cause.
+#
+# Newest layout first, and the 4m build before the older 2MB one, which is too
+# small for some guests' variable stores.
+ovmf_code() {
+    local candidate
+    for candidate in \
+        /usr/share/edk2/x64/OVMF_CODE.4m.fd \
+        /usr/share/edk2/x64/OVMF_CODE.fd \
+        /usr/share/edk2-ovmf/x64/OVMF_CODE.4m.fd \
+        /usr/share/edk2-ovmf/x64/OVMF_CODE.fd \
+        /usr/share/ovmf/x64/OVMF_CODE.fd
+    do
+        if [[ -f "$candidate" ]]; then printf '%s' "$candidate"; return 0; fi
+    done
+
+    die "no OVMF firmware found (tried /usr/share/edk2/x64/, /usr/share/edk2-ovmf/x64/, /usr/share/ovmf/x64/). Is edk2-ovmf installed?"
+}
+
+# The template a new machine's variable store is copied from. It must match the
+# CODE file it is paired with - a 4m CODE with a 2MB VARS does not boot - so it
+# is derived from the CODE path rather than searched for independently.
+ovmf_vars_template() {
+    local code="$1" vars
+    vars="${code/OVMF_CODE/OVMF_VARS}"
+    [[ -f "$vars" ]] || die "found $code but no matching $vars beside it"
+    printf '%s' "$vars"
+}
+
+# ----------------------------------------------------------------------
+# Defaults, sized to the host
+# ----------------------------------------------------------------------
+#
+# Written into vm.conf when a machine is created rather than recomputed at every
+# run, so that what a machine will do is visible in a file and editable, and so
+# that copying the store to a bigger host does not silently reshape the guests.
+#
+# The memory figure is a CAP, and it carries more weight than tidiness:
+# setup/system/earlyoom.conf lists qemu under --avoid, because killing a guest is
+# a power cut to the machine inside it rather than a lost browser tab. An
+# uncapped guest plus an avoid rule is a host that cannot defend itself, so the
+# cap and the avoid rule belong together. See TASK-69.1.
+default_memory_mb() {
+    local total_kb half
+    total_kb="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)"
+    half=$(( total_kb / 1024 / 2 ))
+    (( half < 1024 )) && half=1024
+    (( half > 8192 )) && half=8192
+    printf '%s' $(( half / 256 * 256 ))
+}
+
+default_cpus() {
+    local half
+    half=$(( $(nproc) / 2 ))
+    (( half < 1 )) && half=1
+    (( half > 8 )) && half=8
+    printf '%s' "$half"
+}
+
+write_conf() {
+    local dir="$1" iso="${2-}"
+    cat > "$dir/vm.conf" <<CONF
+# How this machine is shaped. Edit it; the next 'vm run' picks it up.
+#
+# MEMORY is a cap in MiB, and it is not only a preference: qemu is in earlyoom's
+# --avoid list, so the host will not reclaim memory from a running guest. This
+# number is what keeps that arrangement safe. See setup/system/earlyoom.conf.
+MEMORY=$(default_memory_mb)
+CPUS=$(default_cpus)
+
+# An installer image attached at boot. Only meaningful for a machine made with
+# --iso. Clear it once the guest is installed, or it boots the installer again
+# every single time.
+ISO=$iso
+CONF
+}
+
+# Defaults are applied here as well as at creation, so that a hand-edited
+# vm.conf which has lost a line still starts.
+read_conf() {
+    local dir="$1"
+    MEMORY=""; CPUS=""; ISO=""
+    if [[ -f "$dir/vm.conf" ]]; then
+        # shellcheck disable=SC1091
+        source "$dir/vm.conf"
+    fi
+    MEMORY="${MEMORY:-$(default_memory_mb)}"
+    CPUS="${CPUS:-$(default_cpus)}"
+    ISO="${ISO:-}"
+}
+
+# ----------------------------------------------------------------------
+# What is running
+# ----------------------------------------------------------------------
+#
+# Matched on the machine's own disk path, which appears in qemu's command line
+# and nowhere else on the system. Deliberately NOT matched on a category like
+# the qemu binary name, which would report every guest as this one, and not on
+# anything that could appear in this script's own command line - `pkill -f` and
+# swaymsg selectors have both killed the wrong thing here before. `vm run work`
+# does not contain the disk path, so the pattern cannot match the process asking
+# the question.
+is_running() {
+    pgrep -f -- "$(vm_disk "$1")" >/dev/null 2>&1
+}
+
+running_names() {
+    local dir name
+    [[ -d "$STORE" ]] || return 0
+    for dir in "$STORE"/*/; do
+        [[ -d "$dir" ]] || continue
+        name="$(basename "$dir")"
+        exists "$name" || continue
+        if is_running "$name"; then printf '%s\n' "$name"; fi
+    done
+    return 0
+}
+
+# ----------------------------------------------------------------------
+# Commands
+# ----------------------------------------------------------------------
+
+# The size a machine actually occupies, which for an overlay is what it has
+# written rather than what the guest believes its disk to be. Plain `du` counts
+# blocks used, which is the number wanted here; --apparent-size would report the
+# virtual size and make every fresh clone look like a full disk.
+disk_usage() {
+    local out
+    out="$(du -sh "$1" 2>/dev/null | awk '{print $1}')"
+    printf '%s' "${out:-?}"
+}
+
+backing_of() {
+    qemu-img info --output=json "$1" 2>/dev/null |
+        sed -n 's/.*"backing-filename": *"\([^"]*\)".*/\1/p' | head -1
+}
+
+cmd_list() {
+    ensure_store
+
+    if [[ ! -e "$BASE" ]]; then
+        echo "No base image yet: $BASE"
+        echo "Build it with tools/build-vm-image.sh from the repository (TASK-69.2)."
+        echo
+    fi
+
+    local found=0 dir name state based size
+    for dir in "$STORE"/*/; do
+        [[ -d "$dir" ]] || continue
+        name="$(basename "$dir")"
+        exists "$name" || continue
+
+        if [[ $found -eq 0 ]]; then
+            printf '%-16s %-9s %-8s %s\n' NAME STATE SIZE BASED-ON
+            found=1
+        fi
+
+        state=stopped
+        is_running "$name" && state=running
+
+        based="$(backing_of "$(vm_disk "$name")")"
+        if [[ -n "$based" ]]; then based="$(basename "$based")"; else based="(whole disk)"; fi
+
+        size="$(disk_usage "$dir")"
+        printf '%-16s %-9s %-8s %s\n' "$name" "$state" "$size" "$based"
+    done
+
+    [[ $found -eq 1 ]] || echo "No machines yet. 'vm new NAME' makes one."
+}
+
+cmd_new() {
+    local name="" blank="" iso=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --blank) blank="${2-}"; [[ -n "$blank" ]] || die "--blank needs a size, e.g. 20G"; shift 2 ;;
+            --iso)   iso="${2-}";   [[ -n "$iso" ]]   || die "--iso needs a path"; shift 2 ;;
+            -*)      die "unknown option '$1'" ;;
+            *)       [[ -z "$name" ]] || die "only one name, please"; name="$1"; shift ;;
+        esac
+    done
+
+    check_name "$name"
+    ensure_store
+
+    local dir; dir="$(vm_dir "$name")"
+    [[ ! -e "$dir" ]] || die "'$name' already exists. 'vm rm $name' first, or pick another name."
+
+    if [[ -n "$iso" ]]; then
+        [[ -f "$iso" ]] || die "no such ISO: $iso"
+        iso="$(readlink -f "$iso")"
+    fi
+
+    # A machine is either an overlay on the base or a disk of its own. --iso
+    # implies the latter, because attaching an installer to a machine that is
+    # already a working Arch system is not a thing anybody means.
+    if [[ -z "$blank" && -n "$iso" ]]; then blank="20G"; fi
+
+    if [[ -z "$blank" ]]; then
+        [[ -f "$BASE" ]] ||
+            die "no base image at $BASE. Build it with tools/build-vm-image.sh, or use --blank SIZE for a machine that is not based on it."
+    fi
+
+    mkdir -p "$dir"
+
+    if [[ -n "$blank" ]]; then
+        qemu-img create -f qcow2 "$dir/disk.qcow2" "$blank" >/dev/null
+        echo "vm: '$name' created with an empty ${blank} disk"
+    else
+        # -F states the backing file's format explicitly. Without it qemu-img
+        # probes, warns, and in newer versions refuses outright.
+        #
+        # The backing path is absolute so the overlay does not depend on being
+        # opened from a particular directory - a relative backing file is
+        # resolved against the overlay's own location and breaks the moment
+        # anything is moved.
+        qemu-img create -f qcow2 -F qcow2 -b "$BASE" "$dir/disk.qcow2" >/dev/null
+        echo "vm: '$name' cloned from $(basename "$BASE") (it costs almost nothing until it writes)"
+    fi
+
+    cp "$(ovmf_vars_template "$(ovmf_code)")" "$dir/OVMF_VARS.fd"
+    chmod u+w "$dir/OVMF_VARS.fd"
+    write_conf "$dir" "$iso"
+
+    echo "vm: 'vm run $name' starts it"
+}
+
+cmd_run() {
+    local name="${1-}"
+    check_name "$name"
+    require_exists "$name"
+
+    local dir; dir="$(vm_dir "$name")"
+
+    if is_running "$name"; then
+        die "'$name' is already running"
+    fi
+
+    read_conf "$dir"
+
+    local code vars
+    code="$(ovmf_code)"
+    vars="$dir/OVMF_VARS.fd"
+
+    # A machine made before this file was per-machine, or one whose vars were
+    # lost, still starts - it just gets a fresh set of boot entries.
+    if [[ ! -f "$vars" ]]; then
+        warn "no UEFI variable store for '$name'; making a new one"
+        cp "$(ovmf_vars_template "$code")" "$vars"
+        chmod u+w "$vars"
+    fi
+
+    # Writing to a backing file corrupts every overlay derived from it, and the
+    # corruption appears in the clones rather than here. Worth one stat call.
+    if [[ -f "$BASE" && -w "$BASE" ]]; then
+        local backing; backing="$(backing_of "$(vm_disk "$name")")"
+        if [[ -n "$backing" ]]; then
+            warn "the base image $BASE is writable. Anything that writes to it corrupts every machine cloned from it; consider 'chmod a-w $BASE'."
+        fi
+    fi
+
+    [[ -w /dev/kvm ]] ||
+        die "no writable /dev/kvm, so this would fall back to software emulation and be unusably slow. Is virtualisation enabled in firmware?"
+
+    local args=(
+        -name "vm:$name"
+        -machine q35,accel=kvm
+        -cpu host
+        -smp "$CPUS"
+        -m "$MEMORY"
+        -drive "if=pflash,format=raw,readonly=on,file=$code"
+        -drive "if=pflash,format=raw,file=$vars"
+        -drive "file=$dir/disk.qcow2,if=virtio,format=qcow2,cache=writeback,discard=unmap"
+        -netdev user,id=net0
+        -device virtio-net,netdev=net0
+        # A tablet rather than a mouse: it reports absolute coordinates, so the
+        # host and guest pointers stay together without the window grabbing the
+        # cursor and needing a key to release it.
+        -device virtio-tablet
+        -device virtio-keyboard
+        -audiodev "pipewire,id=snd0"
+        -device intel-hda
+        -device "hda-output,audiodev=snd0"
+    )
+
+    if [[ -n "$ISO" && -f "$ISO" ]]; then
+        args+=( -drive "file=$ISO,media=cdrom,readonly=on" )
+    fi
+
+    # The display device is chosen from what is actually installed rather than
+    # asserted. In Arch the virtio display devices are SEPARATE packages from
+    # qemu-system-x86, so naming one that is absent fails at start with an error
+    # about an unknown device - configuration that looks right and does nothing,
+    # which is the failure this repository keeps meeting.
+    #
+    # virtio-vga-gl gives the guest 3D acceleration through virglrenderer and is
+    # what makes a desktop guest feel like a desktop. Plain virtio-vga is the
+    # same device without it. std is built into qemu itself and always works.
+    # Asked once and held, rather than piped into `grep -q` twice. `grep -q`
+    # exits at the first match and closes the pipe; qemu then takes SIGPIPE and
+    # exits 141, and `pipefail` reports the pipeline as 141 rather than grep's
+    # 0. The test would report the device as ABSENT while it was present, and
+    # intermittently, depending on whether qemu had finished writing first.
+    # `grep -c` reads to the end and cannot do this.
+    local devices
+    devices="$(qemu-system-x86_64 -device help 2>/dev/null || true)"
+
+    if [[ "$(printf '%s' "$devices" | grep -c '"virtio-vga-gl"')" -gt 0 ]]; then
+        args+=( -device virtio-vga-gl -display "gtk,gl=on,zoom-to-fit=on,show-menubar=off" )
+    elif [[ "$(printf '%s' "$devices" | grep -c '"virtio-vga"')" -gt 0 ]]; then
+        args+=( -device virtio-vga -display "gtk,zoom-to-fit=on,show-menubar=off" )
+    else
+        warn "no virtio display device installed; falling back to std VGA, which has no acceleration. Install qemu-hw-display-virtio-vga-gl."
+        args+=( -vga std -display "gtk,zoom-to-fit=on,show-menubar=off" )
+    fi
+
+    exec qemu-system-x86_64 "${args[@]}"
+}
+
+cmd_rm() {
+    local name="${1-}"
+    check_name "$name"
+    require_exists "$name"
+
+    if is_running "$name"; then die "'$name' is running; shut it down first"; fi
+
+    rm -rf -- "$(vm_dir "$name")"
+    echo "vm: '$name' deleted"
+}
+
+cmd_reset() {
+    local name="${1-}"
+    check_name "$name"
+    require_exists "$name"
+
+    if is_running "$name"; then die "'$name' is running; shut it down first"; fi
+
+    local dir disk backing
+    dir="$(vm_dir "$name")"
+    disk="$(vm_disk "$name")"
+    backing="$(backing_of "$disk")"
+
+    [[ -n "$backing" ]] ||
+        die "'$name' has a whole disk of its own rather than an overlay, so there is no earlier state to return it to. 'vm rm $name' deletes it."
+
+    [[ -f "$backing" ]] || die "'$name' is based on $backing, which is missing"
+
+    rm -f -- "$disk"
+    qemu-img create -f qcow2 -F qcow2 -b "$backing" "$disk" >/dev/null
+
+    cp "$(ovmf_vars_template "$(ovmf_code)")" "$dir/OVMF_VARS.fd"
+    chmod u+w "$dir/OVMF_VARS.fd"
+
+    echo "vm: '$name' is back to $(basename "$backing")"
+}
+
+# ----------------------------------------------------------------------
+# The menu
+# ----------------------------------------------------------------------
+#
+# -replace because this is reachable from rofi itself, through the launcher, and
+# rofi refuses to start twice without it.
+#
+# No -mesg. This repository's rofi theme sets
+# `window { children: [ inputbar, listview, textbox-footer ] }` and `message` is
+# not among them, so rofi accepts the argument, styles the element and places it
+# nowhere - no warning, no error. The rows carry the state instead: each says
+# whether that machine is running and how much it has written.
+
+menu() {
+    ensure_store
+
+    local rows=() choice dir name state size
+
+    for dir in "$STORE"/*/; do
+        [[ -d "$dir" ]] || continue
+        name="$(basename "$dir")"
+        exists "$name" || continue
+
+        if is_running "$name"; then state="running"; else state="stopped"; fi
+        size="$(disk_usage "$dir")"
+        rows+=("$name  -  $state, $size")
+    done
+
+    if [[ -f "$BASE" ]]; then
+        rows+=("New machine from the base image")
+    fi
+
+    if [[ ${#rows[@]} -eq 0 ]]; then
+        rofi -e "No virtual machines, and no base image to clone one from. Build it with tools/build-vm-image.sh in the repository." -replace
+        return 0
+    fi
+
+    choice="$(printf '%s\n' "${rows[@]}" |
+        rofi -dmenu -i -p "Virtual machines" -no-custom -replace || true)"
+    [[ -n "$choice" ]] || return 0
+
+    if [[ "$choice" == "New machine from the base image" ]]; then
+        local new
+        new="$(printf '' | rofi -dmenu -p "Name for the new machine" -replace || true)"
+        [[ -n "$new" ]] || return 0
+        cmd_new "$new"
+        cmd_run "$new"
+        return 0
+    fi
+
+    # The row is "name  -  state, size"; the name is everything before the
+    # first two-space separator. Split on that rather than on the first space,
+    # so nothing here depends on a machine's name having no spaces in it - which
+    # check_name already forbids, but that is a second place to keep in step.
+    name="${choice%%  -  *}"
+    require_exists "$name"
+
+    if is_running "$name"; then
+        rofi -e "'$name' is already running." -replace
+        return 0
+    fi
+
+    cmd_run "$name"
+}
+
+# Printed from the header comment rather than duplicated, so the two cannot
+# drift. Anchored on the content and not on line numbers, which this file has
+# already changed once.
+usage() {
+    sed -n '/^#   vm  /,/^#   vm --current/p' "$(readlink -f "$0")" |
+        sed 's/^# \{0,1\}//'
+}
+
+main() {
+    case "${1-}" in
+        "")          menu ;;
+        list)        cmd_list ;;
+        new)         shift; cmd_new "$@" ;;
+        run)         shift; cmd_run "${1-}" ;;
+        rm)          shift; cmd_rm "${1-}" ;;
+        reset)       shift; cmd_reset "${1-}" ;;
+        --current)   running_names ;;
+        -h|--help)   usage ;;
+        *)           usage >&2; die "unknown command '$1'" ;;
+    esac
+}
+
+main "$@"

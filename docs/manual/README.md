@@ -18,7 +18,7 @@ you will come back to.
 | 1 | [Getting started](01-getting-started.md) — what this machine is, what happens when you turn it on, and the first five minutes |
 | 2 | [The desktop](02-the-desktop.md) — windows, workspaces, the bar, notifications |
 | 3 | [The keyboard](03-the-keyboard.md) — every shortcut, the modes, and the scroll layer that lives below the compositor |
-| 4 | [Applications](04-applications.md) — the terminal, the shell, the editor, the browsers, files, git, the calendar |
+| 4 | [Applications](04-applications.md) — the terminal, the shell, the editor, the browsers, files, git, the calendar, virtual machines |
 | 5 | [Making it yours](05-making-it-yours.md) — themes, wallpapers, the bar, and what is machine-local rather than tracked |
 | 6 | [Getting work done](06-working.md) — focus music, the timer, clipboard history, screenshots, the notification centre |
 

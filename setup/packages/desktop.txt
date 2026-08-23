@@ -272,3 +272,62 @@ mesa
 # extra and considerably quicker. Used to run automatically from
 # greeting.service; TASK-113 removed that, not this.
 fastfetch
+
+# Virtual machines, for isolating dangerous work or a project from the machine
+# you are sitting at. Driven by ~/.local/bin/vm; see TASK-69 and DECISIONS.md.
+#
+# Deliberately qemu on its own rather than libvirt and virt-manager. Both run
+# the same qemu process with the same guest RAM, so the guest costs the same
+# either way and the difference is only scaffolding: roughly 30 MiB for a
+# kiosk compositor against 140 MiB for libvirtd plus virt-viewer, or 250-330
+# MiB once the virt-manager GUI is open. That saving is second-order next to a
+# 2-4 GiB guest and is NOT the reason. The reasons are fewer moving parts - no
+# daemon, no XML domain definitions, no libvirt group - and skipping the SPICE
+# round trip, since qemu can present straight to a Wayland surface. What
+# libvirt would have bought is snapshots, and qcow2 overlays give most of that
+# for free.
+#
+# qemu-system-x86 is the emulator; qemu-img creates and clones the disks.
+qemu-system-x86
+qemu-img
+
+# The display. GTK rather than SDL because gtk3 is already installed here, so
+# the whole difference is vte3 at 1.8 MiB, and GTK gives zoom-to-fit and a
+# menubar that can be switched off - which the full-screen session in
+# TASK-69.3 needs.
+qemu-ui-gtk
+
+# The guest's graphics card. These are SEPARATE packages from qemu-system-x86 in
+# Arch, which is worth knowing before debugging: without them the device simply
+# is not there, and the configuration naming it looks perfectly correct.
+#
+# virtio-vga-gl is what ~/.local/bin/vm asks for first, and it is what makes a
+# desktop guest feel like a desktop rather than a slideshow.
+#
+# ALL FOUR ARE NEEDED, which is not obvious and was found by installing two and
+# watching it not work. The -gl devices are subclasses of the plain ones, so
+# with only the -gl modules present qemu lists NEITHER: `-device help` showed no
+# virtio device at all, and nothing anywhere said why. The plain modules
+# register the base device the -gl module then extends. Separately, -gpu-gl is
+# what actually drags in virglrenderer; -vga-gl declares only qemu-common and
+# would leave a GL device with no renderer behind it.
+#
+# The script degrades on its own if these are absent, ending at std VGA with a
+# warning, so a machine that skips them still runs guests. It just runs them
+# without acceleration.
+qemu-hw-display-virtio-vga
+qemu-hw-display-virtio-vga-gl
+qemu-hw-display-virtio-gpu
+qemu-hw-display-virtio-gpu-gl
+
+# Guest audio, straight into the pipewire this desktop already runs.
+qemu-audio-pipewire
+
+# UEFI firmware for the guest. The disk layout this repository installs is
+# GPT/UEFI, so a guest built from it cannot boot without this.
+#
+# Declared even though qemu-system-x86 already depends on it, for the reason
+# packages/README.md gives and polkit and mesa are listed under: ~/.local/bin/vm
+# names the firmware file directly, so a dependency-graph change must not be
+# able to take it away quietly.
+edk2-ovmf

@@ -3146,6 +3146,93 @@ was found by testing the behaviour rather than reading the flag name.
 
 ---
 
+## Virtual machines with qemu alone, and clones that cost nothing
+
+**Decision:** Ship the ability to run virtual machines, driven by qemu directly
+through `~/.local/bin/vm`. No libvirt, no virt-manager, no daemon. Machines
+cloned from the bundled base image are qcow2 **overlays** rather than copies.
+
+### Why
+
+Running something dangerous, or keeping a project's tooling away from the
+machine you actually use, previously meant either not doing it or doing it on
+the real system. Rebuilding this setup in a VM by hand was always possible and
+never happened, because it meant an ISO download and the install wizard every
+single time.
+
+**Why qemu on its own.** libvirt and virt-manager do not run virtual machines;
+qemu does, and it is the same `qemu-system-x86_64` process with the same `-m`
+underneath either arrangement. A 2–4 GiB guest therefore costs the same both
+ways, and the entire difference is scaffolding:
+
+| Stack | Host-side overhead |
+| --- | --- |
+| qemu + a kiosk compositor | ~30 MiB |
+| libvirt + `virt-viewer` | ~140 MiB (daemon plus viewer) |
+| libvirt + the `virt-manager` GUI | ~250–330 MiB |
+
+That saving is second-order next to the guest and is **not** the reason. The
+reasons are fewer moving parts — no daemon, no XML domain definitions, no
+`libvirt` group membership, no managed virtual network — and that qemu presents
+straight to a Wayland surface instead of going through a SPICE server and a
+`spice-gtk` client, which is a latency difference rather than a memory one and
+is far more noticeable in use.
+
+**Why overlays.** `qemu-img create -b` makes a disk that names the base as its
+backing file and holds only what the guest has written since. A new machine is
+therefore a few hundred KB and appears instantly, and returning one to a clean
+state is deleting that file rather than reinstalling anything. This is most of
+what libvirt's snapshots would have provided, for none of the machinery.
+
+**Why the base image is generated and never committed.** Same rule wallpapers
+follow, and for the same reason: a full Arch desktop image is 8–15 GiB, and
+`checks/session.sh` already refuses anything image-shaped under
+`setup/dotfiles/`. The image is built on the machine by repository tooling.
+
+### Trade-off
+
+**The base image must never be written to.** Modifying a backing file corrupts
+every overlay derived from it, and the damage appears in the clones rather than
+in the base — a genuinely unpleasant thing to debug. The builder leaves it
+read-only and `vm run` warns if it has stopped being so, but this is a real
+sharp edge that libvirt's managed storage would have blunted.
+
+**No lifecycle management.** Nothing autostarts a guest at boot, there is no
+API, and no snapshot tree beyond the single base-and-overlay relationship. If
+any of that is wanted later, it is an argument for revisiting libvirt rather
+than for growing `vm` into a daemon.
+
+**qemu is exempt from `earlyoom`.** Killing a guest is a power cut to the
+machine inside it, with the filesystem damage that implies, so qemu is in the
+`--avoid` list in `setup/system/earlyoom.conf`. The host therefore cannot
+reclaim memory from a running guest, which is only safe because `vm` always
+passes a fixed `-m`. The cap and the exemption are one decision and must not be
+separated. On the 7.5 GiB reference machine the default is half of host RAM.
+
+### Alternatives considered
+
+**libvirt + virt-manager.** The obvious answer. It buys snapshots, autostart,
+managed NAT networking and a stable API, at the cost of a persistent daemon, XML
+domain definitions, group membership and roughly 150 MiB of disk. None of the
+things it buys were wanted; the overlay model covers the one that was.
+
+**GNOME Boxes.** A friendlier front end to the same libvirt stack, and it brings
+a large GNOME dependency footprint onto a machine that deliberately has no
+desktop environment.
+
+**`systemd-nspawn` containers.** Much cheaper, and genuinely better for
+isolating a project's *tooling*. Rejected because it shares the host kernel, so
+it does not answer the case this exists for — running something you do not trust
+— and it cannot boot a different operating system.
+
+**`qemu-ui-sdl` instead of `qemu-ui-gtk`.** Measured rather than assumed: `gtk3`
+is already installed here, so GTK costs only `vte3` at 1.79 MiB while SDL would
+cost `sdl2_image`. About 2 MiB apart. GTK was chosen for `zoom-to-fit` and a
+menubar that can be switched off, both of which the full-screen login session
+needs.
+
+---
+
 # Guiding principle
 
 When evaluating future changes, prefer the option that best preserves this balance:
