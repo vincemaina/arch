@@ -243,9 +243,17 @@ menu() {
             ;;
     esac
 
+    # No -mesg here, and that is a finding rather than an omission: this menu
+    # passed `-mesg "$(describe)"` for a while and the line never appeared. The
+    # rofi theme sets `window { children: [ inputbar, listview, textbox-footer ] }`
+    # and `message` is not among them, so rofi accepts the argument, styles the
+    # element it defines, and places it nowhere. No warning, no error.
+    #
+    # The rows carry the state anyway - a menu offering "Turn bluetooth off" is
+    # telling you it is on - and `bluetooth status` prints the full sentence for
+    # anyone who wants it.
     choice="$(printf '%s\n' "${rows[@]}" |
-        rofi -dmenu -i -p "Bluetooth" -no-custom -replace \
-             -mesg "$(describe)" || true)"
+        rofi -dmenu -i -p "Bluetooth" -no-custom -replace || true)"
     [[ -n "$choice" ]] || return 0
 
     case "$choice" in

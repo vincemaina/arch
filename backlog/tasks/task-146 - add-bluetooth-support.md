@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-23 12:21'
-updated_date: '2026-08-23 14:01'
+updated_date: '2026-08-23 14:14'
 labels: []
 dependencies: []
 priority: medium
@@ -45,3 +45,29 @@ further more blueooth should be in the waybar if being used e.g. if connected to
 7. checks/session.sh: assert the repository does not enable bluetooth.service anywhere, and that the module's on-click resolves. Break each on purpose before believing it passes.
 8. Docs: manual chapter, docs/software/README.md, DECISIONS.md.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented on branch worktree-task-146-bluetooth (commit ebfa5d8).
+
+WHAT WAS BUILT
+- setup/packages/desktop.txt: bluez + bluez-utils, with the reasoning that installing a package and enabling a service are two decisions, not one.
+- setup/dotfiles/dot_local/bin/executable_bluetooth: on/off/status/--current, plus a rofi menu. enable --now / disable --now via polkit, not sudo, because it is launched from a menu where a terminal sudo prompt would hang.
+- Waybar bluetooth module with format-no-controller set to the empty string, plus #bluetooth styling: secondary when connected, warning when the daemon is up with nothing connected, muted when powered off or rfkilled.
+- bluetooth-tui window rule, and a launcher entry - the only way back to the switch when the module is hidden.
+- checks/session.sh: a Bluetooth section asserting nothing in setup/ enables the service and that format-no-controller stays empty.
+- Manual ch2 (a Bluetooth section and a bar-table row) and ch5, docs/software/README.md, DECISIONS.md.
+
+VERIFIED
+- Module hidden with no controller: proven live before any of this was written, with a throwaway waybar on a headless output. waybar logged 'no bluetooth controller found' and the module was absent entirely - no empty pill.
+- Rendered config parses as JSON; the icons decode to U+F293 / U+F294, both confirmed inside JetBrains Mono Nerd Font's f000-f385 range. My literal escape sequences were twice silently converted to the raw character en route to disk, so they are now written by building the escape from parts and asserting afterwards that no raw private-use character was introduced.
+- Both new check assertions were broken on purpose and watched go red. That caught a real bug: the bluez-declared check was matching the MANIFEST COMMENT about bluez rather than the declaration, and passed with the packages deleted. Now anchored to a whole line.
+- The pairing window's app_id is written out literally at both sites, not held in a variable, because checks/session.sh enforces the toggle/--app-id/for_window agreement by reading the file as text and a variable is invisible to it.
+- session.sh 95 passed / 0 failed; sway-bindings clean; manual.sh 8/8.
+
+NOT YET VERIFIED - needs the packages installed
+bluez is not on this machine and sudo needs a password, so the states where the module is VISIBLE (on, and connected) have not been seen. That is the half that cannot be proven by reasoning: whether waybar's bluetooth module notices a controller appearing at runtime, and whether the CSS class names .on/.off/.connected are what waybar actually sets. checks/sway-commands.sh and packages.sh each fail on exactly this, and only this.
+
+Also unmeasured: bluetoothd's resident cost, recorded as a named gap in docs/software/README.md rather than left silent.
+<!-- SECTION:NOTES:END -->

@@ -1,6 +1,6 @@
 # Software this setup installs
 
-Ninety-eight packages are declared across [`setup/packages/`](../../setup/packages/).
+One hundred packages are declared across [`setup/packages/`](../../setup/packages/).
 This document accounts for every one of them: what it is for, where its
 rationale lives, and what it costs on the machine.
 
@@ -153,12 +153,30 @@ graphical.target reached after 2.061s in userspace
 
 ### What the whole declared set costs on disk
 
-**1.49 GiB** (1523.6 MiB) across all 98 declared packages, currently
+**1.51 GiB** (1541.2 MiB) across all 100 declared packages, currently
 installed, from `pacman -Qi`, excluding dependencies. Re-derived on
-**2026-08-22** against every package name in `setup/packages/*.txt` — all 98
-found installed, 0 missing. That is up from the 1.13 GiB / 90-package figure
-recorded on 2026-08-21; the difference is almost entirely two packages added
-since: `firefox` (294.9 MiB) and `yt-dlp` (31.7 MiB).
+**2026-08-23** against every package name in `setup/packages/*.txt` — all 100
+found installed, 0 missing.
+
+That last figure was taken on a **different machine** from every other number in
+this document: the ThinkPad TASK-146 was done on, not the KVM guest described
+above. For disk that is defensible — a package occupies the same space wherever
+it is installed — but the comparison against yesterday's 1.49 GiB is looser than
+it looks, because the two machines were not checked for matching package
+versions and some of the 17.6 MiB difference is certainly upstream growth rather
+than anything this repository did. Treat the trend as real and the exact delta
+as approximate. It would not be defensible at all for the memory or CPU tables,
+and none of those were touched.
+
+The history, since the shape of the growth is more useful than the number: 1.13
+GiB across 90 packages on 2026-08-21, then 1.49 GiB across 98 on 2026-08-22 —
+almost entirely `firefox` (294.9 MiB) and `yt-dlp` (31.7 MiB) — and 1.51 GiB
+across 100 today. Of the 17.6 MiB between yesterday and today, 5.41 MiB is the
+two new packages (`bluez`, `bluez-utils`) and the remaining ~12 MiB is not
+attributable from here — it is some mixture of upstream growth and the two
+machines differing, and this document should not guess which. What is worth
+keeping from it: **no figure in here is exact for long**, and the roll call is
+the durable part, not the totals.
 
 | Package | Installed |
 | --- | ---: |
@@ -653,8 +671,8 @@ of the declared `pipewire-pulse` — itself depends on `bluez-libs` and ships
 `/usr/lib/spa-0.2/bluez5/` with SBC, AAC, aptX, LDAC, LC3 and the HFP codecs.
 That was already on every machine here; only the daemon was missing.
 
-**Cost.** 1.73 MiB (`bluez`) + 3.69 MiB (`bluez-utils`) = **5.42 MiB** installed,
-from `pacman -Si` on 2026-08-23. Resident cost is **not measured** — see the
+**Cost.** 1.73 MiB (`bluez`) + 3.69 MiB (`bluez-utils`) = **5.41 MiB** installed,
+from `pacman -Qi` after installing them on 2026-08-23. Resident cost is **not measured** — see the
 gap below.
 
 ## Gaps this document does not close
