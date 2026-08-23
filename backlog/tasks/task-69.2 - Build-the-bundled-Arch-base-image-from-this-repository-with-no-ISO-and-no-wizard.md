@@ -3,11 +3,11 @@ id: TASK-69.2
 title: >-
   Build the bundled Arch base image from this repository, with no ISO and no
   wizard
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-23 15:58'
-updated_date: '2026-08-23 19:51'
+updated_date: '2026-08-23 20:52'
 labels: []
 dependencies:
   - TASK-69.1
@@ -40,11 +40,11 @@ The guest inherits this repo's WLR_NO_HARDWARE_CURSORS handling, so the inverted
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A base image is built end-to-end by the repository's own installer against an nbd-attached qcow2
-- [ ] #2 The builder refuses any target that is not an nbd device
-- [ ] #3 The finished base image boots under qemu with UEFI firmware and reaches the login screen
-- [ ] #4 The base image is read-only once built, and is ignored by git
-- [ ] #5 install.sh is unchanged, or changed only in ways that do not weaken its interactive password handling
+- [x] #1 A base image is built end-to-end by the repository's own installer against an nbd-attached qcow2
+- [x] #2 The builder refuses any target that is not an nbd device
+- [x] #3 The finished base image boots under qemu with UEFI firmware and reaches the login screen
+- [x] #4 The base image is read-only once built, and is ignored by git
+- [x] #5 install.sh is unchanged, or changed only in ways that do not weaken its interactive password handling
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -110,4 +110,32 @@ BUG 1, serious: OUTPUT defaulted to "${XDG_DATA_HOME:-$HOME/.local/share}/vm/bas
 BUG 2: the final 'umount -R /mnt' hit a transient 'target is busy' - something (a keyring agent from pacman's signature checks is the likely cause, unconfirmed) held a handle into /mnt for a moment after 05-dotfiles.sh returned, and released it almost immediately on its own. Under set -e this aborted the WHOLE remaining script - chmod a-w and the success message never ran - even though the build had genuinely and completely finished. Fixed with a bounded 5-attempt retry with a 1s pause; a real, non-transient failure still stops the script loudly rather than being swallowed.
 
 RECOVERY: the already-built image was intact and byte-complete at /root/.local/share/vm/base.qcow2 (owned by root, not yet chmod a-w). Copied to the correct path with pkexec cp (plain cp, not --reflink, so it genuinely inherits nodatacow from the destination directory rather than copying the attribute literally - confirmed with lsattr afterward), chowned to the real user, checksum-verified byte-identical against the /root original, made read-only, and the /root copy removed. Nothing was rebuilt; the successful build's actual output was recovered and fixed up in place.
+
+REAL BUILD COMPLETED AND VERIFIED, all criteria closed with genuine evidence.
+
+AC1: the user ran tools/build-vm-image.sh themselves, in their own terminal, and it completed end-to-end - both passwords, 191 base packages plus the full desktop.txt and dev.txt sets, dotfiles - producing a real 5.4 GiB image. Two bugs it exposed (wrong $HOME under sudo, a transient umount failure aborting the script's tail) were fixed in the script and the already-complete image was recovered rather than rebuilt: copied to the correct path, checksum-verified byte-identical (sha256sum matched exactly against the /root original before it was removed), ownership and read-only permission fixed up.
+
+AC2: tested directly - '--device /dev/sda' refuses immediately with no destructive action taken, confirmed by the file never being created.
+
+AC3: 'vm new firstboot' cloned the REAL base image (196 KiB overlay against the 5.4 GiB base - the cost claim proven against the real thing, not a scratch test), booted on a throwaway headless output (the user's own screen never touched, restored via trap), and reached ReGreet within about 20 seconds: 'Welcome back!', User: vincemaina (correctly baked in from install.conf), Session: Sway, themed dark, Login/Reboot/Power Off all present. Two screenshots taken 8s apart, sent to the user. The test clone was removed afterward; the base image and its read-only permission are untouched.
+
+AC4: confirmed via ls - mode is -r--r--r-- (0444), and lsattr confirms it inherited nodatacow from the destination directory rather than merely having the attribute set on it directly. Never inside the repository: the builder refuses any --output path under REPO_ROOT outright, tested directly.
+
+AC5: 'git diff --stat origin/main -- install.sh setup/install/' is empty - byte-for-byte unmodified.
+
+All repo checks green: session.sh 122/0, manual.sh 8/0, sway-commands.sh clean, packages.sh clean modulo pre-existing unrelated drift (ffmpeg, spotify-player - neither touched by this task).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+tools/build-vm-image.sh builds the base image ~/.local/bin/vm clones from, using this repository's own installer - not an ISO, not a wizard - against a qcow2 attached over qemu-nbd.
+
+The task assumed install.sh could simply be pointed at the nbd device; reading it closely found that unsafe on a running desktop rather than a live ISO: it ends in poweroff, and bootctl inside arch-chroot would - confirmed by reading /usr/bin/arch-chroot - write real UEFI NVRAM entries onto the host's own firmware, since arch-chroot mounts a live, kernel-populated sysfs regardless of which disk you meant. So the builder drives the five install stages directly instead, with a tmpfs that shadows exactly the one dangerous path for the duration of stage 3 only. Every stage script is byte-for-byte unmodified - confirmed via git diff against origin/main.
+
+Two bugs in the builder's own nbd device picker were found by testing against real conditions on this machine, not assumed: sysfs's busy indicators for nbd devices are permanently stale after a genuine disconnect, and a device can accept a connection while serving no I/O at all (a device I personally wedged during testing). Both fixed with logic that trusts only a real connect-and-read proof, and routes around a bad device instead of dying on it.
+
+Two more were found by the FIRST REAL BUILD, which no scratch test could have caught: $HOME resolves to root's home under plain sudo, silently writing the whole image to the wrong account; and a transient 'target is busy' on the final unmount aborted the script's tail (chmod a-w, the success message) under set -e even though the build had genuinely finished. Both fixed; the already-complete 5.4 GiB image from that first real run was recovered rather than rebuilt - checksum-verified byte-identical after being copied to the correct path.
+
+Verified end to end with real evidence, not assumption: the recovered base image is read-only (0444) with nodatacow genuinely inherited (not just present); a clone of it costs 196 KiB against 5.4 GiB; booted on a throwaway headless output (the user's real screen never touched) it reaches ReGreet within ~20 seconds showing the correct user and the real Sway session. All repo checks green.
+<!-- SECTION:FINAL_SUMMARY:END -->
