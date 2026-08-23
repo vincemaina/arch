@@ -277,7 +277,23 @@ cleanup() {
     if mountpoint -q /mnt 2>/dev/null; then
         umount -R /mnt 2>/dev/null || true
     fi
-    if [[ -n "$DEVICE" ]]; then
+    # CRITICAL: disconnecting a device that is STILL MOUNTED discards
+    # whatever the filesystem had buffered and not yet flushed, and can
+    # leave the filesystem's own metadata inconsistent - this is not
+    # theoretical, it is exactly how a real base.qcow2 lost its filesystem
+    # signatures entirely on this machine, confirmed by `blkid -p` finding
+    # nothing recognisable on either partition afterwards, while `qemu-img
+    # check` still reported the qcow2 container itself as structurally
+    # sound. The corruption was findable only at the filesystem level,
+    # because that is exactly the layer this used to skip checking.
+    #
+    # So: if umount above did not actually succeed, do NOT disconnect.
+    # A connected-but-orphaned nbd device is an annoyance - `qemu-nbd
+    # --disconnect /dev/nbdN` once whatever was holding it releases - not
+    # data loss. That trade is correct every time.
+    if mountpoint -q /mnt 2>/dev/null; then
+        warn "/mnt is still mounted - NOT disconnecting $DEVICE, to avoid discarding unflushed writes and corrupting it. Once whatever is holding it releases (check with 'fuser -vm /mnt'), unmount by hand and then 'qemu-nbd --disconnect $DEVICE'."
+    elif [[ -n "$DEVICE" ]]; then
         assert_nbd "$DEVICE"
         qemu-nbd --disconnect "$DEVICE" >/dev/null 2>&1 || true
     fi
@@ -460,17 +476,25 @@ msg "Unmounting"
 # and the success message - never ran, even though every stage had already
 # finished. The image was completely built and simply left writable and
 # unannounced. Nothing was lost, but it read like a failed build.
+#
+# 5 attempts at 1s each was not always enough - a second real build hit the
+# same busy condition and it had not cleared even after 5s, though it did
+# clear shortly after (confirmed: /mnt was freely unmountable moments later,
+# by hand). 15 attempts at 2s (up to 30s) gives real headroom without
+# changing the fundamental contract: still a bounded retry, still a hard
+# die() if it genuinely never clears - see cleanup() above for why running
+# out of patience here must never mean disconnecting a still-mounted device.
 umount_err="$(mktemp)"
-for attempt in 1 2 3 4 5; do
+for attempt in $(seq 1 15); do
     if umount -R /mnt 2>"$umount_err"; then
         break
     fi
-    if (( attempt == 5 )); then
+    if (( attempt == 15 )); then
         cat "$umount_err" >&2
         rm -f "$umount_err"
-        die "/mnt would not unmount after 5 attempts. 'fuser -vm /mnt' from another terminal shows what still has it open."
+        die "/mnt would not unmount after 15 attempts (30s). 'fuser -vm /mnt' from another terminal shows what still has it open."
     fi
-    sleep 1
+    sleep 2
 done
 rm -f "$umount_err"
 
