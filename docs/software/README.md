@@ -556,15 +556,21 @@ ruled out the AUR route in TASK-43.
 mpv plays perfectly and nothing on the desktop can see it. `mpv` is started
 with `systemd-run --user --scope` so it dies with whatever launched it rather
 than surviving in an orphaned cgroup. Stations are tracked data in
-`~/.config/focus-music/stations`, reached through `~/.local/bin/focus-music`;
-`yt-dlp` is on that default path for exactly one of them — the SomaFM and
-laut.fm stations are direct HTTP streams that need no resolving step, while
-Minecraft's soundtrack is carried by no radio station anywhere and is a
-YouTube URL resolved at start — and it also exists for pasting an arbitrary
-YouTube or SoundCloud link.
+`~/.config/focus-music/stations`, reached through `~/.local/bin/focus-music`,
+alongside whatever a machine has kept in `stations.local`. `yt-dlp` is no
+longer an accessory to that path but part of it: the helper searches YouTube
+for arbitrary text and plays the result, so anything not carried by a radio
+station is one prompt away rather than a file edit. The SomaFM and laut.fm
+stations remain direct HTTP streams that start instantly with nothing to
+resolve; a station may also be written as `search:<text>`, which is resolved
+afresh on every play. That is deliberate - what the helper writes down is
+always a search and never a video id, because an id is a link that rots and a
+search is not. `focus-music --check` resolves every entry and names the dead
+ones.
 **Cost.** `mpv` 6.34 MiB, `mpv-mpris` 35.18 KiB, `yt-dlp` 31.66 MiB installed
 (2026-08-22) — 31.66 MiB of that is a Python interpreter's worth of extractor
-code, earned by one tracked station and by pasting a link. None of the three is resident until a station is actually playing,
+code, and it now earns it: search is a first-class way into this feature
+rather than a fallback. None of the three is resident until a station is actually playing,
 so there is no row in the session-cost table above.
 
 ### cava

@@ -166,7 +166,11 @@ if ignore_file.exists():
 # Listed here rather than derived from the helper, because the helper builds
 # the path from components - home() / "Pictures" / "wallpapers" - so there is
 # no literal string in the source to match on that is not a comment.
-created_on_demand = {"~/Pictures/wallpapers"}
+# ~/.config/focus-music/stations.local is the same shape of thing: focus-music
+# writes it the first time something found by search is kept, and a machine
+# where nobody has kept anything is not a machine with a broken manual.
+created_on_demand = {"~/Pictures/wallpapers",
+                     "~/.config/focus-music/stations.local"}
 ignored |= created_on_demand
 
 missing = []
