@@ -1,0 +1,40 @@
+# The font every surface uses, and the sizes each one asks for.
+#
+# TRACKED DEFAULTS, MACHINE-LOCAL OVERRIDES. chezmoi merges the [data] table in
+# ~/.config/chezmoi/chezmoi.toml OVER this file, key by key, so a machine can
+# set one size and inherit the rest:
+#
+#     ~/.local/lib/desktop_config.py set data.font.terminal 15
+#     chezmoi --source ~/Projects/arch/setup apply       # or ./sync.sh
+#
+# That the merge is per-key rather than per-table was measured, not assumed -
+# overriding `terminal` alone leaves `bar` at its default here. Setting a whole
+# table would otherwise have silently dropped every key it did not mention.
+#
+# Nothing machine-local is tracked, so raising a font size leaves no diff in
+# git, the same bargain as the selected theme. See "Machine-local dotfile
+# changes" in DECISIONS.md.
+
+[font]
+
+# One family for every surface. Repeated in six places before this file
+# existed, which is five opportunities to change five of them.
+#
+# Nerd Font rather than plain JetBrains Mono because the bar, the launcher and
+# the prompt all render glyphs from the patched range.
+family = "JetBrainsMono Nerd Font"
+
+# Points, for everything that measures in points.
+#
+# Split by how each surface is read rather than by taste. A terminal is read
+# continuously for hours and is the one worth raising on a small panel;
+# window titles and notifications are glanced at; the launcher is read at
+# arm's length for a second at a time and is deliberately larger.
+terminal = 10
+desktop = 10
+menu = 12
+
+# Pixels, because Waybar is styled with CSS and CSS has no points. Not derived
+# from the numbers above: the conversion depends on output scale, so a formula
+# here would be a guess that looks like arithmetic.
+bar = 13

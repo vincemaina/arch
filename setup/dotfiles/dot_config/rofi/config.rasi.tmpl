@@ -209,7 +209,7 @@ inputbar {
 prompt {
     background-color: transparent;
     text-color:       @accent;
-    font:             "JetBrainsMono Nerd Font Bold 12";
+    font:             "{{ .font.family }} Bold {{ .font.menu }}";
 }
 
 entry {
@@ -217,7 +217,7 @@ entry {
     text-color:        @text;
     placeholder:       "Search applications, windows, files";
     placeholder-color: @muted;
-    font:              "JetBrainsMono Nerd Font 12";
+    font:              "{{ .font.family }} {{ .font.menu }}";
 }
 
 listview {
@@ -287,7 +287,7 @@ textbox-footer {
     text-color:       @muted;
     padding:          12px 22px;
     content:          "↑↓ move · ⏎ open · Shift+↹ next source · Esc close";
-    font:             "JetBrainsMono Nerd Font 10";
+    font:             "{{ .font.family }} {{ .font.desktop }}";
 }
 
 message {

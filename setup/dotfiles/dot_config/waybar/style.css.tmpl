@@ -28,8 +28,8 @@
 @define-color text_dim    {{ $palette.text_dim }};
 
 * {
-    font-family: "JetBrainsMono Nerd Font", monospace;
-    font-size: 13px;
+    font-family: "{{ .font.family }}", monospace;
+    font-size: {{ .font.bar }}px;
     min-height: 0;
 }
 

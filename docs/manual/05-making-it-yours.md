@@ -182,3 +182,61 @@ open the same `btop` window; the network reading opens `nmtui`; audio opens
 remaining. The definitive, current copy of this table is the comment block
 at the top of `waybar/config.jsonc.tmpl` — reproduced here for orientation
 rather than as the source of truth, since that file is what actually renders.
+
+## Changes this machine keeps
+
+Everything above is tracked in the repository, which means `./sync.sh` will
+put it back the way the repository says. That is the point — it is how one
+change reaches every machine — but it makes the obvious move, editing the
+file, the wrong one. Your edit survives until the next sync and then quietly
+disappears.
+
+So each machine has a layer of its own, above the repository, that sync never
+touches. There are two kinds, and which one you want depends on what you are
+changing.
+
+**A setting you want to add or override** goes in that tool's local file. It
+is created for you on first install, it is never rewritten, and the tracked
+config reads it *last* — so whatever you put there wins.
+
+| Tool | Your file |
+| --- | --- |
+| The shell | `~/.config/zsh/local.zsh` |
+| Sway | any `~/.config/sway/config.d/99-*.conf` |
+| Session environment | any `~/.config/environment.d/99-*.conf` |
+| keyd (system-wide remapping) | `/etc/keyd/local` |
+
+Editing keyd's file needs `sudo`, and `sudo keyd check` before `sudo keyd
+reload` — a config keyd cannot parse leaves the machine with no working
+keyboard, and the way out is holding Backspace, Escape and Enter together.
+
+**A value that appears in more than one place** is not an override but a
+setting, and lives with the theme in chezmoi's own config at
+`~/.config/chezmoi/chezmoi.toml`. Nothing there is tracked, which is why
+switching theme leaves no diff in git.
+
+Font size is the worked example. One family and four sizes cover every
+surface, so raising the terminal font is one command rather than an edit in
+five files:
+
+```bash
+python3 ~/.local/lib/desktop_config.py set data.font.terminal 15
+./sync.sh
+```
+
+The keys are `family`, `terminal` (the terminal), `desktop` (window titles
+and notifications), `menu` (the launcher) and `bar` (Waybar, in pixels
+because CSS has no points). Set one and the rest keep the repository's
+defaults — the merge is per key, not per table. Only `desktop_config.py`
+should write that file; two separate writers disagreed about nested tables
+once and broke every subsequent sync.
+
+Already-open terminals keep the old size. foot reads its config when it
+starts and has no reload.
+
+The dividing line, and it is worth applying honestly: **put things in the
+local layer that you are content to lose if this machine is rebuilt.**
+Anything you would be annoyed to lose belongs in the repository, where it is
+backed up and reaches your other machines. `./sync.sh --dry-run` prints the
+`chezmoi re-add` command for anything that has diverged, so folding a change
+back in is one command when that turns out to be the right answer.

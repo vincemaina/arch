@@ -7,7 +7,7 @@
 # Until this file existed mako ran on stock defaults, which is why notifications
 # looked like they belonged to a different desktop than the one around them.
 
-font=JetBrainsMono Nerd Font 10
+font={{ .font.family }} {{ .font.desktop }}
 
 background-color={{ $palette.surface }}
 text-color={{ $palette.text }}

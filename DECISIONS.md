@@ -2359,7 +2359,7 @@ Because the file is only edited rather than owned, a mapping changed by hand wil
 
 ## Machine-local dotfile changes
 
-**Decision:** Ship a drop-in the repository does not own. `.zshrc` is fully managed and sources `~/.config/zsh/local.zsh`, which `.chezmoiignore` keeps chezmoi from ever writing, diffing or removing.
+**Decision:** Every machine gets a layer above the repository that the repository never sees and never reverts. The tracked config stays fully managed and reaches out to a local file it does not own - `.zshrc` sources `~/.config/zsh/local.zsh`, and the same shape is applied per tool wherever the tool supports it.
 
 ### Why
 
@@ -2376,6 +2376,33 @@ Three kinds of divergence were being conflated, and only the middle one was expr
 The third had no mechanism at all, so anything in it had to be typed into a managed file. That is what produced the conflict, and it also hid a real bug: a `PATH` line added by hand was not machine-local at all. `dot_local/bin/` installs executables and nothing ever put that directory on `PATH`, so every machine built from this repository had helper scripts that could not be run by name.
 
 The rule that decides the column: **put things in the local file that you are content to lose when the machine is rebuilt.** Anything you would be annoyed to lose is universal or declared per-machine, and belongs in git.
+
+### The same shape, everywhere the tool allows it
+
+The shell had a mechanism and nothing else did, which made the repository a cage for every other tool: a machine that wanted to differ either hardcoded itself into shared config or watched `sync.sh` revert it. That is fatal to publishing the build, because a stranger's laptop is not this one. It already bit here - a terminal font raised to 15 on a small laptop panel, reverted to the repository's 10 on the next sync.
+
+Two facts make the general version cheap, and both were measured rather than read:
+
+- **Nothing under `setup/dotfiles/` uses chezmoi's `exact_` prefix**, so chezmoi leaves unknown files in managed directories alone. Drop-ins in `sway/config.d/`, `environment.d/` and systemd `*.d/` already survive a sync. That was working and undocumented, which is its own hazard: an accident nobody wrote down is an accident somebody later "tidies up".
+- **chezmoi's `create_` attribute writes a file once and never overwrites it**, even under `apply --force`. So the repository can ship a seeded, commented local file, hand it over on first install, and never touch it again.
+
+Which layer a change belongs to is decided by what the tool can do, not by preference:
+
+| Layer | Mechanism | For |
+| --- | --- | --- |
+| Base | the repository, naming no machine | everything shared |
+| Overrides | a `create_` local file the tracked config includes **last** | additions and overrides - a binding, a tweaked setting |
+| Values | machine-local data in chezmoi's own config, read by templates | a value with no include point, or one that appears in several files at once |
+
+The include has to come last, because an override that loses to the file it is overriding is worse than none - it looks configured and does nothing, which is this repository's signature bug.
+
+Tool support, taken from each tool's own manual rather than assumed: `foot` has `include` (absolute path only, so its include line must be templated), `mako` has `include=` and accepts `~/`, sway already globs `config.d/*.conf` so a `99-` file needs no new line at all, git has `[include]`, waybar takes an `include` array and `@import` in CSS, rofi has `@import`, mpv has `include=`, Neovim can `pcall(dofile, ...)`, and keyd has `include` - which is where this pattern was first used, under TASK-133, for a laptop whose Control key had physically died.
+
+**Starship, yazi and GTK's `settings.ini` support no include at all.** Those can only be reached by the values layer, which is the other reason it exists.
+
+### Why this is not the same as machine profiles
+
+Profiles - templating a laptop's battery module in and a VM's out - are a separate mechanism for a separate question, and both are wanted. A profile answers *"this machine is a laptop"*. The local layer answers *"I like this font bigger"*. Collapsing them would mean declaring a profile for every personal preference, which puts the repository back in the way of trying something quickly - exactly what the shell escape hatch was introduced to stop.
 
 ### Trade-off
 

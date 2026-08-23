@@ -1,6 +1,6 @@
 {{- $palette := index .themes .theme -}}
 [main]
-font=JetBrainsMono Nerd Font:size=10
+font={{ .font.family }}:size={{ .font.terminal }}
 pad=16x16
 
 # Stated rather than relied upon. It is the default, but the palette here is
