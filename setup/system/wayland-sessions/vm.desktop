@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=Virtual machine
+Comment=Boot straight into a virtual machine, with no desktop session behind it
+# Names the launcher by absolute path directly, for the same reason
+# sway-uwsm.desktop does: resolving a bare command through the XDG desktop
+# entry hierarchy is one more place for /usr/local/share's precedence over
+# /usr/share to matter in a way that is easy to get wrong. There is nothing
+# here for that lookup to collide with - unlike sway.desktop, there is no
+# packaged vm.desktop to shadow - but naming the script directly costs
+# nothing and keeps every entry in this directory consistent about it.
+Exec=/usr/local/bin/vm-session
+TryExec=/usr/local/bin/vm-session
+DesktopNames=vm
+Type=Application

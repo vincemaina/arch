@@ -292,12 +292,6 @@ be a power cut to the machine inside it, so qemu is excluded. What keeps that
 safe is the memory cap in `vm.conf` — a guest cannot grow into memory the host
 is no longer allowed to reclaim. Raise that number thoughtfully.
 
-Machines that are not this setup work too:
-
-```bash
-vm new debian --blank 20G --iso ~/Downloads/debian.iso
-```
-
 **Where the base image comes from.** It is not downloaded or shipped with the
 repository — nothing image-shaped is tracked here, the same rule wallpapers
 follow. `tools/build-vm-image.sh` builds it, on the machine, using this
@@ -307,6 +301,45 @@ the same prompts a fresh install makes — so it needs a real terminal to run in
 not a script driving it. See
 [Recipes](08-recipes.md) → "Build (or rebuild) the base VM image" for how.
 
+Machines that are not this setup work too:
+
+```bash
+vm new debian --blank 20G --iso ~/Downloads/debian.iso
+```
+
 That gives a machine with an empty disk and the installer attached. Clear the
 `ISO` line in its `vm.conf` once it is installed, or it boots the installer
 again every time.
+
+## Booting a virtual machine at the login screen
+
+The login screen offers a second session alongside Sway: pick **Virtual
+machine** instead of logging in normally, and the machine boots straight into
+a guest with nothing else running - no Sway, no Waybar, no notifications, no
+idle handling. See [Getting started](01-getting-started.md) → "From power
+button to desktop" for where this fits in the boot sequence.
+
+It runs the same menu as `vm` with no arguments, hosted by `cage` - the kiosk
+compositor that already draws the login screen itself, so this session costs
+no additional package. Whatever you pick behaves exactly as it does from
+inside Sway: `vm new` clones from the base image, an existing machine boots
+straight in. Exiting the guest - shutting it down, or closing its window -
+returns you to the login screen, because that is cage's entire lifecycle:
+it runs one thing, and ends when that thing does.
+
+**Why a separate session rather than just running `vm` from inside Sway**,
+which already works: a guest running under Sway shares the keyboard with
+every Sway keybinding. `$mod`-anything is intercepted by Sway before the
+guest ever sees it, which matters if the guest's own desktop wants to use
+Super for anything. `cage` defines no keybindings of its own - confirmed by
+its own `--help` and manual page, which document no configuration mechanism
+for any - so a key that reaches cage's compositor reaches the guest, full
+stop. This is the strongest reason for a separate session existing at all;
+see `DECISIONS.md` for how it was checked and what a live measurement would
+still add.
+
+**The picker remembers your last choice per user.** ReGreet caches the last
+session you started and preselects it next time - so a boot after using the
+Virtual machine session opens back to Virtual machine, not Sway, until you
+change the dropdown again. This is ReGreet's own behaviour, not something
+configured here.

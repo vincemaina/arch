@@ -44,6 +44,9 @@ CONFIG_FILES=(
     # replace a file pacman owns.
     "wayland-sessions/sway-uwsm.desktop:/usr/local/share/wayland-sessions/sway-uwsm.desktop"
     "wayland-sessions/sway.desktop:/usr/local/share/wayland-sessions/sway.desktop"
+    # A real, selectable entry rather than a suppression like sway.desktop
+    # above - the "Virtual machine" choice at the login screen. See TASK-69.3.
+    "wayland-sessions/vm.desktop:/usr/local/share/wayland-sessions/vm.desktop"
 )
 
 for mapping in "${CONFIG_FILES[@]}"; do
@@ -141,8 +144,16 @@ fi
 # is not on the session PATH; this is the one that cannot be. /usr/local/bin is
 # on the default PATH of every process, so it is found without anything being
 # arranged.
+#
+# vm-session is here for a different reason: it is what vm.desktop's Exec
+# names directly, and greetd launches that Exec line before any user's
+# dotfiles are necessarily even applied for the session being started - a
+# machine-wide desktop entry needs a machine-wide script to point at, the
+# same reasoning system/ vs dotfiles/ follows everywhere else in this
+# repository.
 EXECUTABLES=(
     "bin/xdg-terminal-exec:/usr/local/bin/xdg-terminal-exec"
+    "bin/vm-session:/usr/local/bin/vm-session"
 )
 
 for mapping in "${EXECUTABLES[@]}"; do

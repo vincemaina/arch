@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: cage getent id foot
+
+# The login-screen "Virtual machine" session. Named by
+# setup/system/wayland-sessions/vm.desktop and installed to
+# /usr/local/bin by apply-config.sh. See TASK-69.3.
+#
+# WHAT THIS BOOTS
+#
+# One fixed, conventionally-named machine ("login"), cloned from the base
+# image the first time this session is picked and simply started every time
+# after. NOT a menu: rofi CANNOT RUN under cage at all - confirmed directly,
+# rather than assumed, by trying it: cage implements no wlr-layer-shell,
+# which rofi's Wayland backend requires, and it fails immediately with
+# "Rofi on wayland requires support for the layer shell protocol". Picking
+# machines by name is what running `vm` from inside Sway is for; this
+# session is a fixed point, the same way a physical KVM switch presents one
+# alternate machine rather than a menu of them.
+#
+# cage's own model - "runs a single, maximized application" - fits directly
+# running the guest far better than a menu would have anyway.
+#
+# Deliberately NOT started through uwsm. uwsm exists to reach
+# wayland-session@sway.target and start waybar, mako, swayidle and the
+# polkit agent alongside it. This session wants none of them - that absence
+# is the entire reason it exists, see DECISIONS.md's key-passthrough
+# argument for TASK-69 - and the lifecycle falls out for free without a
+# target: cage exits when its one child exits, and greetd returns to the
+# login screen.
+#
+# WHY getent RATHER THAN $HOME
+#
+# This is exactly the trap tools/build-vm-image.sh hit under `sudo`: trusting
+# an inherited environment variable for a path that has to be right, rather
+# than asking the one authority that cannot be wrong. greetd launches a
+# chosen session as the authenticated user via PAM, which should set $HOME
+# correctly - but "should" was also true of sudo, and cost a rebuilt 5.4 GiB
+# image landing in /root before it was caught. Settling it outright costs one
+# command.
+
+REAL_HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
+VM="$REAL_HOME/.local/bin/vm"
+NAME="login"
+
+# WLR_NO_HARDWARE_CURSORS matters for the same documented reason it does in
+# greetd/config.toml's own cage invocation: on a virtio GPU with 3D
+# acceleration, the hardware cursor plane renders upside down, and nothing
+# clears a stale one afterwards. Set here because this is a SEPARATE cage
+# invocation from the greeter's own - greetd's [default_session] settings
+# apply only to hosting ReGreet, not to whatever session gets picked
+# afterwards.
+export WLR_NO_HARDWARE_CURSORS=1
+
+CMD=("$VM" run "$NAME")
+
+# Cloned once, the first time this session is picked. `vm new` is a no-op
+# error if "login" already exists, so the check is on the disk file rather
+# than re-running it and discarding a "already exists" message every time.
+if [[ ! -f "$REAL_HOME/.local/share/vm/$NAME/disk.qcow2" ]]; then
+    if ! ERR="$("$VM" new "$NAME" 2>&1)"; then
+        # No base image yet is the likely cause - see
+        # tools/build-vm-image.sh - and rofi cannot show this error any more
+        # than it could show a menu. A plain top-level foot window is what
+        # cage's model actually supports, so that is the fallback rather than
+        # a silent bounce straight back to the login screen with nothing
+        # explaining why. Waiting on a keypress rather than a fixed sleep so
+        # this is not timed out before it can be read.
+        CMD=(foot -e sh -c 'printf "%s\n\nPress any key to return to the login screen.\n" "$1"; read -n1 -s' _ "$ERR")
+    fi
+fi
+
+exec cage -s -- "${CMD[@]}"

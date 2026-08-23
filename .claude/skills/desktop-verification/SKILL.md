@@ -89,6 +89,47 @@ swaymsg 'output HEADLESS-1 unplug'
 This is how XWayland scaling was measured and how multi-output workspace
 behaviour was demonstrated, neither of which needed real hardware.
 
+**A freshly created headless output can be powered off**, and `grim` cannot
+read one that is: it fails outright with `no supported format found` rather
+than a black or blank frame, which at least announces itself. Confirmed
+directly - the identical output, identical everything else, failed every time
+without this line and succeeded every time with it:
+
+```bash
+swaymsg output HEADLESS-1 dpms on
+```
+
+Add it right after setting resolution, before anything is launched on the
+output.
+
+**Even powered on, a captured frame that is a flat, uniform colour is not
+proof of an empty output** - it can also mean the client's own surface is not
+being read back, while the compositor's own background layer is. Found this
+way: a client launched with forced, unambiguous colours (bright red
+background, black text - no theme, no contrast question left to chance)
+still produced the exact same flat capture as a workspace with nothing on
+it at all. `swaymsg -t get_tree` told the true story - a correctly sized,
+correctly positioned window, present and undamaged by any error in its own
+log - that `grim` was not seeing. This is the same shape of failure the
+keyd probe in `scripting-traps` describes: an apparatus that looks like it is
+measuring and is not, and the fix is the same - **prove the apparatus is
+connected to what it claims to observe before trusting a negative result
+from it.** Cross-check a suspiciously uniform capture against the tree
+(`get_tree`, filtering for the app_id and reading its `rect`) rather than
+concluding the window failed to render.
+
+This was seen with a plain top-level `foot` window, launched directly under
+Sway - not nested, not through `cage` - so it is not specific to either.
+What it does and does not affect is not yet mapped: a qemu `-display gtk`
+window captured cleanly under the exact same headless-output recipe in a
+different session (see TASK-69.1's boot screenshot), so this is not a
+blanket "grim cannot capture headless outputs" finding - something about
+which clients successfully read back through `wlr-screencopy` on this
+backend, or some other precondition not yet identified, is the open
+question. Until it is, treat an unexpectedly flat capture as **inconclusive,
+not negative** - check the tree, and do not report a rendering failure on
+the strength of a screenshot alone.
+
 **Unplug it, and put the focus back.** This has gone wrong twice, both times
 leaving the user worse off than before the test:
 

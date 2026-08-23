@@ -3626,6 +3626,74 @@ rather than silently decided.
 
 ---
 
+## A virtual machine session at the login screen
+
+**Decision:** Offer "Virtual machine" as a second session in ReGreet, beside
+Sway. Picking it runs `~/.local/bin/vm`'s own menu inside `cage` - the same
+kiosk compositor that already hosts the login screen itself - with nothing
+else started: no Sway, no Waybar, no notifications, no idle handling.
+
+### Why
+
+The architecture already anticipated this. `regreet.toml` says, in the
+comments written for TASK-11: "That is also what will make a second desktop
+selectable if one is ever added." ReGreet builds its session picker by
+scanning the `wayland-sessions` directories, and `greetd/config.toml`
+already forces `XDG_DATA_DIRS` so `/usr/local/share` is searched first - both
+existed before this task touched anything. The whole addition is one
+selectable desktop entry, one three-line launcher, and one line each in
+`apply-config.sh`'s two existing install arrays.
+
+**The reason to want this at all, rather than just running `vm` from inside
+Sway** - which already works - **is keyboard input, not resources.** Measured
+directly on this machine for TASK-69.1: not running the Sway session saves
+roughly 165 MiB, about 2% of this machine's RAM. That is not nothing, but it
+is not the argument either. The argument is that Sway intercepts every
+`$mod` combination before a client running inside it ever sees the key -
+confirmed by this repository's own 76 keybindings - so a guest that wants to
+use its own desktop's Super-key shortcuts cannot, from inside a normal Sway
+session. `cage` defines no keybindings of any kind: its own `--help` output
+and manual page document no configuration mechanism for any, which is a
+structural fact about the compositor rather than an assumption about its
+current config. A key `cage`'s seat receives has nowhere to go but its one
+child.
+
+**This is reasoned from cage's documented absence of a keybinding mechanism,
+not measured with a live key-passthrough test**, and that gap is worth being
+honest about rather than papering over. The direct way to measure it - inject
+a synthetic keypress via a `uinput` device and observe what a guest actually
+receives under each compositor, the same technique this repository already
+uses to verify `keyd` bindings - needs root to create that device, and this
+addition was implemented while root access was unavailable for the session.
+The structural argument is strong (there is no code path in `cage` for a
+keybinding to intercept anything), but it is still an argument rather than an
+observation, and a follow-up with real `uinput` evidence would close the gap
+properly rather than replace reasoning with authority.
+
+### Trade-off
+
+**ReGreet's own session picker, not a prompt after the password.** The
+original shape imagined was choosing after authenticating; ReGreet shows its
+picker on the login form beside the username instead. Same choice, different
+order - patching ReGreet to move it would cost more than the difference is
+worth.
+
+**The picker remembers the last session per user** (ReGreet's own
+`user_to_last_sess` cache), so a boot after picking Virtual machine defaults
+back to Virtual machine, not Sway, until the dropdown is changed again. Not
+configured or suppressed - it is ReGreet's ordinary behaviour, the same as it
+already was for any machine with only one session before this one existed.
+
+**`vm-session` resolves the real user's home through `getent`, not `$HOME`.**
+The exact same class of mistake fixed in `tools/build-vm-image.sh` under
+`sudo` - trusting an inherited environment variable for a path that has to be
+right - would be just as available here: greetd launches the chosen session
+as the authenticated user via PAM, which should set `$HOME` correctly, and
+"should" was also true right up until it cost a rebuilt base image landing in
+`/root`. Settling it outright costs one `getent passwd` call.
+
+---
+
 # Guiding principle
 
 When evaluating future changes, prefer the option that best preserves this balance:
