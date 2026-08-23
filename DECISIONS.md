@@ -3584,6 +3584,36 @@ assumed correct**, both confirmed on this machine:
   accepted; one that fails the read is disconnected and skipped exactly like
   one that never connected.
 
+**Two more, found by the first real build rather than a test one.** Every
+stage completed correctly — both passwords, the full package set, dotfiles —
+and it still went wrong, in a way no scratch test with a discarded image could
+have caught:
+
+- `$HOME` under plain `sudo` (no `-E`) is root's, not the operator's. The
+  entire base image was written to `/root/.local/share/vm/base.qcow2`,
+  invisible to `~/.local/bin/vm`, which reads the real user's home. The image
+  itself was completely correct; only its location was wrong, and nothing
+  said so. Fixed with `invoking_home()`, which checks `SUDO_USER` (`sudo`)
+  then `PKEXEC_UID` resolved through `getent` (`pkexec`) before ever trusting
+  `$HOME` directly — and the resolved output path is now printed plainly and
+  early, with an explicit warning if it still lands under `/root`, so the same
+  mistake would announce itself in the first line rather than twenty minutes
+  later.
+- the final `umount -R /mnt` hit a transient "target is busy" — something,
+  unconfirmed, held a handle into `/mnt` for a moment after the last stage
+  returned, and let go almost immediately on its own. Under `set -e` that
+  aborted the *entire remaining script*, including `chmod a-w` and the success
+  message, even though the build had genuinely finished. A bounded five-attempt
+  retry replaces the bare call; a real, non-transient failure still stops the
+  script loudly.
+
+Both were recovered rather than rebuilt: the already-complete image was
+copied to the right path (plain `cp`, so it genuinely inherits `nodatacow`
+from the destination directory rather than carrying the attribute
+literally), checksum-verified byte-identical against the original, and fixed
+up in place. Twenty-some minutes of `pacstrap` and two typed passwords were
+not spent twice.
+
 ### Trade-off
 
 **Every clone starts from the machine that built the base image's

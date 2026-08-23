@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-23 15:58'
-updated_date: '2026-08-23 19:28'
+updated_date: '2026-08-23 19:51'
 labels: []
 dependencies:
   - TASK-69.1
@@ -102,4 +102,12 @@ Fixed one more latent bug on final review, not yet hit in testing: OUTPUT resolu
 Status: script complete, all guards individually tested against real hazards found on THIS machine (not hypothetical), all repo checks green (session 122/0, manual 8/0, packages/sway-commands clean modulo unrelated pre-existing drift from other sessions - ffmpeg and spotify-player, neither touched by this task). DECISIONS.md and the manual (chapter 4's Virtual machines section, and a new chapter 8 recipe) document the mechanism and the machine-identity trade-off.
 
 Remaining for AC1/AC3: the actual base image has not been built to completion, because completing it needs two real passwd prompts at a real terminal, which the user agreed to run themselves. Handing off now.
+
+USER RAN THE REAL BUILD. It completed every stage - both passwords, full package install (191 base + desktop.txt + dev.txt), dotfiles applied - and hit a real problem at the very last line.
+
+BUG 1, serious: OUTPUT defaulted to "${XDG_DATA_HOME:-$HOME/.local/share}/vm/base.qcow2", and $HOME under plain 'sudo' (no -E) is root's home, not the invoking user's. The entire 5.4 GiB base image was written to /root/.local/share/vm/base.qcow2 - invisible to ~/.local/bin/vm, which reads the real user's home. Nothing was lost; the image itself was completely correct, just in the wrong place. Fixed with invoking_home(), which checks SUDO_USER (sudo) then PKEXEC_UID resolved via getent (pkexec) before ever trusting $HOME directly, and the resolved OUTPUT is now printed plainly and early, with an explicit warning if it still lands under /root - so a repeat of this mistake announces itself immediately rather than twenty minutes later.
+
+BUG 2: the final 'umount -R /mnt' hit a transient 'target is busy' - something (a keyring agent from pacman's signature checks is the likely cause, unconfirmed) held a handle into /mnt for a moment after 05-dotfiles.sh returned, and released it almost immediately on its own. Under set -e this aborted the WHOLE remaining script - chmod a-w and the success message never ran - even though the build had genuinely and completely finished. Fixed with a bounded 5-attempt retry with a 1s pause; a real, non-transient failure still stops the script loudly rather than being swallowed.
+
+RECOVERY: the already-built image was intact and byte-complete at /root/.local/share/vm/base.qcow2 (owned by root, not yet chmod a-w). Copied to the correct path with pkexec cp (plain cp, not --reflink, so it genuinely inherits nodatacow from the destination directory rather than copying the attribute literally - confirmed with lsattr afterward), chowned to the real user, checksum-verified byte-identical against the /root original, made read-only, and the /root copy removed. Nothing was rebuilt; the successful build's actual output was recovered and fixed up in place.
 <!-- SECTION:NOTES:END -->

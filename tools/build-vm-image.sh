@@ -39,7 +39,7 @@ set -euo pipefail
 # when asked. See TASK-69.2 and DECISIONS.md for why that stance is
 # deliberate.
 #
-# requires: qemu-img qemu-nbd modprobe udevadm partprobe unshare arch-chroot mountpoint umount chmod mkdir cp readlink dirname basename sed seq cat
+# requires: qemu-img qemu-nbd modprobe udevadm partprobe unshare arch-chroot mountpoint umount chmod mkdir cp readlink dirname basename sed seq cat getent mktemp
 #
 # Transitively, through the unmodified stage scripts this drives: parted,
 # dosfstools (mkfs.fat), btrfs-progs (mkfs.btrfs), arch-install-scripts
@@ -48,6 +48,7 @@ set -euo pipefail
 # by hand once, exactly like backlog. It never reaches the built machine.
 
 die() { echo "build-vm-image: $*" >&2; exit 1; }
+warn() { echo "build-vm-image: WARNING: $*" >&2; }
 msg() { echo "==> $*"; }
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -97,7 +98,35 @@ if [[ "${_VM_BUILDER_UNSHARED:-}" != 1 ]]; then
         unshare --mount --propagation private -- "$0" "$@"
 fi
 
-OUTPUT="${XDG_DATA_HOME:-$HOME/.local/share}/vm/base.qcow2"
+# $HOME is root's, not the operator's, the moment this runs under `sudo`
+# without -E, or under `pkexec` at all - both reset the environment rather
+# than preserving it. A first real build on this machine wrote a complete
+# 5.4 GiB base image to /root/.local/share/vm/base.qcow2, invisible to
+# ~/.local/bin/vm, which reads the REAL user's home - and $HOME was the only
+# place that mistake could come from, since it is the only thing this script
+# reads to decide where to write.
+#
+# So the default output path is resolved against whoever actually asked for
+# this, not against whatever $HOME resolved to after the privilege escalation:
+# `sudo` sets SUDO_USER, `pkexec` sets PKEXEC_UID (a uid, not a name), and
+# only if neither is set - a genuine root login, not an escalation - does
+# root's own $HOME apply.
+invoking_home() {
+    local user=""
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        user="$SUDO_USER"
+    elif [[ -n "${PKEXEC_UID:-}" ]]; then
+        user="$(getent passwd "$PKEXEC_UID" 2>/dev/null | cut -d: -f1)"
+    fi
+    if [[ -n "$user" ]]; then
+        local home
+        home="$(getent passwd "$user" 2>/dev/null | cut -d: -f6)"
+        [[ -n "$home" ]] && { printf '%s' "$home"; return 0; }
+    fi
+    printf '%s' "$HOME"
+}
+
+OUTPUT="${XDG_DATA_HOME:-$(invoking_home)/.local/share}/vm/base.qcow2"
 SIZE="20G"
 DEVICE=""
 FORCE=0
@@ -122,6 +151,16 @@ done
 # the whole question, the same way ~/.local/bin/vm's own ensure_store() does.
 mkdir -p "$(dirname "$OUTPUT")"
 OUTPUT="$(readlink -f "$(dirname "$OUTPUT")")/$(basename "$OUTPUT")"
+
+# Said plainly and early, not just folded into the first progress line: WHERE
+# this is about to write is exactly the thing that went wrong the first time
+# this ran on this machine. A path under /root here means invoking_home()
+# could not work out who really asked, and is worth stopping to check before
+# spending the next twenty minutes writing to the wrong home entirely.
+msg "Output: $OUTPUT"
+case "$OUTPUT" in
+    /root/*) warn "this is under /root. If you meant this to reach your own account, that did not happen - Ctrl-C now and pass --output explicitly." ;;
+esac
 
 # Refuses a target inside the repository outright, so "never commit an image"
 # holds structurally rather than by remembering to .gitignore it. The default
@@ -332,7 +371,35 @@ msg "[5/5] Installing user configuration"
 arch-chroot /mnt /opt/arch-setup/install/05-dotfiles.sh
 
 msg "Unmounting"
-umount -R /mnt
+# "target is busy" on the first attempt is real, observed behaviour on this
+# machine - the very first full build hit it here, after every install stage
+# had genuinely finished correctly. Something (a keyring agent from pacman's
+# signature checks is the likely culprit, going by what runs during stage 2,
+# though it was not caught in the act) still had a handle into /mnt for a
+# moment after 05-dotfiles.sh returned. It let go on its own almost
+# immediately - a second attempt moments later, made by this exact retry loop
+# during testing, succeeded - so this is a short bounded retry, not a
+# `|| true`: a real failure to unmount should still stop the script before
+# `chmod a-w`, not be silently swallowed.
+#
+# Getting this wrong the first time cost something real: `set -e` on a bare
+# `umount -R /mnt` meant the ENTIRE remaining tail of the script - chmod a-w
+# and the success message - never ran, even though every stage had already
+# finished. The image was completely built and simply left writable and
+# unannounced. Nothing was lost, but it read like a failed build.
+umount_err="$(mktemp)"
+for attempt in 1 2 3 4 5; do
+    if umount -R /mnt 2>"$umount_err"; then
+        break
+    fi
+    if (( attempt == 5 )); then
+        cat "$umount_err" >&2
+        rm -f "$umount_err"
+        die "/mnt would not unmount after 5 attempts. 'fuser -vm /mnt' from another terminal shows what still has it open."
+    fi
+    sleep 1
+done
+rm -f "$umount_err"
 
 # cleanup() (the EXIT trap) disconnects the nbd device from here.
 
