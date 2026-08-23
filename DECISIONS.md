@@ -2964,6 +2964,60 @@ answers, so pruning is a decision rather than a discovery.
 
 ---
 
+## One mpv, addressed by its socket, holding the queue itself
+
+Playing music used to mean starting a fresh `mpv` and killing whatever was
+there. That is fine for one radio station and hopeless for a queue, so mpv is
+now started once, idle, listening on a JSON IPC socket under
+`$XDG_RUNTIME_DIR`, and every later instruction - queue this, play that now,
+reorder, remove, skip, stop - is a message to that socket.
+`~/.local/lib/mpv_queue.py` is the only thing that speaks it, on the same
+principle as `desktop_config.py` being the only writer of `chezmoi.toml`.
+
+**The queue is mpv's own playlist**, not a list kept alongside it. There is
+therefore no second copy of the running order that could drift out of step
+with what is actually playing.
+
+### Why
+
+Addressing mpv by a socket fixed a real bug rather than only enabling a
+feature. Stopping was `pkill -x mpv`, which kills *every* mpv the user is
+running - including one playing a film in another workspace. A socket names
+one instance exactly.
+
+### Trade-off
+
+mpv only knows a title for the entry it is playing; everything queued behind
+it comes back as a bare URL, which is useless as a queue view. So titles are
+remembered in a small map keyed by URL. That map is strictly a lookup and is
+pruned against the playlist on every read: it can be incomplete, but it cannot
+make the queue lie about its own contents, because order and membership always
+come from mpv. Anything queued by something other than this helper simply
+shows its URL.
+
+`keep-open=yes` needed the same care. It exists so a dropped stream does not
+silently end the music, and it is set globally in `mpv.conf` - which also
+governs watching a film. Left alone it means the last track of a queue ends
+and mpv sits on it paused forever, with the bar still advertising music that
+stopped. Rather than change the global, finite tracks are queued with
+`keep-open=no` as a per-file option, so a queue ends cleanly while radio and
+films keep the behaviour the config asked for.
+
+### Alternatives considered
+
+**Keep killing and restarting mpv, and hold the queue here.** Then this
+repository owns a running order, a current position and a title list, all of
+which must be kept in step with a process it does not observe. Every bug in
+that class is invisible until the music does the wrong thing.
+
+**`insert-next-play` for "play now".** It reads exactly right and does not do
+it: mpv's `-play` suffix means "start playback if nothing is playing", not
+"switch to this now", so with music already on it silently behaves like "play
+next". Playing something now is an insert followed by an explicit skip. This
+was found by testing the behaviour rather than reading the flag name.
+
+---
+
 # Guiding principle
 
 When evaluating future changes, prefer the option that best preserves this balance:
