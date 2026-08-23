@@ -1,0 +1,20 @@
+# Exec is an absolute path for the same reason focus-music.desktop's is:
+# ~/.local/bin is not on the PATH sway and rofi hand to what they spawn, so a
+# bare `Exec=spotify` works when tested from a terminal and silently does
+# nothing from the launcher.
+#
+# This is the picker rather than the full application. The library window has
+# its own entry beside this one, because they are different gestures: this one
+# never opens a window, and that one is a window.
+
+[Desktop Entry]
+Type=Application
+Name=Spotify
+GenericName=Music
+Comment=Play a playlist, your liked songs, or a search - controlled from the bar and the media keys
+Icon=multimedia-audio-player
+Exec={{ .chezmoi.homeDir }}/.local/bin/spotify
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=spotify;music;playlist;song;album;artist;stream;liked;
+NoDisplay=false

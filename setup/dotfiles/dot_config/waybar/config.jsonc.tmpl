@@ -234,6 +234,14 @@
     // in this repository before, leaving an empty string that looks
     // configured in the file and renders as nothing.
     //
+    // The key in player-icons is the MPRIS name, not the package name
+    // and not what the application calls itself. `spotify_player` is
+    // the dbus_name spotify-player passes to souvlaki, so that is the
+    // key here; `spotify` or `spotify-player` would both be accepted
+    // silently and simply never match, leaving the default note icon.
+    // Ask the running system - `playerctl --list-all` - rather than
+    // guessing, which is how this one was settled.
+    //
     // No click bindings here on purpose. waybar-mpris(5) already binds left to
     // play-pause, middle to previous and right to next, and its own bindings
     // act on the player the module is following - overriding them with
@@ -276,7 +284,7 @@
         "title-len": 30,
         "artist-len": 20,
         "dynamic-len": 45,
-        "player-icons": { "default": "\uf001", "mpv": "\uf03d" },
+        "player-icons": { "default": "\uf001", "mpv": "\uf03d", "spotify_player": "\uf1bc" },
         "status-icons": { "paused": "\uf04c" },
         // No on-click here on purpose. This module carries waybar's own
         // defaults - left play/pause, middle previous, right next - and

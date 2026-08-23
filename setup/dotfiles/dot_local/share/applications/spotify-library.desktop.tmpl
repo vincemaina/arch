@@ -1,0 +1,22 @@
+# The full Spotify library, in its own window - the same thing $mod+Shift+m
+# toggles.
+#
+# Launched through sway-toggle-window rather than directly, so that picking it
+# twice from the launcher closes the window rather than leaving a second one
+# behind. The app_id here has to match the one `spotify --app` sets and the one
+# 40-window-rules.conf floats; all three say `spotify` on purpose.
+#
+# Absolute paths for both helpers: ~/.local/bin is not on the PATH rofi hands
+# to what it spawns.
+
+[Desktop Entry]
+Type=Application
+Name=Spotify Library
+GenericName=Music library
+Comment=Browse playlists, albums and artists in the full Spotify interface
+Icon=multimedia-audio-player
+Exec={{ .chezmoi.homeDir }}/.local/bin/sway-toggle-window spotify {{ .chezmoi.homeDir }}/.local/bin/spotify --app
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=spotify;music;library;browse;playlist;album;artist;
+NoDisplay=false

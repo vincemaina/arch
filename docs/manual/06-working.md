@@ -139,6 +139,73 @@ This is the counterweight to a list that can grow: searches look after
 themselves, and this is how the handful of real links get pruned on purpose
 rather than discovered dead halfway through a working afternoon.
 
+## Spotify
+
+`$mod+m`, or "Spotify" in the launcher, opens a picker: your playlists, your
+liked songs, saved albums, followed artists, top tracks, and a search. Choose
+something and it plays. No window opens at any point.
+
+Spotify Premium is required — the streaming library this uses cannot play
+without it — and you sign in once per machine. The first time you run the
+picker it says you are not signed in and offers to do it; a terminal opens,
+prints a URL, and your browser takes you through Spotify's normal
+authorisation page. After that the tokens live in `~/.cache/spotify-player`
+and nothing asks again.
+
+Run it again while music is playing and, like `focus-music`, it offers what
+is useful about what is on rather than a bare list to start something else
+from:
+
+| | |
+| --- | --- |
+| **Pause** / **Resume** | whichever applies |
+| **Next**, **Previous** | skip |
+| **Shuffle** | toggle shuffle |
+| **Like this track** | save it to your library |
+| **Play something else** | back to the picker |
+| **Open the full app** | the library window, below |
+| **Stop** | stop playing and shut the player down |
+
+### The library window
+
+`$mod+Shift+m` opens the full Spotify interface in its own floating window,
+and pressing it again closes it. **The music does not stop when it closes.**
+
+That is worth stating plainly, because it is the whole shape of this: the
+thing playing music is a small background daemon, and both the picker and
+this window are remote controls for it. Closing a remote control does not
+stop the music. The daemon starts the first time you play something and stops
+when you choose **Stop**, so a machine that is not playing music has no
+Spotify process running at all.
+
+The window is the place to browse properly — album art, an artist's
+discography, a playlist's full track list — and the picker is the place to
+start something you already know you want.
+
+### It behaves like everything else that plays
+
+Spotify appears in the bar's now-playing module with a Spotify icon, and
+everything in the rest of this chapter applies to it unchanged: the bar
+clicks play, pause and skip it, the media keys do the same, `media` seeks
+inside a track, and the focus timer pauses it when a break starts and resumes
+it afterwards.
+
+None of that is Spotify-specific. All of it works through MPRIS, the same
+mechanism `focus-music` uses for `mpv`, which is why adding Spotify needed no
+change to the bar, to `media` or to the timer.
+
+### Checking it over
+
+```bash
+spotify --check
+```
+
+says whether the player is installed, what it was compiled with, whether you
+are signed in, whether the daemon is running, and what is playing. When the
+daemon is up it also counts your Spotify Connect devices and the MPRIS
+players on the machine — both should be one, and counting them is how that
+claim is kept honest rather than assumed.
+
 ## Controlling whatever is playing
 
 The bar already controls playback and has since the beginning: **left click**

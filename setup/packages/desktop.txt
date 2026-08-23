@@ -167,6 +167,41 @@ mpv
 mpv-mpris
 yt-dlp
 
+# Spotify without the desktop app or a browser tab - TASK-135.
+#
+# WHY THIS CLIENT
+#
+# spotify-player, ncspot, spotifyd and librespot are all in `extra`, so the AUR
+# decision in TASK-43 does not come into it and none of them was ruled out on
+# availability. The choice was made on what Arch actually compiles in:
+#
+#   $ spotify_player features
+#   daemon streaming media-control image notify fzf
+#
+# `media-control` is MPRIS, and it is the whole reason this integrates with
+# anything. ncspot has MPRIS too - it is in its default features and Arch builds
+# the defaults - so that alone did not decide it. `daemon` did: ncspot has no
+# daemon mode at all, so its TUI process IS the player, and hiding that window
+# through sway-toggle-window would stop the music, because that helper kills the
+# window rather than stashing it.
+#
+# spotifyd is the opposite shape - a daemon with no way to browse a library - so
+# it would have needed a second package to pick anything with. spotify-player is
+# both halves in one binary, sharing one config, one cache and one login.
+#
+# HOW IT IS USED HERE
+#
+# One daemon streams and owns the MPRIS name; the TUI and the CLI are
+# controllers that never stream, which is what `enable_streaming = "DaemonOnly"`
+# in ~/.config/spotify-player/app.toml buys. So the bar's media module, the
+# `media` menu and the focus timer act on Spotify through exactly the same MPRIS
+# path they already use for mpv, and none of the three knows Spotify exists.
+#
+# A Premium account is required - librespot cannot stream without one - and
+# authentication is a one-time browser round trip per machine, cached under
+# ~/.cache/spotify-player. Nothing secret is stored in this repository.
+spotify-player
+
 # The spectrum display, on the same audio. 195 KiB, and it needs no integration
 # with any player: it reads the default output's MONITOR, so it visualises
 # whatever is audible - the radio, a video in the browser, a notification -

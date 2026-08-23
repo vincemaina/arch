@@ -1,0 +1,60 @@
+# spotify-player, configured to be a daemon with controllers rather than an app.
+#
+# THE ONE LOAD-BEARING LINE IS enable_streaming
+#
+# Every `spotify_player` invocation is a full client by default, and a client
+# with streaming enabled registers its own librespot device with Spotify and its
+# own MPRIS name on the bus. Run the daemon and open the TUI and you would have
+# two devices called the same thing, two MPRIS players in `playerctl --list-all`,
+# and a bar that follows whichever one it saw first.
+#
+# "DaemonOnly" says: only an instance started with -d streams. The TUI, and the
+# helper client the CLI starts when it needs one, become pure remote controls of
+# the daemon. So there is exactly one device and exactly one thing making noise,
+# which is what makes the rest of the desktop's MPRIS wiring work unchanged.
+#
+# Written as the string rather than `true`: `true` is accepted for backward
+# compatibility and means "Always", which is the behaviour this exists to avoid.
+enable_streaming = "DaemonOnly"
+
+# MPRIS. Left at its default of true and stated anyway, because it is the reason
+# waybar's mpris module, ~/.local/bin/media and ~/.local/bin/focus-timer can act
+# on Spotify without one line of Spotify-specific code between them. Turning it
+# off would not break Spotify - it would silently unplug it from the desktop,
+# which is the exact shape of failure CLAUDE.md warns about.
+#
+# ~/.local/bin/spotify-tui overrides this to false for the TUI, so that only the
+# daemon ever claims a bus name.
+enable_media_control = true
+
+# The bar already shows the track, permanently, in the centre of the screen. A
+# desktop notification per track change is a second copy of something that is
+# never off screen, and mako stacks them.
+enable_notify = false
+
+# No client_id here on purpose. The bundled default is ncspot's, registered in
+# Spotify's extended quota mode and predating the November 2024 Web API changes;
+# an application registered today starts in the restricted default mode and hits
+# 403 and 429 on exactly the browse and personalisation endpoints this uses.
+# spotify-player's own documentation says not to set one, so this does not.
+
+[device]
+    # What this machine calls itself on Spotify Connect, so picking it from a
+    # phone names the laptop rather than offering three identical
+    # "spotify-player" entries once there is more than one machine running this
+    # setup.
+    name = "{{ .chezmoi.hostname }}"
+
+    # Premium streams at 320 already; naming it means a future change is a
+    # decision rather than a default drifting.
+    bitrate = 320
+
+    # Level the loudness across tracks. This is background music that runs for
+    # hours across albums mastered decades apart, and the alternative is reaching
+    # for the volume key every time the source changes.
+    normalization = true
+
+    # Left at librespot's default of false. Caching audio would trade disk for
+    # bandwidth on a machine that is rarely off wifi, and it is the one setting
+    # here that silently grows a directory.
+    audio_cache = false

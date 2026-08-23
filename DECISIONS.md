@@ -3144,6 +3144,91 @@ it: mpv's `-play` suffix means "start playback if nothing is playing", not
 next". Playing something now is an insert followed by an explicit skip. This
 was found by testing the behaviour rather than reading the flag name.
 
+## Spotify as a daemon with remote controls, not an application
+
+Spotify is `spotify-player` from `extra`, arranged so that one background
+daemon streams and everything you interact with is a controller for it.
+`spotify_player -d` is the only process that plays audio and the only one that
+claims an MPRIS name; `~/.local/bin/spotify` (a rofi picker) and the TUI window
+on `$mod+Shift+m` both talk to it over the CLI.
+
+One line in `~/.config/spotify-player/app.toml` is what buys the split:
+
+```toml
+enable_streaming = "DaemonOnly"
+```
+
+The daemon is started on demand in a **named** transient scope,
+`systemd-run --user --scope --unit=spotify-daemon`, and stopped with
+`systemctl --user stop spotify-daemon.scope`. There is no session unit and no
+autostart: a machine that is not playing music runs no Spotify process and
+advertises no Connect device.
+
+### Why
+
+Because the desktop already had the integration and it should not have needed
+any more. `focus-music` established that the way to add a sound source here is
+to make it an MPRIS player and change nothing else - the bar's `mpris` module,
+`~/.local/bin/media` and `~/.local/bin/focus-timer` all act on whatever
+`playerctl` can see. Spotify arriving as a plain MPRIS player meant those three
+gained exactly one line between them: a `player-icons` entry in the bar.
+
+The daemon is what makes that hold. `sway-toggle-window` *kills* the window it
+hides - it does not stash it - so a client whose process is also the player
+would stop the music every time the window was put away. Separating them means
+closing the library window is free.
+
+`DaemonOnly` is not a tidiness setting. The default is that every invocation
+streams, so running the daemon and opening the TUI would register two Spotify
+Connect devices with the same name and two MPRIS bus names for one piece of
+music, and the bar would follow whichever it noticed first.
+
+The scope is named for the reason the mpv socket exists one section above.
+Stopping by `pkill` matches a category you can be standing in; naming the unit
+addresses exactly one process, and makes that mistake unavailable rather than
+merely avoided.
+
+### Trade-off
+
+Spotify Premium is required - librespot cannot stream without it - so this
+feature is worth nothing on a free account, unlike `focus-music`, which needs
+no account at all. The two are kept side by side rather than one replacing the
+other.
+
+Authentication is not reproducible from this repository. It is two OAuth flows
+that open a browser once per machine and cache tokens under
+`~/.cache/spotify-player`. That is the same shape as firefox fetching the
+Widevine CDM at runtime: the retrieval is described here, the artefact is not
+committed, and a rebuilt machine needs one interactive step. Storing anything
+that would remove that step would mean putting a credential in a public
+repository, which is not a trade worth making.
+
+`client_id` is deliberately unset. The bundled default is registered in
+Spotify's extended quota mode and predates the November 2024 Web API changes;
+an application registered today starts restricted and returns 403 and 429 on
+exactly the browse and personalisation endpoints the picker uses. So this
+depends on a client id owned by someone else, and the alternative is worse.
+
+### Alternatives considered
+
+**ncspot.** Has MPRIS - it is in its default features and Arch builds the
+defaults - so that did not separate them. It has no daemon mode at all, which
+does: its TUI process is the player, and the window-hiding problem above has no
+answer.
+
+**spotifyd.** A daemon with no way to browse a library, so it solves the half
+this repository could already have lived without and needs a second package for
+the half it wanted.
+
+**The official client, or a browser tab.** Both are the thing being avoided,
+and the official one is AUR-only besides.
+
+**Playing Spotify through `focus-music` and mpv.** Not possible: Spotify has no
+stream URL to hand to a player. It is not the same kind of source, which is why
+it is a second helper rather than more entries in the station list.
+
+---
+
 ---
 
 # Guiding principle

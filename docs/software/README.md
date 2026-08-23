@@ -273,6 +273,7 @@ the line, **↓** means an entry below in this document.
 | `mpv-mpris` | The plugin that makes `mpv` visible over MPRIS. Without it mpv plays and nothing on the desktop can see it | ↓ |
 | `yt-dlp` | Resolves a pasted YouTube/SoundCloud link for mpv to play | ↓ |
 | `cava` | Terminal spectrum display, reading whatever is audible from the default output's monitor | ↓ |
+| `spotify-player` | Spotify without the desktop app: a daemon that streams and exposes MPRIS, with a TUI and a CLI as remote controls | ↓ |
 | `xdg-user-dirs` | Creates `~/Pictures` and friends | ↓ |
 | `gvfs` | Removable and network volumes for GIO, so a USB stick appears in a Save As dialog | M, D: GVFS |
 | `yazi` | The file manager, on `$mod+e`. It replaced Thunar rather than sitting beside it | M, D: No graphical file manager, reversing an earlier decision |
@@ -604,6 +605,71 @@ ones.
 code, and it now earns it: search is a first-class way into this feature
 rather than a fallback. None of the three is resident until a station is actually playing,
 so there is no row in the session-cost table above.
+
+### spotify-player
+
+**Problem.** Spotify with a Premium account, without keeping either the
+official desktop application or a browser tab open for it. TASK-135.
+**Choice.** `spotify-player`, from `extra`. The decision was made on Arch's
+compiled feature set rather than on the project descriptions, because that is
+what determines whether it can integrate at all:
+
+```text
+$ spotify_player features
+daemon streaming media-control image ratatui-image sixel notify fzf pulseaudio-backend
+```
+
+`media-control` is MPRIS, and `daemon` is what allows playback to outlive the
+window that started it. It is also both halves of the problem in one binary —
+something that streams and something that can browse a library — sharing one
+config, one cache and one login.
+**Alternatives.** `ncspot` has MPRIS too — it is in its default features and
+Arch builds the defaults — so that did not separate them. It has no daemon
+mode at all, which does: its TUI process *is* the player, so hiding that window
+through `sway-toggle-window` would stop the music, because that helper kills
+the window rather than stashing it. `spotifyd` is the opposite shape, a daemon
+with no way to browse a library, so it would have needed a second package to
+pick anything with. `librespot` is the library all three are built on and is
+not a client. The official `spotify` client is AUR-only and is the thing being
+avoided. Nothing here was ruled out on availability: all four are in `extra`,
+so the AUR decision in TASK-43 did not come into it.
+**How it works.** One `spotify_player -d` daemon streams and claims the MPRIS
+name `org.mpris.MediaPlayer2.spotify_player`; the TUI and every CLI call are
+controllers that talk to it. That split is bought by one line in
+`~/.config/spotify-player/app.toml`:
+
+```toml
+enable_streaming = "DaemonOnly"
+```
+
+Without it every invocation registers its own Spotify Connect device and its
+own bus name, and the bar follows whichever it noticed first. The TUI is
+additionally launched with `-o enable_media_control=false` so that only the
+daemon ever claims a bus name.
+
+`~/.local/bin/spotify` is the rofi picker and starts the daemon on demand in a
+*named* transient scope — `systemd-run --user --scope --unit=spotify-daemon` —
+so stopping it is `systemctl --user stop spotify-daemon.scope`, addressing
+exactly this process. `focus-music` reached the same place from the other
+direction after `pkill -x mpv` was found to kill a film playing in another
+workspace; naming the scope means that mistake is not available here.
+
+Because the daemon is a plain MPRIS player, waybar's `mpris` module,
+`~/.local/bin/media` and `~/.local/bin/focus-timer` act on it with no
+Spotify-specific code in any of them. The only line any of them gained is a
+`player-icons` entry in the bar, keyed on the MPRIS name.
+
+Premium is required — librespot cannot stream without it — and authentication
+is two OAuth flows (a librespot session and a Web API token, under two
+different client ids) that happen once per machine and cache under
+`~/.cache/spotify-player`. No password, token or client secret is stored in
+this repository. `client_id` is deliberately left unset: the bundled default
+is registered in Spotify's extended quota mode and predates the November 2024
+Web API changes, whereas an application registered today starts restricted and
+returns 403 and 429 on exactly the browse endpoints this uses.
+**Cost.** 31.76 MiB installed, 8.51 MiB download. Nothing is resident until
+music is playing — there is no session unit and no autostart — so there is no
+row in the session-cost table above.
 
 ### cava
 

@@ -1,0 +1,520 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: spotify_player rofi systemd-run systemctl swaymsg foot python3 notify-send playerctl
+
+# Spotify, without the desktop app and without a browser tab.
+#
+#   spotify           pick something to play, or act on what is playing
+#   spotify --app     the full TUI, in its own window
+#   spotify --check   say whether this machine is set up and what is running
+#
+# THE SHAPE OF IT: ONE DAEMON, EVERYTHING ELSE IS A REMOTE CONTROL
+#
+# `spotify_player -d` is the only thing that streams and the only thing that
+# claims an MPRIS name. This script, the TUI, and every CLI call are controllers
+# that talk to it. That is what `enable_streaming = "DaemonOnly"` in app.toml
+# buys, and it is worth stating because the default is the opposite: every
+# invocation would otherwise register its own Spotify Connect device and its own
+# bus name, and the bar would follow whichever it noticed first.
+#
+# The payoff is that nothing downstream knows Spotify exists. waybar's mpris
+# module shows the track, ~/.local/bin/media seeks and skips it, and
+# ~/.local/bin/focus-timer pauses it for a break - all through the same MPRIS
+# path they already use for mpv, with no Spotify-specific line anywhere in them.
+#
+# WHY THE DAEMON IS A NAMED SCOPE
+#
+# Started from rofi, the daemon would be a child of the launcher and would sit
+# in its cgroup - so it would die with it, and with any unit that happened to
+# restart. focus-music documents this at length for mpv and the reasoning is
+# identical, so it gets the same treatment: a transient scope under app.slice.
+#
+# It differs from focus-music in one way, and deliberately. The scope is *named*,
+# so stopping is `systemctl --user stop spotify-daemon.scope` - which addresses
+# exactly this process. focus-music arrived at the same place from the other
+# direction after `pkill -x mpv` was found to kill a film playing in another
+# workspace. Naming the scope means that mistake is not available here.
+#
+# NOTHING RUNS UNTIL MUSIC IS ASKED FOR
+#
+# There is no session unit and no autostart. The daemon is started on demand and
+# "Stop" ends it, so a machine that is not playing music has no Spotify process,
+# no Connect device advertised, and no network connection to it.
+#
+# AUTHENTICATION
+#
+# Premium is required - librespot cannot stream without it - and logging in is a
+# browser round trip that happens once per machine, after which the tokens live
+# in ~/.cache/spotify-player. Nothing here stores a password, and nothing secret
+# reaches the repository. This script notices when that step has not happened and
+# offers to do it, rather than starting a daemon that will fail somewhere the
+# user cannot see.
+
+APP_ID=spotify
+SCOPE=spotify-daemon.scope
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/spotify-player"
+
+# How long to wait for the daemon to come up and answer. It has to reach
+# Spotify, so this is a network round trip rather than a process start, and the
+# first one after a suspend is the slow one.
+DAEMON_TIMEOUT=25
+
+# How many search results to offer per kind. Enough to choose from, few enough
+# to read without scrolling.
+SEARCH_RESULTS=12
+
+die() {
+    echo "spotify: $*" >&2
+    command -v notify-send >/dev/null 2>&1 &&
+        notify-send -a spotify "spotify" "$*" || true
+    exit 1
+}
+
+note() {
+    command -v notify-send >/dev/null 2>&1 &&
+        notify-send -a spotify -t 4000 "spotify" "$1" || true
+}
+
+menu() {
+    # $1 prompt, rest rows. Prints the chosen row, or nothing if cancelled.
+    local prompt="$1"
+    shift
+    printf '%s\n' "$@" |
+        rofi -dmenu -i -p "$prompt" -format s \
+             -theme-str "listview { lines: $#; }" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------------------
+# The daemon
+# ---------------------------------------------------------------------------
+
+daemon_running() { systemctl --user is-active --quiet "$SCOPE"; }
+
+# Both tokens, cached. The README calls these two independent OAuth flows under
+# two different client ids, so one can be present without the other - which
+# looks exactly like being logged in right up until the daemon cannot stream.
+authenticated() {
+    [[ -s "$CACHE/credentials.json" && -s "$CACHE/user_client_token.json" ]]
+}
+
+# A terminal, because this step is interactive: it prints a URL, opens a
+# browser, and waits for the redirect. Run from rofi with no terminal attached
+# it would appear to hang and then fail.
+authenticate() {
+    setsid foot --app-id=spotify-auth --title="spotify: sign in" \
+        -e spotify_player authenticate >/dev/null 2>&1 &
+    note "Sign in to Spotify in the window that opened"
+}
+
+ensure_daemon() {
+    daemon_running && return 0
+
+    authenticated || die "not signed in yet - run: spotify_player authenticate"
+
+    systemd-run --user --scope --quiet --collect --unit="${SCOPE%.scope}" -- \
+        spotify_player -d >/dev/null 2>&1 &
+    disown
+
+    # Being active is not the same as being able to answer: the scope is up the
+    # moment the process starts, and the process is useful only once it has
+    # reached Spotify. So the wait is on a real reply, not on systemd.
+    local waited=0
+    while (( waited < DAEMON_TIMEOUT * 2 )); do
+        if ! daemon_running && (( waited > 4 )); then
+            die "the daemon exited - try: spotify_player -d"
+        fi
+        spotify_player get key playback >/dev/null 2>&1 && return 0
+        sleep 0.5
+        waited=$(( waited + 1 ))
+    done
+    die "the daemon did not answer in ${DAEMON_TIMEOUT}s"
+}
+
+stop_daemon() {
+    daemon_running || return 0
+    # Pause first. Stopping the scope kills the process, and librespot leaves
+    # the Connect session showing this device as current if it simply vanishes,
+    # so a phone picking up playback afterwards resumes into nothing.
+    spotify_player playback pause >/dev/null 2>&1 || true
+    systemctl --user stop "$SCOPE" >/dev/null 2>&1 || true
+}
+
+# ---------------------------------------------------------------------------
+# Reading what the CLI returns
+# ---------------------------------------------------------------------------
+
+# One of spotify_player's JSON payloads on stdin, "id<TAB>label" lines out.
+#
+#   items <kind> [key] [limit]   kind is playlist|track|album|artist
+#                                key indexes into an object first, for `search`
+#                                limit caps the rows
+#
+# The limit is applied here rather than by piping through `head`, which would
+# exit early, leave this taking SIGPIPE, and - with pipefail set - turn a
+# perfectly good id into a failed pipeline.
+#
+# The ids are taken as the last colon-separated field. rspotify serialises its
+# Id types as either "abc123" or "spotify:track:abc123" depending on the type,
+# and the CLI wants the bare id - so this is correct for both without having to
+# know which form a given payload uses, and stays correct if one of them changes.
+items() {
+    # The program is passed with -c rather than on a heredoc. `python3 - <<PY`
+    # reads the SCRIPT from stdin, so the JSON being piped in never reaches
+    # json.load and every list comes back empty - silently, with exit 0. Same
+    # reason git-ui embeds its python this way.
+    #
+    # Consequently there are no single quotes anywhere in the program below.
+    python3 -c '
+import json, sys
+
+kind, key, limit = sys.argv[1], sys.argv[2], int(sys.argv[3])
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+
+if key:
+    data = (data or {}).get(key) or []
+if not isinstance(data, list):
+    sys.exit(0)
+
+
+def bare(value):
+    return str(value).rsplit(":", 1)[-1]
+
+
+def artists(item):
+    names = [a.get("name") for a in (item.get("artists") or []) if a.get("name")]
+    return ", ".join(names)
+
+
+shown = 0
+for item in data:
+    if not isinstance(item, dict) or not item.get("id") or not item.get("name"):
+        continue
+    if limit and shown >= limit:
+        break
+    shown += 1
+    name = item["name"]
+    if kind == "playlist":
+        owner = (item.get("owner") or ["", ""])[0]
+        label = name + "  \u00b7  " + owner if owner else name
+    elif kind in ("track", "album"):
+        who = artists(item)
+        label = name + "  \u00b7  " + who if who else name
+    else:
+        label = name
+    # A newline or tab inside a name would break the mapping back to the id,
+    # and playlist and track names are entirely user-supplied.
+    label = label.replace("\t", " ").replace("\n", " ")
+    print(bare(item["id"]) + "\t" + label)
+' "$1" "${2:-}" "${3:-0}"
+}
+
+# What is playing, as "state<TAB>track<TAB>artists". state is playing, paused or
+# nothing. Reads the daemon rather than MPRIS on purpose: this script owns the
+# daemon, and asking it directly does not depend on what the bus name turns out
+# to be.
+playback_now() {
+    spotify_player get key playback 2>/dev/null | python3 -c '
+import json, sys
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    data = None
+
+if not isinstance(data, dict):
+    print("nothing\t\t")
+    raise SystemExit
+
+item = data.get("item") or {}
+name = (item.get("name") or "").replace("\t", " ")
+who = ", ".join(
+    a["name"] for a in (item.get("artists") or []) if a.get("name")
+).replace("\t", " ")
+state = "playing" if data.get("is_playing") else ("paused" if name else "nothing")
+print(f"{state}\t{name}\t{who}")
+' 2>/dev/null || printf 'nothing\t\t\n'
+}
+
+# ---------------------------------------------------------------------------
+# Picking something
+# ---------------------------------------------------------------------------
+
+# A list of "id<TAB>label" lines on stdin, through rofi, id printed.
+#
+# -format i returns the position rather than the text, so a label containing a
+# tab, a dot or a leading space cannot break the mapping back to its id. The
+# same reasoning as focus-music's search, and for the same reason: these labels
+# are playlist and track names, which are entirely user-supplied.
+pick_id() {
+    local prompt="$1" ids=() rows=() line id label index
+    while IFS=$'\t' read -r id label; do
+        [[ -n "$id" ]] || continue
+        ids+=("$id")
+        rows+=("$label")
+    done
+
+    [[ ${#ids[@]} -gt 0 ]] || return 1
+
+    index="$(printf '%s\n' "${rows[@]}" |
+        rofi -dmenu -i -p "$prompt" -format i \
+             -theme-str "listview { lines: ${#rows[@]}; }" 2>/dev/null || true)"
+    # A bare [[ -n ]] is not enough: an array subscript is evaluated as
+    # arithmetic, so anything non-numeric would be read as a variable name
+    # rather than rejected.
+    [[ "$index" =~ ^[0-9]+$ ]] || return 1
+    (( index < ${#ids[@]} )) || return 1
+
+    printf '%s' "${ids[$index]}"
+}
+
+# key, kind, context type, prompt. Lists one of the library collections and
+# starts whatever is chosen.
+play_collection() {
+    local key="$1" kind="$2" context="$3" prompt="$4" id
+
+    note "Fetching your ${prompt}..."
+    id="$(spotify_player get key "$key" 2>/dev/null | items "$kind" |
+          pick_id "$prompt")" || return 1
+
+    if [[ "$context" == "track" ]]; then
+        spotify_player playback start track --id "$id" ||
+            die "could not start that track"
+    else
+        spotify_player playback start context --id "$id" "$context" ||
+            die "could not start that ${context}"
+    fi
+}
+
+do_search() {
+    local query results id
+
+    query="$(printf '' |
+        rofi -dmenu -i -p 'search spotify' -format s \
+             -theme-str 'listview { lines: 0; }' 2>/dev/null || true)"
+    [[ -n "$query" ]] || return 1
+
+    note "Searching Spotify for \"$query\"..."
+    results="$(spotify_player search "$query" 2>/dev/null || true)"
+    [[ -n "$results" ]] || die "nothing came back for '$query'"
+
+    local what
+    what="$(menu "$query" "Tracks" "Albums" "Artists" "Playlists")"
+    case "$what" in
+        Tracks)
+            id="$(printf '%s' "$results" | items track tracks "$SEARCH_RESULTS" |
+                  pick_id 'track')" || return 1
+            spotify_player playback start track --id "$id" ||
+                die "could not start that track"
+            ;;
+        Albums)
+            id="$(printf '%s' "$results" | items album albums "$SEARCH_RESULTS" |
+                  pick_id 'album')" || return 1
+            spotify_player playback start context --id "$id" album ||
+                die "could not start that album"
+            ;;
+        Artists)
+            id="$(printf '%s' "$results" | items artist artists "$SEARCH_RESULTS" |
+                  pick_id 'artist')" || return 1
+            spotify_player playback start context --id "$id" artist ||
+                die "could not start that artist"
+            ;;
+        Playlists)
+            id="$(printf '%s' "$results" | items playlist playlists "$SEARCH_RESULTS" |
+                  pick_id 'playlist')" || return 1
+            spotify_player playback start context --id "$id" playlist ||
+                die "could not start that playlist"
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+# The picker. Everything here needs the daemon, so it is started first rather
+# than once per branch.
+pick_something() {
+    local choice
+    choice="$(menu 'spotify' \
+        "Search Spotify..." \
+        "Liked songs" \
+        "Playlists" \
+        "Albums" \
+        "Artists" \
+        "Top tracks" \
+        "Open the full app")"
+
+    [[ -n "$choice" ]] || return 1
+
+    if [[ "$choice" == "Open the full app" ]]; then
+        open_app
+        return 0
+    fi
+
+    ensure_daemon
+
+    case "$choice" in
+        "Search Spotify...") do_search ;;
+        # --random rather than from the beginning: liked tracks come back oldest
+        # first, so without it every session starts with the same songs from
+        # years ago and the rest of the library is never reached.
+        "Liked songs")
+            spotify_player playback start liked --random ||
+                die "could not start your liked songs"
+            note "Playing your liked songs"
+            ;;
+        "Playlists")   play_collection user-playlists        playlist playlist 'playlists' ;;
+        "Albums")      play_collection user-saved-albums     album    album    'albums' ;;
+        "Artists")     play_collection user-followed-artists artist   artist   'artists' ;;
+        "Top tracks")  play_collection user-top-tracks       track    track    'top tracks' ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+# The full application
+# ---------------------------------------------------------------------------
+
+# Focus the window if it is already there, open it if it is not. swaymsg exits
+# non-zero with "No matching node" when nothing matches, which is a cheaper and
+# more direct answer than walking the tree - and it means picking "Open the full
+# app" twice never leaves two of them behind.
+#
+# -o enable_media_control=false is the load-bearing argument. Without it this
+# instance would claim a second MPRIS name alongside the daemon's, and the bar
+# would have two players to choose between for one piece of music.
+open_app() {
+    swaymsg "[app_id=\"$APP_ID\"] focus" >/dev/null 2>&1 && return 0
+
+    setsid foot --app-id="$APP_ID" --title=spotify \
+        -e spotify_player -o enable_media_control=false >/dev/null 2>&1 &
+    disown
+}
+
+# ---------------------------------------------------------------------------
+# Is this machine set up, and what is running?
+# ---------------------------------------------------------------------------
+
+do_check() {
+    local failures=0
+
+    printf 'spotify-player: '
+    if command -v spotify_player >/dev/null 2>&1; then
+        printf '%s\n' "$(spotify_player --version 2>/dev/null || echo installed)"
+    else
+        printf 'NOT INSTALLED\n'
+        failures=$(( failures + 1 ))
+    fi
+
+    printf 'features:       '
+    # The ticked lines only: what is compiled in is the question, and
+    # `media-control` and `daemon` being among them is the whole design.
+    spotify_player features 2>/dev/null |
+        awk '/\xe2\x9c\x93/ { print $2 }' | tr '\n' ' ' || printf 'unknown'
+    printf '\n'
+
+    printf 'signed in:      '
+    if authenticated; then
+        printf 'yes\n'
+    else
+        printf 'NO - run: spotify_player authenticate\n'
+        failures=$(( failures + 1 ))
+    fi
+
+    printf 'daemon:         '
+    if daemon_running; then
+        printf 'running\n'
+    else
+        printf 'not running (started on demand)\n'
+    fi
+
+    if daemon_running; then
+        local state track who
+        IFS=$'\t' read -r state track who < <(playback_now) || true
+        printf 'playback:       %s %s\n' "$state" "${track:+- $track${who:+ · $who}}"
+
+        # The point of the whole design: one device, one bus name. Both are
+        # counted rather than described, because "should be one" is exactly the
+        # kind of claim this repository keeps finding to be false.
+        local devices players
+        devices="$(spotify_player get key devices 2>/dev/null |
+            python3 -c 'import json,sys
+try: print(len(json.load(sys.stdin) or []))
+except Exception: print("?")' 2>/dev/null || echo '?')"
+        players="$(playerctl --list-all 2>/dev/null | grep -c . || true)"
+        printf 'connect devices:%s\n' " $devices"
+        printf 'mpris players:  %s   (%s)\n' \
+            "$players" "$(playerctl --list-all 2>/dev/null | tr '\n' ' ')"
+    fi
+
+    (( failures == 0 ))
+}
+
+usage() {
+    cat <<'USAGE'
+spotify [--app|--check]
+
+  (no arguments)  pick something to play, or act on what is playing
+  --app           the full TUI, in its own window
+  --check         say whether this machine is set up and what is running
+USAGE
+}
+
+# ---------------------------------------------------------------------------
+
+case "${1:-}" in
+    --app)   open_app; exit 0 ;;
+    --check) do_check; exit $? ;;
+    -h|--help) usage; exit 0 ;;
+    "") ;;
+    *) die "unknown option '$1' - try --help" ;;
+esac
+
+command -v spotify_player >/dev/null 2>&1 || die "spotify-player is not installed"
+
+# Not signed in: there is exactly one useful thing to offer, and starting a
+# daemon that cannot reach Spotify is not it.
+if ! authenticated; then
+    choice="$(menu 'spotify: not signed in' "Sign in to Spotify" "Cancel")"
+    [[ "$choice" == "Sign in to Spotify" ]] && authenticate
+    exit 0
+fi
+
+# Something is on: the useful actions are about what is playing, not a bare list
+# to start a second thing from. Same shape as focus-music, and for the same
+# reason - the menu should answer the question you actually have.
+if daemon_running; then
+    IFS=$'\t' read -r state track who < <(playback_now) || true
+
+    if [[ "$state" != "nothing" ]]; then
+        if [[ "$state" == "playing" ]]; then
+            toggle="Pause"
+        else
+            toggle="Resume"
+        fi
+
+        options=("$toggle" "Next" "Previous" "Shuffle" "Like this track"
+                 "Play something else" "Open the full app" "Stop")
+        choice="$(menu "${state}${track:+: ${track:0:40}}" "${options[@]}")"
+
+        case "$choice" in
+            Pause)    spotify_player playback pause >/dev/null || true; exit 0 ;;
+            Resume)   spotify_player playback play  >/dev/null || true; exit 0 ;;
+            Next)     spotify_player playback next  >/dev/null || true; exit 0 ;;
+            Previous) spotify_player playback previous >/dev/null || true; exit 0 ;;
+            Shuffle)  spotify_player playback shuffle >/dev/null || true
+                      note "Shuffle toggled"; exit 0 ;;
+            "Like this track")
+                      spotify_player like >/dev/null 2>&1 &&
+                          note "Liked \"$track\"" || note "could not like that track"
+                      exit 0 ;;
+            "Open the full app") open_app; exit 0 ;;
+            Stop)     stop_daemon; note "Stopped"; exit 0 ;;
+            "Play something else") : ;;                # fall through to the picker
+            *) exit 0 ;;
+        esac
+    fi
+fi
+
+pick_something || exit 0
