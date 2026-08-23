@@ -632,3 +632,57 @@ The general shape is worth naming, because it is not specific to keyd: **a
 measurement apparatus that silently is not measuring produces confident
 negative results.** Every probe should first demonstrate that it is connected
 to the thing it claims to observe.
+
+## Disconnecting an nbd device that is still mounted corrupts it - and reusing the same device number too fast lies about it
+
+**Symptom.** A qcow2 that was demonstrably fine (built by a script that
+finished every stage, printed no error) shows no filesystem at all on a
+later check: `mount` fails with "can't read superblock", a fresh `blkid -p`
+finds nothing on either partition. `qemu-img check` on the same file reports
+no errors - the corruption is invisible at the container level and only
+shows up one layer down, at the filesystem the container holds.
+
+**Cause, the real one.** A retry loop gave up on `umount -R /mnt` after
+several attempts (something else had a transient handle into it) and called
+`die()`. The `cleanup()` trap ALSO tried `umount`, and - regardless of
+whether that second attempt actually succeeded - unconditionally ran
+`qemu-nbd --disconnect` right after. Disconnecting a block device that a
+filesystem is still mounted on discards whatever was buffered and not yet
+flushed, and can leave the filesystem's own on-disk metadata inconsistent.
+The write that triggered the investigation (a config file append) really
+had happened, moments earlier, verified with `tail` while still mounted -
+it was the disconnect afterwards that lost it.
+
+**Fix.** A trap that tears down mounts and devices must check that the
+unmount actually succeeded before disconnecting anything underneath it -
+and if it did not, leave the device connected and warn loudly rather than
+guess:
+
+```bash
+cleanup() {
+    if mountpoint -q /mnt; then umount -R /mnt 2>/dev/null || true; fi
+    if mountpoint -q /mnt; then
+        echo "WARNING: /mnt still mounted, NOT disconnecting - unmount by hand once whatever holds it releases" >&2
+    else
+        qemu-nbd --disconnect "$DEVICE" || true
+    fi
+}
+```
+
+A connected-but-orphaned nbd device is an annoyance to clean up by hand.
+Disconnecting a mounted one is not recoverable.
+
+**A second, separate trap while diagnosing the first one.** Chasing this
+down, an nbd device that had just been cleanly disconnected was immediately
+reconnected on the SAME device number to re-check it, and the mount failed
+identically - "can't read superblock" - even though the file was known good
+seconds before. Reconnecting a *different*, never-before-used device number
+(`/dev/nbd2` instead of the just-used `/dev/nbd0`) against the exact same
+file mounted immediately and correctly. The kernel's nbd driver can be left
+in a confused state by rapid connect/disconnect/reconnect cycles on one
+device number, independent of anything wrong with the qcow2 itself - `partprobe`
+and `udevadm settle` do not reliably clear it. **When re-verifying a
+disk after any nbd operation, use a device number that has not been touched
+in the last few operations, not the one most convenient to reach for.** A
+failed re-check on a freshly-reused number is not evidence the file is bad;
+it is evidence to switch numbers before concluding anything.
