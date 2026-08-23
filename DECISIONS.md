@@ -2626,6 +2626,76 @@ repository already owns.
 
 ---
 
+## The bar's glow is a setting, remembered per theme
+
+**Decision:** The bar's haloes are optional. Every theme declares a `glow`
+default in `themes.toml` — on for the eight dark themes, off for the three
+light ones — and `~/.local/bin/glow` overrides that default for one theme on
+one machine, storing the answer under `[data.glow]` in chezmoi's own config
+next to the wallpaper style. Where the glow stays on, its blur radii dropped
+from 5/6/7 pixels to 3/4/5.
+
+### Why
+
+Because it was tuned on one theme and then applied to eleven. The effect —
+a `text-shadow` with no offset behind every readout, plus an inset bloom along
+the bar's bottom edge — is most of what makes `neon` look like `neon`. Light
+needs somewhere dark to be bright against, and on `paper` the same halo
+renders as a grey smear under near-black text: not light coming off the glyph,
+just a glyph that has gone slightly out of focus.
+
+Per theme rather than one global switch, for the same reason the wallpaper
+style is per theme. The right answer genuinely differs between palettes, and a
+single setting would mean re-deciding it on every switch. Remembering it means
+the choice is made once per theme and never again.
+
+Tracked default plus machine-local override, rather than either alone. The
+default has to be tracked because the installer renders the stylesheet in a
+chroot with no config file at all, and a theme that shipped without an answer
+would fail at render. The override has to be machine-local because choosing
+should not produce a diff to explain — the same rule the theme name and the
+wallpaper style already follow.
+
+The radii came down independently of the switch. At 5-7px the halo reached
+well past its glyph, and on a bar 34 pixels tall neighbouring readouts bled
+into one another; the effect is meant to make text look lit, which needs the
+light to stay where the text is.
+
+### Trade-off
+
+A third thing that varies per machine, and a third thing the repository cannot
+tell you about a running desktop — `glow --current` is the only way to know,
+exactly as with `theme --current` and `wallpaper --current`.
+
+It is also a value that must be spelled `on` or `off`. The template asks
+`eq ... "on"`, so `true` or `yes` would render as off while looking set, which
+is this repository's signature failure. `checks/session.sh` checks both the
+declared defaults and whatever the machine has chosen.
+
+### Alternatives considered
+
+**Derive it from `mode` and have no setting at all.** Rejected, though it is
+what the defaults amount to today. It answers the common case and forbids the
+uncommon one: a dark theme someone wants flat, or `sepia` with a little lift,
+would both be unreachable, and the user's request was explicitly for a switch.
+
+**One global on/off, not per theme.** Rejected. It would have to be re-set on
+every switch between a theme that wants it and one that does not, which is
+precisely the friction the per-theme wallpaper memory already removed.
+
+**Turn the glow down for light themes instead of off.** Rejected as a
+substitute for the switch, on the evidence: a dimmer halo on a white
+background is still a smear, because the problem is direction rather than
+strength. The radius reduction was worth doing on its own merits and was done
+everywhere.
+
+**Leave the rules in place and override with `text-shadow: none`.** Rejected.
+It would leave a rule to keep in step for every module added later, and this
+repository has already been bitten by configuration that looks set and does
+nothing. The template emits no rule at all when a theme does not glow.
+
+---
+
 ## The bar reports and responds
 
 **Decision:** Every module in the bar does something relevant when clicked. The centre carries the date, the time, and whatever is playing — not the focused window's title.

@@ -50,9 +50,7 @@ wallpaper was wanted.
 """
 
 import hashlib
-import json
 import math
-import os
 import pathlib
 import random
 import struct
@@ -83,31 +81,16 @@ def die(message):
 # what the templates see - the machine-local override included. Reading the TOML
 # directly would be a second implementation of that merge, and the two would
 # eventually disagree about which theme is current.
-
-def resolve_source():
-    if os.environ.get("ARCH_SETUP_SOURCE"):
-        return os.environ["ARCH_SETUP_SOURCE"]
-    recorded = desktop_config.get_value("sourceDir")
-    if recorded and os.path.isdir(recorded):
-        return recorded
-    if os.path.isdir("/opt/arch-setup"):
-        return "/opt/arch-setup"
-    die("cannot find the setup directory. Run ./sync.sh from the repository once.")
-
-
-_data = None
-
+#
+# All of it lives in desktop_config, which ~/.local/bin/glow needs too. It was
+# written here first and a second copy was what the module's own docstring
+# warns about, one level up.
 
 def chezmoi_data():
-    global _data
-    if _data is None:
-        result = subprocess.run(
-            ["chezmoi", "--source", resolve_source(), "data"],
-            capture_output=True, text=True)
-        if result.returncode != 0:
-            die("chezmoi could not read the theme data")
-        _data = json.loads(result.stdout)
-    return _data
+    try:
+        return desktop_config.data()
+    except desktop_config.NotFound as error:
+        die(str(error))
 
 
 def current_theme():
@@ -615,8 +598,7 @@ def write_choice(theme, style):
 
 def apply_choice():
     """Re-render the dotfiles, which is what puts the new path into sway."""
-    subprocess.run(["chezmoi", "--source", resolve_source(), "apply", "--force"],
-                   check=True)
+    desktop_config.apply()
 
 
 def main():

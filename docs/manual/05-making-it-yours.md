@@ -9,16 +9,17 @@ you change it:
   bar's configuration. Changing these means editing a file and running
   `./sync.sh`, and every machine built from this repository gets the change.
 - **Machine-local, in `~/.config/chezmoi/chezmoi.toml`:** *which* theme is
-  selected, and which wallpaper style is chosen for each theme. Changing
-  these leaves no `git diff` at all — that is deliberate, so two machines
-  syncing the same repository can legitimately disagree about which theme
-  they are wearing.
+  selected, which wallpaper style is chosen for each theme, and whether the
+  bar glows for each theme. Changing these leaves no `git diff` at all — that
+  is deliberate, so two machines syncing the same repository can legitimately
+  disagree about which theme they are wearing.
 
-One file writes the machine-local half: `~/.local/lib/desktop_config.py`. Both
-`theme` and `wallpaper` call into it rather than editing
-`~/.config/chezmoi/chezmoi.toml` themselves — they used to each carry their
-own copy of that logic, and the two disagreed about nested TOML tables, which
-is the kind of bug that corrupts a config file rather than merely failing.
+One file writes the machine-local half: `~/.local/lib/desktop_config.py`.
+`theme`, `wallpaper` and `glow` all call into it rather than editing
+`~/.config/chezmoi/chezmoi.toml` themselves — two of them used to each carry
+their own copy of that logic, and the copies disagreed about nested TOML
+tables, which is the kind of bug that corrupts a config file rather than
+merely failing.
 
 ## Themes
 
@@ -59,8 +60,8 @@ runtime; every consumer holds a rendered copy, so a render alone would leave
 the running session still showing the old colours until each piece reloads.
 That reload is a separate script
 (`run_onchange_after_reload-theme.sh.tmpl`) that chezmoi runs automatically
-whenever the rendered theme name, wallpaper style, or a hash of the selected
-palette changes — which is also why editing a colour directly in
+whenever the rendered theme name, wallpaper style, glow setting, or a hash of
+the selected palette changes — which is also why editing a colour directly in
 `themes.toml` and running `sync.sh` reloads everything too, not only a named
 `theme` switch. It, in order:
 
@@ -95,6 +96,34 @@ without it, rendering to a scratch directory still *runs* every
 `run_onchange_` script against your real, running system — the theme reload
 script really does restart your waybar even though the rendered files went
 to `/tmp`.
+
+## The bar's glow
+
+Every readout in the bar can carry a halo in its own colour, and the bar
+itself a soft bloom along its bottom edge. Together they are what make the bar
+look lit rather than printed, and on the loud dark themes — `neon` above all —
+they are most of the character.
+
+They do not suit every palette. Light needs somewhere dark to be bright
+against, so on `paper`, `daylight` and `sepia` the same halo reads as a smudge
+under the text instead of light coming off it. So it is a setting:
+
+- `glow` turns it on if it is off, and off if it is on.
+- `glow on` and `glow off` set it explicitly.
+- `glow --current` prints just the current setting.
+- `glow --list` shows every theme and what each is set to, marking the
+  current one and saying which values are the theme's own default.
+- The "Glow" entry in the launcher (`$mod+space`) flips it in one click.
+
+**The answer is remembered per theme**, exactly as the wallpaper style is —
+switch to another theme and back and the bar returns the way you left it. Each
+theme in `themes.toml` also declares a `glow` default, which is what a fresh
+install and the installer use: on for the eight dark themes, off for the three
+light ones. Setting it yourself overrides that default for that one theme, on
+that one machine, and leaves no `git diff`.
+
+Changing it re-renders the waybar stylesheet and restarts waybar through the
+same reload script a theme switch uses, so it takes effect immediately.
 
 ## Wallpapers
 

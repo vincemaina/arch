@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+# requires: python3 chezmoi
+
+"""Turn the bar's glow on and off, and remember the answer per theme.
+
+    glow              turn it on if it is off, off if it is on
+    glow on           turn it on for the current theme
+    glow off          turn it off for the current theme
+    glow --current    just the current setting
+    glow --list       every theme, and what each is set to
+
+WHAT THE GLOW IS
+
+Every readout in the bar carries a halo in its own colour - a text-shadow with
+no offset - and the bar itself carries a bloom along its bottom edge. Together
+they are what make the bar look lit rather than printed.
+
+WHY IT IS OPTIONAL
+
+Because light needs somewhere dark to be bright against. The effect was tuned
+on the loud dark themes, neon most of all, where it is most of the character;
+on paper, daylight and sepia the same halo reads as a smudge under the text
+instead of light coming off it.
+
+So it is a setting rather than a rule. Every theme in .chezmoidata/themes.toml
+declares a `glow` default - on for the eight dark themes, off for the three
+light ones - and this command overrides that default for one theme, on this
+machine.
+
+WHERE THE ANSWER LIVES
+
+In chezmoi's own configuration under [data.glow], keyed by theme name, exactly
+as the wallpaper style is and for the same reasons: choosing should not leave a
+diff to explain, and two machines syncing the same repository should be able to
+disagree. Written through ~/.local/lib/desktop_config.py, which is the only
+thing that writes that file.
+
+Being keyed by theme is the point. Switch to another theme and back and the bar
+comes back the way you left it, without having to remember which way that was.
+"""
+
+import pathlib
+import sys
+
+# The machine-local config has exactly one writer, shared with ~/.local/bin/theme
+# and ~/.local/bin/wallpaper.
+sys.path.insert(0, str(pathlib.Path.home() / ".local" / "lib"))
+import desktop_config                                        # noqa: E402
+
+SETTINGS = ("on", "off")
+
+
+def die(message):
+    print(f"glow: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def data():
+    try:
+        return desktop_config.data()
+    except desktop_config.NotFound as error:
+        die(str(error))
+
+
+def setting_for(theme):
+    """What this theme is set to: the machine's answer, or the theme's own."""
+    chosen = data().get("glow")
+    if isinstance(chosen, dict) and theme in chosen:
+        return chosen[theme], "chosen"
+    return data()["themes"][theme].get("glow", "on"), "default"
+
+
+def main():
+    argument = sys.argv[1] if len(sys.argv) > 1 else ""
+
+    if argument in ("-h", "--help"):
+        print(__doc__.split("WHAT THE GLOW IS")[0].strip())
+        return
+
+    theme = data()["theme"]
+    current, _ = setting_for(theme)
+
+    if argument == "--current":
+        print(current)
+        return
+
+    if argument == "--list":
+        themes = data()["themes"]
+        width = max(len(name) for name in themes)
+        for name in themes:
+            value, origin = setting_for(name)
+            mark = "*" if name == theme else " "
+            note = "" if origin == "chosen" else "  (theme default)"
+            # `off` is a character wider than `on`, so the note column would be
+            # ragged without padding it.
+            print(f"{mark} {name:<{width}}   {value:<3}{note}".rstrip())
+        return
+
+    if argument == "":
+        # A two-state setting does not need a menu. Bare `glow` flips it, which
+        # is also what the launcher entry runs - one click, and the answer is
+        # the bar in front of you.
+        wanted = "off" if current == "on" else "on"
+    elif argument in SETTINGS:
+        wanted = argument
+    else:
+        die(f"'{argument}' is not one of: {', '.join(SETTINGS)}")
+
+    if wanted == current:
+        print(f"The glow is already {wanted} for {theme}.")
+        return
+
+    print(f"Turning the glow {wanted} for {theme}")
+    desktop_config.set_value(f"data.glow.{theme}", wanted)
+
+    # Rendering is what makes it visible: the stylesheet is a template that
+    # reads this setting, and run_onchange_after_reload-theme.sh - which names
+    # the setting among the lines that make it re-run - restarts waybar so the
+    # new stylesheet is actually read.
+    desktop_config.apply()
+
+
+if __name__ == "__main__":
+    main()
