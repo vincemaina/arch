@@ -1,0 +1,19 @@
+# Exec is an absolute path for the same reason wallpaper's and theme's are:
+# ~/.local/bin is not on the PATH that sway and rofi hand to what they spawn, so
+# a bare `Exec=glow` works when tested from a terminal and silently does nothing
+# from the launcher.
+#
+# No arguments, because bare `glow` flips it. A two-state setting launched from
+# a menu wants one click, and the confirmation is the bar itself.
+
+[Desktop Entry]
+Type=Application
+Name=Glow
+GenericName=Bar glow
+Comment=Turn the bar's glow on or off for the current theme, and remember it
+Icon=preferences-desktop-theme
+Exec={{ .chezmoi.homeDir }}/.local/bin/glow
+Terminal=false
+Categories=Settings;DesktopSettings;
+Keywords=glow;bar;waybar;shadow;halo;theme;appearance;
+NoDisplay=false

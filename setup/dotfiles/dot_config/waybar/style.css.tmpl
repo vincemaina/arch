@@ -1,4 +1,10 @@
 {{- $palette := index .themes .theme -}}
+{{- /* Does this theme glow? The palette carries the default and the machine may
+       disagree with it - ~/.local/bin/glow writes [data.glow] in chezmoi's own
+       config, which is merged over .chezmoidata, so a machine with no config
+       file at all (the installer's chroot) still renders. `dig` is what makes
+       the missing-key case the theme's own answer rather than an error. */ -}}
+{{- $glow := eq (dig "glow" .theme $palette.glow .) "on" -}}
 /* Waybar. Colours from the selected theme in .chezmoidata/themes.toml — edit
  * them there, not here.
  *
@@ -96,8 +102,14 @@ window#waybar > box {
      * the bar and needs nothing. It is static, so it costs nothing per frame.
      *
      * Kept tight. A wider blur on a 28px bar reaches the top edge and stops
-     * looking like light coming from the strip below. */
+     * looking like light coming from the strip below.
+     *
+     * Present only when the theme glows. With the glow off the hairline below
+     * is left to do the job on its own, which is what it was drawn for - the
+     * bloom is the decoration, not the separator. */
+{{- if $glow }}
     box-shadow: inset 0 -3px 5px -4px mix(@bar, @secondary, 0.55);
+{{- end }}
 
     border-bottom: 1px solid transparent;
     border-image: linear-gradient(90deg,
@@ -154,13 +166,25 @@ window#waybar > box {
  * through between the readings. */
 /* Each reading glows in its own colour. A text-shadow with no offset is how a
  * glow is spelled, and being static it costs nothing to draw - which is the
- * whole reason this is here and the animated gradient is not. */
-#idle_inhibitor { color: @muted;     text-shadow: 0 0 5px @muted; }
-#cpu            { color: @info;      text-shadow: 0 0 5px @info; }
-#memory         { color: @secondary; text-shadow: 0 0 5px @secondary; }
-#pulseaudio     { color: @ok;        text-shadow: 0 0 5px @ok; }
-#battery        { color: @ok;        text-shadow: 0 0 5px @ok; }
-#network        { color: @muted;     text-shadow: 0 0 5px @muted; }
+ * whole reason this is here and the animated gradient is not.
+ *
+ * OPTIONAL, AND KEPT CLOSE
+ *
+ * Every one of these is behind `$glow`, so a theme that does not want haloes
+ * renders without them entirely rather than setting `none` afterwards - there
+ * is no rule left to override, and nothing to go stale. `glow` toggles it and
+ * remembers the answer per theme.
+ *
+ * The radii used to be 5, 6 and 7 pixels and are now 3, 4 and 5. At the old
+ * sizes the halo reached well past the glyph and neighbouring readouts bled
+ * into each other on a bar only 34 pixels tall; the point of the effect is
+ * that the text looks lit, which needs the light to stay where the text is. */
+#idle_inhibitor { color: @muted;    {{ if $glow }} text-shadow: 0 0 3px @muted;{{ end }} }
+#cpu            { color: @info;     {{ if $glow }} text-shadow: 0 0 3px @info;{{ end }} }
+#memory         { color: @secondary;{{ if $glow }} text-shadow: 0 0 3px @secondary;{{ end }} }
+#pulseaudio     { color: @ok;       {{ if $glow }} text-shadow: 0 0 3px @ok;{{ end }} }
+#battery        { color: @ok;       {{ if $glow }} text-shadow: 0 0 3px @ok;{{ end }} }
+#network        { color: @muted;    {{ if $glow }} text-shadow: 0 0 3px @muted;{{ end }} }
 
 /* Bluetooth, which is the one module here that says something by its mere
  * presence - see the config for why it is invisible whenever bluetoothd is not
@@ -182,11 +206,11 @@ window#waybar > box {
  * the bar is meant to be scanned by colour - two neighbours in the same hue is
  * the one thing that defeats that. memory is also secondary but cpu sits
  * between them. */
-#bluetooth           { color: @secondary; text-shadow: 0 0 5px @secondary; }
-#bluetooth.connected { color: @secondary; text-shadow: 0 0 5px @secondary; }
-#bluetooth.on        { color: @warning;   text-shadow: 0 0 5px @warning; }
+#bluetooth           { color: @secondary;{{ if $glow }} text-shadow: 0 0 3px @secondary;{{ end }} }
+#bluetooth.connected { color: @secondary;{{ if $glow }} text-shadow: 0 0 3px @secondary;{{ end }} }
+#bluetooth.on        { color: @warning;  {{ if $glow }} text-shadow: 0 0 3px @warning;{{ end }} }
 #bluetooth.off,
-#bluetooth.disabled  { color: @muted;     text-shadow: 0 0 5px @muted; }
+#bluetooth.disabled  { color: @muted;    {{ if $glow }} text-shadow: 0 0 3px @muted;{{ end }} }
 
 /* The scratchpad, in the warning colour rather than a quiet one.
  *
@@ -201,22 +225,22 @@ window#waybar > box {
  * `tertiary`, the obvious pick since the workspace discs use it, falls to
  * 2.04:1 in mono. Tertiary is a fill colour with light text on top of it, not
  * a text colour. */
-#scratchpad     { color: @warning;   text-shadow: 0 0 5px @warning; }
+#scratchpad     { color: @warning;  {{ if $glow }} text-shadow: 0 0 3px @warning;{{ end }} }
 
 /* Same reasoning as the scratchpad just above: hidden almost always, so it
  * can afford the warning colour on the rare occasions it is not - "something
  * is waiting, nothing is wrong". notification-count leaves text empty at
  * zero, and waybar hides a custom module outright when its text is empty, so
  * there is no bare bell glyph sitting in the bar the rest of the time. */
-#custom-notifications { color: @warning; text-shadow: 0 0 5px @warning; }
+#custom-notifications { color: @warning;{{ if $glow }} text-shadow: 0 0 3px @warning;{{ end }} }
 
 /* The focus timer, coloured by phase rather than by one fixed colour: working
  * is the accent, a break is the calmer ok green, and the moment a break is due
  * but unanswered is urgent - that state is the one worth noticing, and it is
  * the only one the timer cannot advance out of on its own. */
-#custom-focus-timer.work    { color: @accent;  text-shadow: 0 0 5px @accent; }
-#custom-focus-timer.break   { color: @ok;      text-shadow: 0 0 5px @ok; }
-#custom-focus-timer.pending { color: @urgent;  text-shadow: 0 0 6px @urgent; }
+#custom-focus-timer.work    { color: @accent;{{ if $glow }} text-shadow: 0 0 3px @accent;{{ end }} }
+#custom-focus-timer.break   { color: @ok;    {{ if $glow }} text-shadow: 0 0 3px @ok;{{ end }} }
+#custom-focus-timer.pending { color: @urgent;{{ if $glow }} text-shadow: 0 0 4px @urgent;{{ end }} }
 
 /* The centre. The clock took the space the focused window's title used to
  * have, and with it the job of being the one bright thing in the middle of the
@@ -229,12 +253,16 @@ window#waybar > box {
 #clock {
     color: @accent;
     font-weight: bold;
-    text-shadow: 0 0 6px @accent;
+{{- if $glow }}
+    text-shadow: 0 0 4px @accent;
+{{- end }}
 }
 
 #mpris {
     color: @secondary;
-    text-shadow: 0 0 6px @secondary;
+{{- if $glow }}
+    text-shadow: 0 0 4px @secondary;
+{{- end }}
 }
 
 /* Paused is still worth showing - it is the difference between "nothing is
@@ -302,8 +330,10 @@ window#waybar > box {
  * fought the caffeine indicator, which was a filled disc for the same bad
  * reason - two solid blobs competing on a strip 34 pixels tall.
  *
- * So: the active workspace is bright and glowing, the others are muted, and
- * nothing is filled unless you are pointing at it. The pill on hover is there
+ * So: the active workspace is bright, the others are muted, and nothing is
+ * filled unless you are pointing at it. The glow is emphasis on top of that
+ * rather than the thing doing the work - accent against muted still reads on
+ * a theme that has turned it off. The pill on hover is there
  * to show where the click lands, which is the one thing a shape is genuinely
  * better at than a colour.
  *
@@ -323,7 +353,9 @@ window#waybar > box {
 
 #workspaces button.focused {
     color: @accent;
-    text-shadow: 0 0 6px @accent;
+{{- if $glow }}
+    text-shadow: 0 0 4px @accent;
+{{- end }}
     background: transparent;
 }
 
@@ -358,12 +390,15 @@ window#waybar > box {
  * everything else with colour; there is no reason this one thing should shout
  * with a shape.
  *
- * Bright and glowing against muted-and-flat is a large enough difference to
- * read at a glance, and it is the same language the workspaces now use. */
+ * Bright against muted is a large enough difference to read at a glance, and
+ * it is the same language the workspaces now use. The glow sharpens it where
+ * a theme wants one, and is not what carries it. */
 #idle_inhibitor.activated {
     background: transparent;
     color: @warning;
-    text-shadow: 0 0 7px @warning;
+{{- if $glow }}
+    text-shadow: 0 0 5px @warning;
+{{- end }}
 }
 
 #pulseaudio.muted {

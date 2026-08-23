@@ -206,19 +206,29 @@ Names are by role (`accent`, `urgent`, `muted`), not by colour.
 under `[data]`, deliberately not in the repository — so switching leaves no diff.
 chezmoi merges config data *over* `.chezmoidata`, which is what makes the tracked
 default in `themes.toml` work for the installer, which has no config file at all.
-`~/.local/bin/theme` is the switcher and `~/.local/bin/wallpaper` picks the
-background style within a theme, remembered per theme. `theme --current` and
-`wallpaper --current` are how you find out what a machine is actually wearing,
-because git no longer tells you.
+`~/.local/bin/theme` is the switcher, `~/.local/bin/wallpaper` picks the
+background style within a theme, and `~/.local/bin/glow` turns the bar's haloes
+on and off — the last two both remembered per theme. `theme --current`,
+`wallpaper --current` and `glow --current` are how you find out what a machine
+is actually wearing, because git no longer tells you.
 
-**Both write the same file, through one writer.** `~/.local/lib/desktop_config.py`
-is the only thing that reads or writes `chezmoi.toml`. They each had their own
-copy once and the copies disagreed about nested tables, which turned
-`[data.wallpaper]` into a string and broke every subsequent `apply`. Add a
-machine-local value through that helper, not by hand.
+**All three write the same file, through one writer.**
+`~/.local/lib/desktop_config.py` is the only thing that reads or writes
+`chezmoi.toml`, and it also owns finding the source directory and asking
+chezmoi for its merged data. Two of them had their own copy of the writer once
+and the copies disagreed about nested tables, which turned `[data.wallpaper]`
+into a string and broke every subsequent `apply`. Add a machine-local value
+through that helper, not by hand.
 
-Four things worth holding onto before touching a theme:
+Five things worth holding onto before touching a theme:
 
+- **A theme also declares `glow`, `on` or `off`, and it is only a default.**
+  It decides whether the bar's readouts carry a halo and whether the bar has a
+  bloom along its bottom edge; the machine may disagree, per theme, under
+  `[data.glow]`. The template asks `eq ... "on"`, so any other spelling renders
+  as off while looking set — `checks/session.sh` checks both the declared
+  defaults and whatever the machine chose. Nothing else in the desktop glows;
+  it is entirely the waybar stylesheet.
 - **A theme declares `mode`, light or dark, and it is load-bearing.** It picks
   the GTK theme and icon set, neovim's `background`, and which section foot
   writes its colours into. `checks/session.sh` fails if a theme's declared mode
@@ -243,8 +253,8 @@ Four things worth holding onto before touching a theme:
 Nothing here reads colours at runtime — every consumer holds a rendered copy — so
 a change has to be reloaded into each one. That is
 `run_onchange_after_reload-theme.sh.tmpl`, which re-runs whenever the theme name,
-the wallpaper style or a hash of the selected palette changes. The three lines
-carrying them read like comments and are load-bearing. foot is the one consumer that cannot reload at
+the wallpaper style, the glow setting or a hash of the selected palette changes.
+The four lines carrying them read like comments and are load-bearing. foot is the one consumer that cannot reload at
 all: terminals already open keep their colours.
 
 To check a template renders before applying it anywhere:

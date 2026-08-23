@@ -43,6 +43,22 @@
 #
 # So a theme may be light, and three are. See DECISIONS.md.
 #
+# WHETHER THE BAR GLOWS
+#
+# Every theme also declares `glow`, and it is the same shape of decision as
+# `mode`: a property of the palette rather than of the machine. The bar's
+# readouts each carry a halo in their own colour, which is what makes a
+# saturated theme look lit rather than printed - and which, on a light theme,
+# reads as a smudge under the text instead. Bright light needs somewhere dark
+# to be bright against.
+#
+# So the eight dark themes default to "on" and the three light ones to "off".
+# This is only the default. It is remembered per theme on the machine, under
+# [data.glow] in chezmoi's own config, exactly as the wallpaper style is, and
+# ~/.local/bin/glow is what writes it - so disagreeing with the value here
+# leaves no diff to explain. `glow --current` says what a machine is actually
+# wearing, because the repository no longer knows.
+#
 # WRITING A NEW ONE
 #
 # Names are by role rather than by colour, so a palette swap does not leave a
@@ -71,6 +87,7 @@ theme = "neon"
 [themes.neon]
 description = "Electric cyan and magenta on near-black. The loudest of the set."
 mode        = "dark"
+glow        = "on"
     bg          = "#0b0e14"  # window background
     bar         = "#000000"  # the bar's base. Black, and deliberately not
                              # tinted here: the stylesheet mixes accent and
@@ -136,6 +153,7 @@ mode        = "dark"
 [themes.ember]
 description = "Warm amber and coral on brown-black. The only warm theme."
 mode        = "dark"
+glow        = "on"
     bg          = "#14100d"  # window background, black with a brown cast
     bar         = "#000000"  # as neon: the stylesheet tints it
     bg_dim      = "#0c0908"  # lock screen, behind everything
@@ -188,6 +206,7 @@ mode        = "dark"
 [themes.slate]
 description = "Muted blue-violet on cool grey. Soft, low glare."
 mode        = "dark"
+glow        = "on"
     bg          = "#11151a"  # window background
     bar         = "#000000"  # as neon: the stylesheet tints it
     bg_dim      = "#0b0e12"  # lock screen, behind everything
@@ -236,6 +255,7 @@ mode        = "dark"
 [themes.verdant]
 description = "Green on deep forest black. Calm, high contrast."
 mode        = "dark"
+glow        = "on"
     bg          = "#0a1210"
     bar         = "#000000"
     bg_dim      = "#060c0a"
@@ -276,6 +296,7 @@ mode        = "dark"
 [themes.abyss]
 description = "Cyan and indigo on deep navy. Cold and deep."
 mode        = "dark"
+glow        = "on"
     bg          = "#080f16"
     bar         = "#000000"
     bg_dim      = "#050a10"
@@ -317,6 +338,7 @@ mode        = "dark"
 [themes.orchid]
 description = "Purple and pink on aubergine. Rich, unusual."
 mode        = "dark"
+glow        = "on"
     bg          = "#120b16"
     bar         = "#000000"
     bg_dim      = "#0b0710"
@@ -357,6 +379,7 @@ mode        = "dark"
 [themes.cobalt]
 description = "Bright blue and violet on midnight. Crisp and vivid."
 mode        = "dark"
+glow        = "on"
     bg          = "#0a0f1c"
     bar         = "#000000"
     bg_dim      = "#060a14"
@@ -401,6 +424,7 @@ mode        = "dark"
 [themes.mono]
 description = "Greyscale on charcoal. No hue at all - colour only for warnings."
 mode        = "dark"
+glow        = "on"
     bg          = "#0e0e10"
     bar         = "#000000"
     bg_dim      = "#08080a"
@@ -470,6 +494,7 @@ mode        = "dark"
 [themes.paper]
 description = "Near-black on paper white. No hue at all - the e-ink theme."
 mode        = "light"
+glow        = "off"
     bg          = "#f6f6f3"  # paper. Very slightly warm, because a pure #ffffff
                              # page glares under a lamp in a way this does not
     bar         = "#ffffff"  # the bar's base, and the lightest thing on screen.
@@ -517,6 +542,7 @@ mode        = "light"
 [themes.daylight]
 description = "Indigo and violet on white. The conventional light theme."
 mode        = "light"
+glow        = "off"
     bg          = "#fbfcfe"  # white with the faintest blue cast
     bar         = "#ffffff"
     bg_dim      = "#ffffff"
@@ -556,6 +582,7 @@ mode        = "light"
 [themes.sepia]
 description = "Rust and olive on warm cream. Light without being white."
 mode        = "light"
+glow        = "off"
     bg          = "#f4ece0"  # cream. The light theme for a room with the lamp
                              # on rather than the window open
     bar         = "#fbf5ec"

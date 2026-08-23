@@ -11,10 +11,15 @@ set -euo pipefail
 #   theme --current    just the current name
 #
 # The whole desktop moves together: sway's borders, the bar, the terminal, the
-# launcher, notifications, the lock screen, the prompt and the wallpaper. What
-# does not move is GTK, which reads GTK_THEME once at session start and stays
-# Adwaita dark - which is why every theme in themes.toml is a dark theme. See
-# DECISIONS.md.
+# launcher, notifications, the lock screen, the prompt and the wallpaper. GTK
+# follows too, though only from light to dark and only for applications started
+# after the switch - each one reads gtk-3.0/settings.ini as it starts. This used
+# to say that GTK stays Adwaita dark and that every theme must therefore be
+# dark; the premise was wrong, and three themes are light. See DECISIONS.md.
+#
+# Two things about a theme are remembered per theme rather than switched with
+# it: the wallpaper style (~/.local/bin/wallpaper) and whether the bar glows
+# (~/.local/bin/glow). Switching away and back restores both.
 #
 # HOW IT WORKS
 #

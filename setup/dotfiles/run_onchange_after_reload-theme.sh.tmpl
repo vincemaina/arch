@@ -20,15 +20,18 @@ set -euo pipefail
 #
 # WHAT MAKES IT RE-RUN
 #
-# run_onchange_ re-runs a script when the *rendered script* changes, so the three
+# run_onchange_ re-runs a script when the *rendered script* changes, so the four
 # lines below are load-bearing rather than informational. The theme name catches
 # a switch between themes; the wallpaper name catches a change of style within
-# one theme; the hash catches an edit to the selected theme's colours without
-# either name changing. None of them is decoration - delete one and this stops
-# running in exactly the case it covers.
+# one theme; the glow catches turning the bar's haloes on or off, which changes
+# only the stylesheet and would otherwise leave waybar showing the old one; the
+# hash catches an edit to the selected theme's colours without any of the names
+# changing. None of them is decoration - delete one and this stops running in
+# exactly the case it covers.
 #
 # theme:     {{ .theme }}
 # wallpaper: {{ dig "wallpaper" .theme "mesh" . }}
+# glow:      {{ dig "glow" .theme $palette.glow . }}
 # palette:   {{ toJson $palette | sha256sum }}
 
 # The wallpaper first, and deliberately before the session check below.

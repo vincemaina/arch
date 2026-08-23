@@ -416,6 +416,40 @@ else:
     else:
         say("pass", f"all {len(themes)} themes declare a mode that matches their background")
 
+    # Whether the bar glows is the theme's default and the machine may disagree
+    # with it, so the value has to be one the stylesheet recognises at both
+    # ends. The template asks `eq ... "on"`, which means any other spelling -
+    # "true", "yes", "On" - renders as off while looking set, which is exactly
+    # the invisible-configuration failure this file exists to catch.
+    #
+    # The chosen value is checked as well as the declared one: it is written by
+    # ~/.local/bin/glow, which validates, but it is a plain text file that a
+    # person can also edit.
+    wrong = []
+    for name, palette in sorted(themes.items()):
+        value = palette.get("glow")
+        if value not in ("on", "off"):
+            wrong.append(f"{name} declares glow {value!r}, not 'on' or 'off'")
+    chosen = data.get("glow")
+    if isinstance(chosen, dict):
+        for name, value in sorted(chosen.items()):
+            if name not in themes:
+                wrong.append(f"the machine has a glow setting for {name!r}, "
+                             f"which is not a theme")
+            elif value not in ("on", "off"):
+                wrong.append(f"the machine sets glow {value!r} for {name}, "
+                             f"which the stylesheet reads as off")
+    if wrong:
+        for problem in wrong:
+            say("fail", problem)
+    else:
+        selected_glow = (chosen or {}).get(selected) if isinstance(chosen, dict) \
+            else None
+        origin = "chosen here" if selected_glow else "the theme's default"
+        say("pass", f"all {len(themes)} themes declare a usable glow; "
+                    f"{selected} is {selected_glow or themes[selected]['glow']} "
+                    f"({origin})")
+
     # No theme ships an image any more: they are generated on the machine from
     # the palette and cached. Three themes at one image each was already 7.8M of
     # tracked PNG, and the arrangement this replaced would have grown by about
@@ -477,15 +511,16 @@ fi
 
 # The reload script is what makes a switch visible rather than merely written,
 # and run_onchange_ decides to re-run it by comparing the rendered script. The
-# two lines carrying the theme name and the palette hash are therefore what
-# triggers it at all - they read like comments and are not.
+# four lines carrying the theme name, the wallpaper style, the glow setting and
+# the palette hash are therefore what triggers it at all - they read like
+# comments and are not.
 reload_template="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/setup/dotfiles/run_onchange_after_reload-theme.sh.tmpl"
 if [[ ! -f "$reload_template" ]]; then
     fail "nothing reloads the session after a theme change"
-elif [[ "$(grep -c '{{ .theme }}\|dig "wallpaper"\|sha256sum' "$reload_template")" -lt 3 ]]; then
-    fail "$(basename "$reload_template") no longer embeds the theme name, the wallpaper style and the palette hash, so chezmoi will not re-run it in every case that needs it"
+elif [[ "$(grep -c '{{ .theme }}\|dig "wallpaper"\|dig "glow"\|sha256sum' "$reload_template")" -lt 4 ]]; then
+    fail "$(basename "$reload_template") no longer embeds the theme name, the wallpaper style, the glow setting and the palette hash, so chezmoi will not re-run it in every case that needs it"
 else
-    pass "the reload script re-runs on a theme switch, a wallpaper change and a colour edit"
+    pass "the reload script re-runs on a theme switch, a wallpaper change, a glow change and a colour edit"
 fi
 
 # GTK follows the theme's mode, and there is exactly one line that can silently

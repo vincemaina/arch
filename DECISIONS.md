@@ -2626,6 +2626,76 @@ repository already owns.
 
 ---
 
+## The bar's glow is a setting, remembered per theme
+
+**Decision:** The bar's haloes are optional. Every theme declares a `glow`
+default in `themes.toml` — on for the eight dark themes, off for the three
+light ones — and `~/.local/bin/glow` overrides that default for one theme on
+one machine, storing the answer under `[data.glow]` in chezmoi's own config
+next to the wallpaper style. Where the glow stays on, its blur radii dropped
+from 5/6/7 pixels to 3/4/5.
+
+### Why
+
+Because it was tuned on one theme and then applied to eleven. The effect —
+a `text-shadow` with no offset behind every readout, plus an inset bloom along
+the bar's bottom edge — is most of what makes `neon` look like `neon`. Light
+needs somewhere dark to be bright against, and on `paper` the same halo
+renders as a grey smear under near-black text: not light coming off the glyph,
+just a glyph that has gone slightly out of focus.
+
+Per theme rather than one global switch, for the same reason the wallpaper
+style is per theme. The right answer genuinely differs between palettes, and a
+single setting would mean re-deciding it on every switch. Remembering it means
+the choice is made once per theme and never again.
+
+Tracked default plus machine-local override, rather than either alone. The
+default has to be tracked because the installer renders the stylesheet in a
+chroot with no config file at all, and a theme that shipped without an answer
+would fail at render. The override has to be machine-local because choosing
+should not produce a diff to explain — the same rule the theme name and the
+wallpaper style already follow.
+
+The radii came down independently of the switch. At 5-7px the halo reached
+well past its glyph, and on a bar 34 pixels tall neighbouring readouts bled
+into one another; the effect is meant to make text look lit, which needs the
+light to stay where the text is.
+
+### Trade-off
+
+A third thing that varies per machine, and a third thing the repository cannot
+tell you about a running desktop — `glow --current` is the only way to know,
+exactly as with `theme --current` and `wallpaper --current`.
+
+It is also a value that must be spelled `on` or `off`. The template asks
+`eq ... "on"`, so `true` or `yes` would render as off while looking set, which
+is this repository's signature failure. `checks/session.sh` checks both the
+declared defaults and whatever the machine has chosen.
+
+### Alternatives considered
+
+**Derive it from `mode` and have no setting at all.** Rejected, though it is
+what the defaults amount to today. It answers the common case and forbids the
+uncommon one: a dark theme someone wants flat, or `sepia` with a little lift,
+would both be unreachable, and the user's request was explicitly for a switch.
+
+**One global on/off, not per theme.** Rejected. It would have to be re-set on
+every switch between a theme that wants it and one that does not, which is
+precisely the friction the per-theme wallpaper memory already removed.
+
+**Turn the glow down for light themes instead of off.** Rejected as a
+substitute for the switch, on the evidence: a dimmer halo on a white
+background is still a smear, because the problem is direction rather than
+strength. The radius reduction was worth doing on its own merits and was done
+everywhere.
+
+**Leave the rules in place and override with `text-shadow: none`.** Rejected.
+It would leave a rule to keep in step for every module added later, and this
+repository has already been bitten by configuration that looks set and does
+nothing. The template emits no rule at all when a theme does not glow.
+
+---
+
 ## The bar reports and responds
 
 **Decision:** Every module in the bar does something relevant when clicked. The centre carries the date, the time, and whatever is playing — not the focused window's title.
@@ -3271,6 +3341,93 @@ is correct: from the shell's side a session is one command that runs for an
 hour, so the only thing this hook could ring for is quitting it. Claude Code has
 its own notification setting for the per-response case, and pointing that at the
 terminal bell puts it back on this same chain.
+
+---
+
+## Virtual machines with qemu alone, and clones that cost nothing
+
+**Decision:** Ship the ability to run virtual machines, driven by qemu directly
+through `~/.local/bin/vm`. No libvirt, no virt-manager, no daemon. Machines
+cloned from the bundled base image are qcow2 **overlays** rather than copies.
+
+### Why
+
+Running something dangerous, or keeping a project's tooling away from the
+machine you actually use, previously meant either not doing it or doing it on
+the real system. Rebuilding this setup in a VM by hand was always possible and
+never happened, because it meant an ISO download and the install wizard every
+single time.
+
+**Why qemu on its own.** libvirt and virt-manager do not run virtual machines;
+qemu does, and it is the same `qemu-system-x86_64` process with the same `-m`
+underneath either arrangement. A 2–4 GiB guest therefore costs the same both
+ways, and the entire difference is scaffolding:
+
+| Stack | Host-side overhead |
+| --- | --- |
+| qemu + a kiosk compositor | ~30 MiB |
+| libvirt + `virt-viewer` | ~140 MiB (daemon plus viewer) |
+| libvirt + the `virt-manager` GUI | ~250–330 MiB |
+
+That saving is second-order next to the guest and is **not** the reason. The
+reasons are fewer moving parts — no daemon, no XML domain definitions, no
+`libvirt` group membership, no managed virtual network — and that qemu presents
+straight to a Wayland surface instead of going through a SPICE server and a
+`spice-gtk` client, which is a latency difference rather than a memory one and
+is far more noticeable in use.
+
+**Why overlays.** `qemu-img create -b` makes a disk that names the base as its
+backing file and holds only what the guest has written since. A new machine is
+therefore a few hundred KB and appears instantly, and returning one to a clean
+state is deleting that file rather than reinstalling anything. This is most of
+what libvirt's snapshots would have provided, for none of the machinery.
+
+**Why the base image is generated and never committed.** Same rule wallpapers
+follow, and for the same reason: a full Arch desktop image is 8–15 GiB, and
+`checks/session.sh` already refuses anything image-shaped under
+`setup/dotfiles/`. The image is built on the machine by repository tooling.
+
+### Trade-off
+
+**The base image must never be written to.** Modifying a backing file corrupts
+every overlay derived from it, and the damage appears in the clones rather than
+in the base — a genuinely unpleasant thing to debug. The builder leaves it
+read-only and `vm run` warns if it has stopped being so, but this is a real
+sharp edge that libvirt's managed storage would have blunted.
+
+**No lifecycle management.** Nothing autostarts a guest at boot, there is no
+API, and no snapshot tree beyond the single base-and-overlay relationship. If
+any of that is wanted later, it is an argument for revisiting libvirt rather
+than for growing `vm` into a daemon.
+
+**qemu is exempt from `earlyoom`.** Killing a guest is a power cut to the
+machine inside it, with the filesystem damage that implies, so qemu is in the
+`--avoid` list in `setup/system/earlyoom.conf`. The host therefore cannot
+reclaim memory from a running guest, which is only safe because `vm` always
+passes a fixed `-m`. The cap and the exemption are one decision and must not be
+separated. On the 7.5 GiB reference machine the default is half of host RAM.
+
+### Alternatives considered
+
+**libvirt + virt-manager.** The obvious answer. It buys snapshots, autostart,
+managed NAT networking and a stable API, at the cost of a persistent daemon, XML
+domain definitions, group membership and roughly 150 MiB of disk. None of the
+things it buys were wanted; the overlay model covers the one that was.
+
+**GNOME Boxes.** A friendlier front end to the same libvirt stack, and it brings
+a large GNOME dependency footprint onto a machine that deliberately has no
+desktop environment.
+
+**`systemd-nspawn` containers.** Much cheaper, and genuinely better for
+isolating a project's *tooling*. Rejected because it shares the host kernel, so
+it does not answer the case this exists for — running something you do not trust
+— and it cannot boot a different operating system.
+
+**`qemu-ui-sdl` instead of `qemu-ui-gtk`.** Measured rather than assumed: `gtk3`
+is already installed here, so GTK costs only `vte3` at 1.79 MiB while SDL would
+cost `sdl2_image`. About 2 MiB apart. GTK was chosen for `zoom-to-fit` and a
+menubar that can be switched off, both of which the full-screen login session
+needs.
 
 ---
 
