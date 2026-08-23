@@ -3217,10 +3217,12 @@ was found by testing the behaviour rather than reading the flag name.
 ## The desktop's sounds are generated, not shipped
 
 Four sounds — `notify`, `alert`, `complete`, `limit` — are computed on the
-machine from a table of frequencies, envelopes and levels in
+machine from tables of frequencies, envelopes and levels in
 `~/.local/bin/sounds`, cached in `~/.local/share/sounds/`, and played by
 `~/.local/bin/play-sound` through `pw-play`. Nothing audio-shaped is tracked in
-this repository, and `checks/session.sh` fails if anything ever is.
+this repository, and `checks/session.sh` fails if anything ever is. (TASK-154
+added a choice of instrument for those four sounds — see *Sound packs* below —
+without touching any of the reasoning here.)
 
 ### Why
 
@@ -3285,6 +3287,73 @@ notification sounds, but two of the three callers are not mako — the password
 prompt and the volume ceiling — and they would have gone on pinging. The check
 lives in `play-sound` instead, so one rule covers all of them and cannot drift
 between two files.
+
+## Sound packs
+
+Which four sounds play is a choice, not a fixed set. `~/.local/bin/sounds`
+holds several **packs** — `chime` (the original), `ps2`, `8bit` — each
+defining the same four events with its own instrument: `chime` sums harmonic
+partials, `ps2` is a single sine oscillator with a soft downward pitch-bend
+onto each note, `8bit` is square and triangle waves with no bend at all,
+using quick arpeggios instead — the trick chiptunes have always used to fake
+a chord on a chip that can only hold one note. `sounds --pack <name>`
+switches; `sounds --pack` opens a picker; an override set with `sounds set`
+still wins over whichever pack is active.
+
+### Why
+
+Because a struck-glass ping is one aesthetic and there is no reason to make it
+the only one this desktop can have, once sounds are generated rather than
+shipped anyway — the marginal cost of a second and third pack is a table of
+numbers, not a set of files to record, license or track.
+
+### Where the active pack lives, and where it deliberately does not
+
+**Not `chezmoi.toml`.** The theme, the wallpaper style and the bar's glow all
+live there, under `[data]`, because a chezmoi template reads them at apply
+time — see *Switchable system-wide themes* and *TASK-152* below. The active
+sound pack is read by nothing that renders; it is read by
+`~/.local/bin/play-sound`, in bash, on every single notification. Routing
+that through `~/.local/lib/desktop_config.py` — which is itself Python — would
+mean starting an interpreter on every notification purely to learn one word,
+which is exactly the cost `play-sound` is written in shell to avoid (see the
+entry above, and TASK-85).
+
+So it lives in one line of plain text at `~/.local/state/soundpack`, written
+only by `sounds --pack`, read directly by both `sounds` and `play-sound` with
+no interpreter and no parser on the read path. It is still the same *kind* of
+machine-local fact CLAUDE.md describes for theme/wallpaper/glow — switching it
+leaves no diff, and two machines can disagree — it is just not consumed the
+same way, and `~/.local/state/` (XDG state, not config) is the more honest
+home for something read on a hot path rather than rendered once.
+
+`play-sound` keeps a short duplicate of the pack list, so an unreadable or
+hand-edited state file can fall back to `chime` without starting Python to ask
+what the real list is. `checks/session.sh` checks that the two lists agree,
+the same shape as the check that already covered the four event names.
+
+### Trade-off
+
+Two places now list the same three pack names — `sounds`, which is
+authoritative, and `play-sound`'s fallback `case`. That is exactly the "two
+lists that must agree" shape this repository is usually suspicious of, taken
+on deliberately because the alternative was slower on every notification, not
+occasionally. `checks/session.sh` is what stops it drifting silently, and was
+proven to catch a real mismatch before being trusted (see the scripting-traps
+skill's note on never trusting a check that has not been watched to fail).
+
+### Alternatives considered
+
+**One `chezmoi.toml` key, read by `play-sound` through `desktop_config.py`
+anyway**, accepting the interpreter cost. Rejected on the same measurement
+that put `play-sound` in shell in the first place: 30ms of Python startup on
+every notification, for a value that changes on the order of once a session.
+
+**A separate `soundpack` helper script**, mirroring `theme`/`wallpaper`/`glow`
+each being their own command. Rejected because a pack is a property of the
+sounds themselves, not a separate concern — `sounds --pack` keeps one binary
+answering every question about what the desktop's sounds are, the same reason
+`wallpaper` was not split into a second command when styles were added to it.
 
 ## Volume and brightness keys go through a helper that knows their limits
 

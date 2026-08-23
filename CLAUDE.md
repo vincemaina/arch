@@ -296,6 +296,17 @@ table of frequencies and envelopes and caches them in `~/.local/share/sounds/`.
 only thing that makes a noise; it is shell rather than Python because it runs on
 every notification.
 
+**Which four sounds is a choice.** `sounds --pack` switches between `chime`
+(the original struck-glass ping), `ps2` (soft sine, pitch-bent onto each note)
+and `8bit` (square/triangle, arpeggios instead of a bend a real chip could not
+do). Every pack defines the same four events. The active pack is `~/.local/
+state/soundpack`, a plain one-line file — **deliberately not `chezmoi.toml`**,
+even though it is exactly the kind of machine-local fact theme/wallpaper/glow
+live there for. Nothing templates it; `play-sound` reads it directly on every
+notification, and routing that through `desktop_config.py` would reintroduce
+the interpreter-start cost the whole design exists to avoid. See *Sound packs*
+in `DECISIONS.md` before changing how the active pack is read or stored.
+
 Three callers, and each one is somewhere different:
 
 | Sound | Fired by | Where |
@@ -310,9 +321,10 @@ Four things that will silently break it, all covered by `checks/session.sh`:
 - **mako's PATH is not your PATH.** Same trap as waybar — it is a systemd user
   service, so `on-notify` must name an absolute path. That is why the mako
   config is a template.
-- **The event lists must agree.** `play-sound` validates its argument against a
-  `case`, the generator holds a separate table, and a name in one and not the
-  other fails on stderr nobody reads.
+- **The event lists must agree, and so must the pack lists.** `play-sound`
+  validates its argument against a `case`, the generator holds a separate
+  table, and a name in one and not the other fails on stderr nobody reads.
+  Same shape, same check, for the pack whitelist `play-sound` keeps a copy of.
 - **`mako` cannot see notification hints.** foot already sends `sound-name` and
   `suppress-sound`, and `makoctl list -j` returns neither, nor are they criteria
   fields. Measured. So urgency and app-name are what the sounds are chosen by;

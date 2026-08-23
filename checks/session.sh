@@ -1498,6 +1498,77 @@ if [[ -x "$SOUNDS_BIN" && -x "$PLAY_BIN" ]]; then
     fi
 fi
 
+# TASK-154: every declared pack, not only the active one, generates all four
+# events without error. Nothing exercises a pack you have never switched to
+# except this - a broken table in it would sit unnoticed until the day someone
+# picks it from the launcher.
+if [[ -x "$SOUNDS_BIN" ]]; then
+    # cut -c2- drops the leading marker column (`*` for the active pack, a
+    # space otherwise) before awk takes the first field - taking a fixed field
+    # by position first, THEN splitting on whitespace, is what keeps this
+    # correct for both marked and unmarked rows. awk alone collapses the
+    # unmarked row's leading space and shifts every field left by one, which
+    # first read this list as the packs "chime soft square-wave" - the
+    # marker's own space had merged into the name column, so the check was
+    # reading the first WORD OF THE DESCRIPTION as ps2 and 8bit's names.
+    mapfile -t PACKS < <("$SOUNDS_BIN" --packs 2>/dev/null | cut -c2- | awk '{print $1}')
+    if (( ${#PACKS[@]} < 3 )); then
+        fail "only ${#PACKS[@]} sound pack(s) declared (${PACKS[*]:-none}); TASK-154 asked for at least three"
+    else
+        pass "${#PACKS[@]} sound packs declared: ${PACKS[*]}"
+    fi
+
+    if "$SOUNDS_BIN" --regenerate >/dev/null 2>&1; then
+        broken=""
+        for pack in "${PACKS[@]}"; do
+            for event in $GENERATED; do
+                path="$HOME/.local/share/sounds/$pack/$event.wav"
+                [[ -s "$path" ]] || broken+=" $pack/$event"
+            done
+        done
+        if [[ -n "$broken" ]]; then
+            fail "no audio file for:$broken after --regenerate - a pack's table is broken"
+        else
+            # $GENERATED is a newline-separated string, not an array - ${#GENERATED}
+            # would be its character count, which is not "how many events" and
+            # printed 27 the first time this ran.
+            event_count="$(wc -w <<<"$GENERATED")"
+            pass "every event of every pack generated (${#PACKS[@]} packs x ${event_count} events)"
+        fi
+    else
+        fail "sounds --regenerate exited non-zero; at least one pack fails to render"
+    fi
+fi
+
+# WHICH PACK IS ACTIVE is a plain state file rather than chezmoi.toml - see
+# ~/.local/bin/sounds's own docstring for why - and play-sound carries its own
+# short copy of the pack list so it need not start python to read it. Nothing
+# notices if the two lists drift apart except this.
+PACK_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/soundpack"
+if [[ -s "$PACK_STATE" ]]; then
+    recorded="$(head -n1 "$PACK_STATE" | tr -d '[:space:]')"
+    if [[ " ${PACKS[*]:-} " == *" $recorded "* ]]; then
+        pass "the active pack ($recorded) is one sounds declares"
+    else
+        fail "~/.local/state/soundpack names '$recorded', which is not a pack sounds --packs lists"
+    fi
+else
+    skip "no pack has been switched to yet; play-sound defaults to chime"
+fi
+
+if [[ -x "$PLAY_BIN" && ${#PACKS[@]} -gt 0 ]]; then
+    BASH_PACKS="$(grep -oE '^ *[a-z0-9|]+\) pack=' "$PLAY_BIN" | head -n1 | \
+        sed -E 's/\).*//' | tr -d ' ' | tr '|' '\n' | sort -u)"
+    PY_PACKS="$(printf '%s\n' "${PACKS[@]}" | sort -u)"
+    if [[ -z "$BASH_PACKS" ]]; then
+        fail "could not find play-sound's own pack whitelist to compare"
+    elif [[ "$BASH_PACKS" == "$PY_PACKS" ]]; then
+        pass "play-sound's pack whitelist agrees with sounds --packs"
+    else
+        fail "play-sound accepts [$(tr '\n' ' ' <<<"$BASH_PACKS")] but sounds declares [$(tr '\n' ' ' <<<"$PY_PACKS")] - a pack added to one and not the other silently falls back to chime"
+    fi
+fi
+
 # mako runs as a systemd user service, so ~/.local/bin is not on its PATH -
 # .zshrc puts it there and applies to interactive shells only. A bare
 # `play-sound` here would silently never run, which is exactly the failure the

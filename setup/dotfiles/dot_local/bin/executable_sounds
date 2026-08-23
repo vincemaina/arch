@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
-# requires: python3 pw-play
+# requires: python3 pw-play rofi
 
-"""The desktop's sounds: what they are, and where they come from.
+"""The desktop's sounds: what they are, which pack is active, and where they
+come from.
 
-    sounds                    list them, and say which are yours
-    sounds --preview          play each one in turn, named
-    sounds --preview notify   play just that one
-    sounds --ensure           generate any that are missing
-    sounds --regenerate       generate them all again
-    sounds --path notify      where that sound is, generated or yours
-    sounds set notify a.wav   use a file of your own for that event
-    sounds set notify --default   go back to the generated one
+    sounds                       the active pack, then what each event is
+    sounds --list                just the per-event table (for scripts)
+    sounds --packs                every pack, with the active one marked
+    sounds --pack                 pick a pack from the launcher
+    sounds --pack ps2             switch to that pack directly
+    sounds --current-pack         just the active pack's name
+    sounds --preview              play the active pack, each event named
+    sounds --preview alert        just that one
+    sounds --preview --pack 8bit  preview a pack without switching to it
+    sounds --ensure               generate whatever the active pack is missing
+    sounds --regenerate           generate every event of every pack again
+    sounds --path notify          where that event's sound is, active pack or yours
+    sounds set notify a.wav       use a file of your own for that event
+    sounds set notify --default   go back to the pack's own sound
 
 Playing a sound is ~/.local/bin/play-sound, not this. This is the thing that
 decides what the sounds ARE; that is the thing mako, sway and zsh call, and it
@@ -24,41 +31,42 @@ follows deliberately. Audio is binary, and binary in a git repository is a cost
 that only ever goes up: it cannot be diffed, cannot be reviewed, and every
 revision keeps the old copy forever. checks/session.sh already fails if anything
 image-shaped appears in setup/dotfiles/, and sound is the same class of thing.
+A sound PACK is the same argument multiplied by however many packs exist, so it
+matters more here, not less.
 
-There is a second reason, and it is the one that actually decided it. Arch has
-sound-theme-freedesktop, and it is already on this machine - but only as a
-transitive dependency of pavucontrol, which is exactly the "installed as a
-dependency" trap CLAUDE.md spends a section on. Using its files would mean
-declaring it explicitly, and would still leave the sounds themselves fixed: that
-set was designed for GNOME around 2008, and its members have no particular
-relationship to each other. What was asked for was a subtle sound and a
-prominent one that clearly belong together, which is a statement about the
-INTERVAL between two sounds rather than about either one.
+THE PACKS
 
-Generating them makes that relationship something the table below states
-outright, and costs nothing per sound.
+Every pack defines the same four events - notify, alert, complete, limit - so
+switching one never leaves an event silent. What differs is the instrument:
 
-WHAT THEY SOUND LIKE, AND WHY
+    chime  a struck-glass ping (additive synthesis, harmonic partials that
+           decay faster the higher they are - what a real struck object does)
+    ps2    a soft rounded blip that lands from slightly above its pitch, with
+           a little vibrato - a console menu rather than a game
+    8bit   square and triangle waves with no glide at all, because a real chip
+           could not bend a note - arpeggios do the work instead, the same
+           trick chiptunes have always used to fake a chord on one voice
 
-One timbre, four shapes. The timbre is a struck-glass ping: a fundamental with
-two harmonics and one deliberately inharmonic partial for a little shimmer, each
-decaying faster the higher it is - which is what real struck objects do, and
-what stops an additive tone sounding like a test signal.
+Each is its own worked example of the same idea: count and register carry the
+meaning, not volume - see the docstring on EVENT_TABLE further down, and
+DECISIONS.md, for the full argument. `alert` is the loud one in every pack, for
+the same reason in every pack: a dialog is a process blocked on you.
 
-The shapes carry the meaning, and they are meant to be told apart with your back
-to the screen:
+WHICH PACK IS ACTIVE IS NOT IN chezmoi.toml
 
-    notify    one note, high, quiet           something happened
-    alert     two notes rising, bright, loud   something is WAITING for you
-    complete  three notes rising, warm, mid    something finished
-    limit     one note, low, blunt, short      that control has no more to give
+Unlike the theme, the wallpaper style and the bar's glow, the active pack is
+never read by a chezmoi template - nothing renders differently because of it.
+It is read by ~/.local/bin/play-sound, in bash, on every single notification.
+Routing it through ~/.local/lib/desktop_config.py the way those three do would
+mean starting a Python interpreter for that read, which is exactly the cost
+play-sound was written in shell to avoid - see its own docstring, and TASK-85.
 
-Count and register do the work, so none of them needs to be loud to be legible.
-alert is the only one that is, and that is the point of it: a dialog is a
-process blocked on you, and it should interrupt.
-
-Pitches are equal-tempered and the intervals are consonant, so two arriving
-close together do not clash.
+So the active pack lives in one plain line of text at ~/.local/state/soundpack,
+written only by `sounds --pack`, read directly by both this script and
+play-sound with no interpreter and no parser. It is still exactly the kind of
+machine-local value CLAUDE.md describes - switching it should leave no diff,
+and two machines should be able to disagree - it is just not the SAME kind of
+machine-local value theme/wallpaper/glow are, because nothing templates it.
 """
 
 import math
@@ -70,87 +78,59 @@ import sys
 import wave
 
 SAMPLE_RATE = 48000
+TWO_PI = 2.0 * math.pi
 
-# ~/.local/share/sounds holds GENERATED audio. It is disposable: delete it and
-# the next play-sound builds it again. ~/.config/sounds holds YOURS, and is
-# never written by the generator - which is the whole reason they are two
-# directories rather than one flag.
+# ~/.local/share/sounds/<pack> holds GENERATED audio. It is disposable: delete
+# it and the next play-sound (or `sounds --ensure`) builds it again.
+# ~/.config/sounds holds YOURS, flat and pack-independent, and is never written
+# by the generator - which is the whole reason they are two directories rather
+# than one flag. An override wins over whichever pack is active.
 CACHE = pathlib.Path.home() / ".local" / "share" / "sounds"
 OVERRIDE = pathlib.Path.home() / ".config" / "sounds"
 
-# The struck-glass timbre. (ratio, amplitude); ratio 1.0 is the note itself.
+# The one place the active pack is recorded. See the docstring above for why
+# this is a plain file and not chezmoi.toml. play-sound reads this same path -
+# checks/session.sh checks that the two do not drift apart.
+STATE_DIR = pathlib.Path.home() / ".local" / "state"
+STATE_FILE = STATE_DIR / "soundpack"
+DEFAULT_PACK = "chime"
+
+EVENTS = ("notify", "alert", "complete", "limit")
+
+
+def note_frequency(name):
+    """Equal-tempered frequency for a name like 'A4' or 'F#5'. A4 = 440."""
+    letter = name[:-1]
+    octave = int(name[-1])
+    index = {
+        "C": -9, "C#": -8, "D": -7, "D#": -6, "E": -5, "F": -4,
+        "F#": -3, "G": -2, "G#": -1, "A": 0, "A#": 1, "B": 2,
+    }[letter]
+    semitone = index + (octave - 4) * 12
+    return 440.0 * (2.0 ** (semitone / 12.0))
+
+
+# ----------------------------------------------------------------------
+# The "chime" pack - the original, unchanged sound.
+# ----------------------------------------------------------------------
 #
+# The struck-glass timbre. (ratio, amplitude); ratio 1.0 is the note itself.
 # 4.73 is not a harmonic and is not a mistake - it is the partial that keeps
 # this from sounding like a sine generator. Small enough not to be heard as a
 # second note, large enough to give the attack an edge.
-PARTIALS = [(1.0, 1.00), (2.0, 0.28), (3.0, 0.11), (4.73, 0.06)]
-
-# Equal temperament, A4 = 440.
-NOTES = {
-    "A3": 220.00,
-    "C5": 523.25,
-    "E5": 659.25,
-    "G5": 783.99,
-    "A5": 880.00,
-    "C6": 1046.50,
-    "F6": 1396.91,
-}
-
-# The four events.
-#
-#   notes    (start second, note name) - the shape
-#   decay    seconds for a partial to fall to 1/e; higher partials are quicker
-#   length   total file, long enough for the tail to reach silence
-#   gain     peak amplitude, 0-1. This is the RELATIVE loudness of the events
-#            and the only place it is decided. It is not a volume control:
-#            the system volume still applies on top, which is what was asked
-#            for - one slider for everything.
-#   colour   how much of the upper partials to keep, 0-1. Lower is warmer.
-SOUNDS = {
-    "notify": {
-        "what": "a notification arrived",
-        "notes": [(0.000, "A5")],
-        "decay": 0.14,
-        "length": 0.34,
-        "gain": 0.30,
-        "colour": 0.55,
-    },
-    "alert": {
-        "what": "a dialog is waiting for you",
-        "notes": [(0.000, "C6"), (0.130, "F6")],
-        "decay": 0.16,
-        "length": 0.52,
-        "gain": 0.72,
-        "colour": 1.00,
-    },
-    "complete": {
-        "what": "a long task finished",
-        "notes": [(0.000, "C5"), (0.110, "E5"), (0.220, "G5")],
-        "decay": 0.22,
-        "length": 0.78,
-        "gain": 0.50,
-        "colour": 0.45,
-    },
-    "limit": {
-        "what": "a control is already at its limit",
-        "notes": [(0.000, "A3")],
-        "decay": 0.05,
-        "length": 0.18,
-        "gain": 0.42,
-        "colour": 0.20,
-    },
-}
+CHIME_PARTIALS = [(1.0, 1.00), (2.0, 0.28), (3.0, 0.11), (4.73, 0.06)]
 
 
-def render(spec):
-    """One event, as a list of floats between -1 and 1."""
+def render_chime(pack, spec):
+    """Additive synthesis: several harmonically-related partials per note,
+    each decaying at its own rate. See CHIME_PARTIALS."""
     count = int(SAMPLE_RATE * spec["length"])
     buffer = [0.0] * count
 
     for start, name in spec["notes"]:
-        frequency = NOTES[name]
+        frequency = note_frequency(name)
         first = int(start * SAMPLE_RATE)
-        for ratio, amplitude in PARTIALS:
+        for ratio, amplitude in pack["partials"]:
             # Upper partials are quieter in a warm sound and die away sooner in
             # every sound. Both are what makes this read as "struck" rather
             # than "generated".
@@ -158,30 +138,256 @@ def render(spec):
             if level < 0.001:
                 continue
             decay = spec["decay"] / (1.0 + 0.6 * (ratio - 1.0))
-            step = 2.0 * math.pi * frequency * ratio / SAMPLE_RATE
+            step = TWO_PI * frequency * ratio / SAMPLE_RATE
             for index in range(first, count):
                 offset = index - first
                 t = offset / SAMPLE_RATE
                 # A 4ms ramp in. Without it the waveform starts at full height
-                # and the speaker is asked for a step change, which is heard as
-                # a click in front of the note.
+                # and the speaker is asked for a step change, heard as a click.
                 attack = min(1.0, t / 0.004)
                 buffer[index] += (
                     level * attack * math.exp(-t / decay) * math.sin(step * offset)
                 )
 
-    # A ramp out over the last 5ms, for the same reason as the ramp in: the
-    # tail is very quiet but it is not zero, and truncating it clicks too.
-    tail = int(0.005 * SAMPLE_RATE)
-    for index in range(count - tail, count):
-        buffer[index] *= (count - index) / tail
-
-    peak = max((abs(value) for value in buffer), default=0.0)
-    if peak > 0:
-        scale = spec["gain"] / peak
-        buffer = [value * scale for value in buffer]
+    _declick_and_normalize(buffer, spec["gain"])
     return buffer
 
+
+# ----------------------------------------------------------------------
+# The "ps2" and "8bit" packs - a single oscillator per note, rather than
+# several summed partials. What differs between them is the waveform, and
+# whether a note is allowed to glide into its pitch.
+# ----------------------------------------------------------------------
+
+def _osc_sample(waveform, phase, duty, harmonic2):
+    frac = (phase / TWO_PI) % 1.0
+    if waveform == "square":
+        return 1.0 if frac < duty else -1.0
+    if waveform == "triangle":
+        return 4.0 * frac - 1.0 if frac < 0.5 else 3.0 - 4.0 * frac
+    # sine, with an optional quiet second harmonic for roundness - ps2's
+    # signature warmth, unused (harmonic2 = 0) by every other pack.
+    sample = math.sin(phase)
+    if harmonic2:
+        sample += harmonic2 * math.sin(2.0 * phase)
+    return sample
+
+
+def render_osc(pack, spec):
+    """One oscillator per note. A note may glide DOWN into its pitch from
+    above (ps2's soft landing) and may carry vibrato (also ps2); neither
+    applies to 8bit; a chip cannot bend a note, which is why its packs use
+    quick arpeggios instead - several short notes, not one bent one."""
+    count = int(SAMPLE_RATE * spec["length"])
+    buffer = [0.0] * count
+
+    decay = spec["decay"]
+    waveform = spec.get("waveform", pack["waveform"])
+    duty = spec.get("duty", pack.get("duty", 0.5))
+    harmonic2 = pack.get("harmonic2", 0.0)
+    glide_semitones = spec.get("glide_semitones", pack.get("glide_semitones", 0.0))
+    glide_time = spec.get("glide_time", pack.get("glide_time", 0.0))
+    vibrato_rate = pack.get("vibrato_rate", 0.0)
+    vibrato_depth = pack.get("vibrato_depth", 0.0)
+
+    for start, name in spec["notes"]:
+        target = note_frequency(name)
+        first = int(start * SAMPLE_RATE)
+        phase = 0.0
+        for index in range(first, count):
+            offset = index - first
+            t = offset / SAMPLE_RATE
+
+            bend = 0.0
+            if glide_time and t < glide_time:
+                bend += glide_semitones * (1.0 - t / glide_time)
+            if vibrato_depth:
+                bend += vibrato_depth * math.sin(TWO_PI * vibrato_rate * t)
+
+            # Phase is ACCUMULATED, not computed from t directly, because the
+            # frequency changes during a glide. sin(2*pi*f*t) is only correct
+            # for a constant f; integrating the instantaneous frequency one
+            # sample at a time is what keeps a bending note in tune with
+            # itself rather than clicking at the seam where the bend ends.
+            freq = target * (2.0 ** (bend / 12.0))
+            phase += TWO_PI * freq / SAMPLE_RATE
+
+            # 3ms rather than chime's 4ms: these are meant to feel more
+            # immediate, especially 8bit's, and 3ms is still soft enough that
+            # it does not click.
+            attack = min(1.0, t / 0.003)
+            envelope = attack * math.exp(-t / decay)
+            buffer[index] += envelope * _osc_sample(waveform, phase, duty, harmonic2)
+
+    _declick_and_normalize(buffer, spec["gain"])
+    return buffer
+
+
+def _declick_and_normalize(buffer, gain):
+    # A ramp out over the last 5ms, for the same reason as each note's ramp
+    # in: the tail is very quiet but it is not zero, and truncating it clicks.
+    tail = int(0.005 * SAMPLE_RATE)
+    count = len(buffer)
+    for index in range(max(0, count - tail), count):
+        buffer[index] *= (count - index) / tail
+
+    # Peak-normalized to the event's own gain, so `gain` is the actual peak
+    # level in the finished file regardless of how many notes or partials
+    # summed into it - the same reason every pack's `alert` ends up loudest
+    # without any pack having to reason about the others.
+    peak = max((abs(value) for value in buffer), default=0.0)
+    if peak > 0:
+        scale = gain / peak
+        for index in range(count):
+            buffer[index] *= scale
+
+
+# ----------------------------------------------------------------------
+# The packs.
+# ----------------------------------------------------------------------
+#
+# "notes" is a list of (start second, note name). "decay" is how many seconds
+# a partial or oscillator takes to fall to 1/e; "length" is the whole file,
+# long enough for the tail to reach silence; "gain" is the event's peak level,
+# 0-1 - the RELATIVE loudness between events, not a volume control: the system
+# volume still applies on top of every pack equally. "what" is shown by
+# `sounds` and `sounds --preview`.
+PACKS = {
+    "chime": {
+        "description": "the default - a struck-glass ping, one timbre, four shapes",
+        "render": render_chime,
+        "partials": CHIME_PARTIALS,
+        "events": {
+            "notify": {
+                "what": "a notification arrived",
+                "notes": [(0.000, "A5")],
+                "decay": 0.14, "length": 0.34, "gain": 0.30, "colour": 0.55,
+            },
+            "alert": {
+                "what": "a dialog is waiting for you",
+                "notes": [(0.000, "C6"), (0.130, "F6")],
+                "decay": 0.16, "length": 0.52, "gain": 0.72, "colour": 1.00,
+            },
+            "complete": {
+                "what": "a long task finished",
+                "notes": [(0.000, "C5"), (0.110, "E5"), (0.220, "G5")],
+                "decay": 0.22, "length": 0.78, "gain": 0.50, "colour": 0.45,
+            },
+            "limit": {
+                "what": "a control is already at its limit",
+                "notes": [(0.000, "A3")],
+                "decay": 0.05, "length": 0.18, "gain": 0.42, "colour": 0.20,
+            },
+        },
+    },
+    "ps2": {
+        "description": "soft rounded blips that land from above their pitch, like a console menu",
+        "render": render_osc,
+        "waveform": "sine",
+        "harmonic2": 0.15,
+        "glide_semitones": 5.0,
+        "glide_time": 0.05,
+        "vibrato_rate": 5.0,
+        "vibrato_depth": 0.12,
+        "events": {
+            "notify": {
+                "what": "a notification arrived",
+                "notes": [(0.000, "E5")],
+                "decay": 0.20, "length": 0.42, "gain": 0.28,
+            },
+            "alert": {
+                "what": "a dialog is waiting for you",
+                "notes": [(0.000, "A5"), (0.150, "D6")],
+                "decay": 0.22, "length": 0.62, "gain": 0.68,
+            },
+            "complete": {
+                "what": "a long task finished",
+                "notes": [(0.000, "D5"), (0.140, "F#5"), (0.280, "A5")],
+                "decay": 0.28, "length": 0.85, "gain": 0.46,
+            },
+            "limit": {
+                # No glide: a landing note has somewhere to land FROM, and a
+                # ceiling is a flat statement rather than an arrival.
+                "what": "a control is already at its limit",
+                "notes": [(0.000, "A3")],
+                "decay": 0.06, "length": 0.20, "gain": 0.34,
+                "glide_semitones": 0.0,
+            },
+        },
+    },
+    "8bit": {
+        "description": "square-wave arcade beeps and a chiptune victory jingle",
+        "render": render_osc,
+        "waveform": "square",
+        "duty": 0.5,
+        "events": {
+            "notify": {
+                "what": "a notification arrived",
+                "notes": [(0.000, "A5")],
+                "decay": 0.05, "length": 0.12, "gain": 0.32,
+            },
+            "alert": {
+                # A coin pickup: a quick big interval, the loudest and
+                # thinnest duty cycle in the pack so it cuts through.
+                "what": "a dialog is waiting for you",
+                "notes": [(0.000, "B5"), (0.045, "E6")],
+                "decay": 0.08, "length": 0.28, "gain": 0.78, "duty": 0.25,
+            },
+            "complete": {
+                # The four-note ascending run every platformer's level-clear
+                # jingle is built from. Triangle rather than square - a real
+                # chip's mellower voice, and this pack's one moment of warmth.
+                "what": "a long task finished",
+                "notes": [
+                    (0.000, "C5"), (0.090, "E5"), (0.180, "G5"), (0.270, "C6"),
+                ],
+                "decay": 0.16, "length": 0.62, "gain": 0.50, "waveform": "triangle",
+            },
+            "limit": {
+                # A two-note descending "denied" - the classic chiptune answer
+                # to a blocked action - on the thinnest duty cycle of all,
+                # which is what makes it read as a buzz rather than a note.
+                "what": "a control is already at its limit",
+                "notes": [(0.000, "G4"), (0.060, "D4")],
+                "decay": 0.05, "length": 0.18, "gain": 0.42, "duty": 0.125,
+            },
+        },
+    },
+}
+
+# Fails loudly rather than resolving to a silently-missing file: a pack with a
+# typo'd event name would otherwise generate three sounds and skip the fourth,
+# and nothing downstream would say which.
+for _name, _pack in PACKS.items():
+    _missing = set(EVENTS) - set(_pack["events"])
+    assert not _missing, "pack %r is missing events: %s" % (_name, _missing)
+
+
+# ----------------------------------------------------------------------
+# Which pack is active.
+# ----------------------------------------------------------------------
+
+def current_pack():
+    try:
+        name = STATE_FILE.read_text().strip()
+    except (FileNotFoundError, OSError):
+        return DEFAULT_PACK
+    # An unknown name - hand-edited, or a pack removed since - falls back
+    # rather than failing, the same way play-sound's own bash copy of this
+    # check does. Both must agree, and checks/session.sh checks that they do.
+    return name if name in PACKS else DEFAULT_PACK
+
+
+def set_current_pack(name):
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    temporary = STATE_FILE.with_name(STATE_FILE.name + ".new")
+    temporary.write_text(name + "\n")
+    temporary.replace(STATE_FILE)
+
+
+# ----------------------------------------------------------------------
+# Generating, resolving, playing.
+# ----------------------------------------------------------------------
 
 def write_wav(path, samples):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -189,8 +395,8 @@ def write_wav(path, samples):
         struct.pack("<h", max(-32768, min(32767, int(value * 32767))))
         for value in samples
     )
-    # Written to a temporary name and moved into place, so a play-sound running
-    # at the same moment sees either the old file or the new one, never a
+    # Written to a temporary name and moved into place, so a play-sound
+    # running at the same moment sees the old file or the new one, never a
     # half-written one.
     temporary = path.with_name(path.name + ".new")
     with wave.open(str(temporary), "wb") as handle:
@@ -202,7 +408,8 @@ def write_wav(path, samples):
 
 
 def override_for(event):
-    """A file of your own for this event, whatever its extension, or None."""
+    """A file of your own for this event, whatever its extension, or None.
+    Pack-independent - it wins over whichever pack is active."""
     if not OVERRIDE.is_dir():
         return None
     for candidate in sorted(OVERRIDE.glob(event + ".*")):
@@ -211,40 +418,101 @@ def override_for(event):
     return None
 
 
-def resolve(event):
-    """Where this event's sound is - yours if you have set one, else generated."""
-    return override_for(event) or (CACHE / (event + ".wav"))
+def resolve(event, pack=None):
+    """Where this event's sound is - yours if you have set one, else the
+    active pack's (or the given pack's)."""
+    return override_for(event) or (CACHE / (pack or current_pack()) / (event + ".wav"))
 
 
-def ensure(events=None, force=False):
-    """Generate what is missing. Returns the events actually written."""
+def ensure(events=None, pack=None, force=False):
+    """Generate what is missing for one pack. Returns the events written."""
+    pack = pack or current_pack()
     made = []
-    for event in events or SOUNDS:
-        path = CACHE / (event + ".wav")
+    for event in events or EVENTS:
+        path = CACHE / pack / (event + ".wav")
         if force or not path.exists():
-            write_wav(path, render(SOUNDS[event]))
+            spec = PACKS[pack]["events"][event]
+            write_wav(path, PACKS[pack]["render"](PACKS[pack], spec))
             made.append(event)
     return made
 
 
-def play(event):
-    path = resolve(event)
+def regenerate_all():
+    """Every event of every pack, unconditionally. What
+    run_onchange_after_generate-sounds.sh.tmpl calls, so that editing a pack
+    you are not currently using does not leave it stale until you happen to
+    switch to it - `--ensure` alone would only ever fix the active one."""
+    result = {}
+    for pack in PACKS:
+        result[pack] = ensure(pack=pack, force=True)
+    return result
+
+
+def play(event, pack=None):
+    path = resolve(event, pack)
     if not path.exists():
-        ensure([event])
+        ensure([event], pack=pack)
     subprocess.run(["pw-play", "--media-role", "Notification", str(path)], check=False)
 
 
-def listing():
-    for event, spec in SOUNDS.items():
+def listing(pack=None):
+    """The pure per-event table `--list` and checks/session.sh depend on: one
+    line per event, the event name first. No pack header here - see main()."""
+    pack = pack or current_pack()
+    for event in EVENTS:
+        spec = PACKS[pack]["events"][event]
         mine = override_for(event)
         where = "yours: %s" % mine if mine else "generated"
         print("  %-9s %-34s %s" % (event, spec["what"], where))
 
 
+def list_packs():
+    current = current_pack()
+    width = max(len(name) for name in PACKS)
+    for name, pack in PACKS.items():
+        marker = "*" if name == current else " "
+        print("%s %-*s   %s" % (marker, width, name, pack["description"]))
+
+
+def pick_pack_with_rofi():
+    width = max(len(name) for name in PACKS)
+    lines = "\n".join(
+        "%-*s   %s" % (width, name, pack["description"]) for name, pack in PACKS.items()
+    )
+    result = subprocess.run(
+        ["rofi", "-dmenu", "-i", "-p", "Sound pack", "-no-custom",
+         "-select", current_pack()],
+        input=lines, capture_output=True, text=True,
+    )
+    chosen = result.stdout.strip()
+    return chosen.split()[0] if chosen else None
+
+
+def switch_pack(name):
+    if name not in PACKS:
+        print(
+            "sounds: no pack called %r. Available: %s" % (name, " ".join(PACKS)),
+            file=sys.stderr,
+        )
+        return 1
+    if name == current_pack():
+        print("Already using %s." % name)
+        return 0
+    print("Switching to %s" % name)
+    set_current_pack(name)
+    ensure(pack=name)
+    return 0
+
+
 def main():
     arguments = sys.argv[1:]
 
-    if not arguments or arguments[0] in ("--list", "-l"):
+    if not arguments:
+        print("pack: %s  (sounds --packs to see the others)" % current_pack())
+        listing()
+        return 0
+
+    if arguments[0] in ("--list", "-l"):
         listing()
         return 0
 
@@ -252,41 +520,70 @@ def main():
         print(__doc__.strip())
         return 0
 
+    if arguments[0] == "--packs":
+        list_packs()
+        return 0
+
+    if arguments[0] == "--current-pack":
+        print(current_pack())
+        return 0
+
+    if arguments[0] == "--pack":
+        if len(arguments) >= 2:
+            return switch_pack(arguments[1])
+        chosen = pick_pack_with_rofi()
+        if not chosen:
+            return 0
+        return switch_pack(chosen)
+
     if arguments[0] == "--ensure":
         ensure()
         return 0
 
     if arguments[0] == "--regenerate":
-        # force, so this also rebuilds an event you have overridden. The
-        # generated file goes back beside your own rather than replacing it,
-        # ready for `sounds set <event> --default`.
-        made = ensure(force=True)
-        print("generated: %s" % " ".join(made))
+        made = regenerate_all()
+        for pack, events in made.items():
+            print("%s: %s" % (pack, " ".join(events)))
         return 0
 
     if arguments[0] == "--path":
-        if len(arguments) < 2 or arguments[1] not in SOUNDS:
-            print("usage: sounds --path <%s>" % "|".join(SOUNDS), file=sys.stderr)
+        if len(arguments) < 2 or arguments[1] not in EVENTS:
+            print("usage: sounds --path <%s>" % "|".join(EVENTS), file=sys.stderr)
             return 2
         print(resolve(arguments[1]))
         return 0
 
     if arguments[0] == "--preview":
-        wanted = arguments[1:] or list(SOUNDS)
+        rest = arguments[1:]
+        pack = None
+        wanted = []
+        index = 0
+        while index < len(rest):
+            if rest[index] == "--pack" and index + 1 < len(rest):
+                pack = rest[index + 1]
+                index += 2
+                continue
+            wanted.append(rest[index])
+            index += 1
+        if pack and pack not in PACKS:
+            print("sounds: no pack called %r" % pack, file=sys.stderr)
+            return 2
+        wanted = wanted or list(EVENTS)
         for event in wanted:
-            if event not in SOUNDS:
+            if event not in EVENTS:
                 print("no such sound: %s" % event, file=sys.stderr)
                 return 2
-        ensure()
+        ensure(pack=pack)
+        print("pack: %s" % (pack or current_pack()))
         for event in wanted:
-            print("  %-9s %s" % (event, SOUNDS[event]["what"]))
-            play(event)
+            print("  %-9s %s" % (event, PACKS[pack or current_pack()]["events"][event]["what"]))
+            play(event, pack)
         return 0
 
     if arguments[0] == "set":
-        if len(arguments) != 3 or arguments[1] not in SOUNDS:
+        if len(arguments) != 3 or arguments[1] not in EVENTS:
             print(
-                "usage: sounds set <%s> <file|--default>" % "|".join(SOUNDS),
+                "usage: sounds set <%s> <file|--default>" % "|".join(EVENTS),
                 file=sys.stderr,
             )
             return 2
@@ -295,9 +592,9 @@ def main():
         if source == "--default":
             if existing:
                 existing.unlink()
-                print("%s: back to the generated sound" % event)
+                print("%s: back to the pack's own sound" % event)
             else:
-                print("%s: already the generated sound" % event)
+                print("%s: already the pack's own sound" % event)
             ensure([event])
             return 0
         origin = pathlib.Path(source).expanduser()
@@ -309,8 +606,8 @@ def main():
         OVERRIDE.mkdir(parents=True, exist_ok=True)
         destination = OVERRIDE / (event + (origin.suffix or ".wav"))
         # Copied rather than linked. The point of an override is that it keeps
-        # working; a symlink into ~/Downloads stops making a sound the day that
-        # file is tidied away, and nothing would say so.
+        # working; a symlink into ~/Downloads stops making a sound the day
+        # that file is tidied away, and nothing would say so.
         shutil.copyfile(origin, destination)
         print("%s: now %s" % (event, destination))
         return 0
