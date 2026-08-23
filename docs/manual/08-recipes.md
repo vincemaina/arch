@@ -409,3 +409,53 @@ dotfile. Which theme a fresh install boots with is whatever `theme` is set to
 in the tracked `themes.toml` — a machine's own selection in
 `chezmoi.toml` is local to that machine and never installed by `install.sh`,
 which has no user config to read yet.
+
+## 9. Build (or rebuild) the base VM image
+
+`~/.local/bin/vm` (see [Applications](04-applications.md) → "Virtual
+machines") clones every new machine from one base image, and that image is
+built by `tools/build-vm-image.sh` — not downloaded, not shipped with the
+repository.
+
+```bash
+sudo ./tools/build-vm-image.sh
+```
+
+Run this yourself, at a real terminal — not through a script that pipes
+answers into it. Partway through it asks for a root password and a user
+password, the exact same `passwd` prompts a fresh install makes. That is
+deliberate — see `DECISIONS.md` → "Passwords" — and this builder does not
+weaken it; it drives the real, unmodified installer stages, so the same
+interactive prompt is what you get.
+
+What it actually does is run every stage under `setup/install/` in order — the
+same numbered scripts `install.sh` runs, completely unmodified — against a scratch
+qcow2 attached over `nbd`, so the base image genuinely is a fresh install
+built by this repository's own installer, not an approximation of one. It
+cannot simply call `install.sh` itself: that script ends by powering off the
+machine it ran on, correct on the live ISO `install.sh` expects and wrong on
+a running desktop, and stage 3's `bootctl install` would — unmitigated — write
+real UEFI boot entries onto the host's firmware rather than the scratch
+disk's, since `arch-chroot` mounts a live view of the kernel's EFI state
+inside the chroot regardless of which disk you meant. The builder neutralises
+this by shadowing that one path with an empty `tmpfs` for the duration of
+stage 3 only; nothing about stages 1, 2, 4 or 5 needs it.
+
+Verify:
+
+```bash
+vm list                 # shows base.qcow2 and its size
+ls -l ~/.local/share/vm/base.qcow2   # mode should have no w bits: it is read-only
+vm new probe && vm run probe         # clone it and confirm it boots
+```
+
+**Rebuilding an existing base image is refused while any machine still clones
+from it** — `vm rm` them first, or pass `--output` for a different path. Every
+overlay names the base by absolute path as its backing file; replacing the
+file at that path with different content is the same corruption as writing to
+it directly, just reached by substitution instead.
+
+Reaches: **neither**, directly — this is a one-time (or occasional) local
+build step, not something `sync.sh` or a fresh install does on your behalf.
+What it produces, `~/.local/share/vm/base.qcow2`, is what every future `vm
+new` reaches for.

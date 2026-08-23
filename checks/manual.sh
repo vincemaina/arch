@@ -173,10 +173,13 @@ if ignore_file.exists():
 # anything, with nodatacow set on it before any disk image lands inside - which
 # is the whole reason the directory is created deliberately rather than by a
 # stray mkdir -p. A machine where nobody has made a virtual machine yet is not
-# a machine with a broken manual.
+# a machine with a broken manual. base.qcow2 specifically only exists once
+# tools/build-vm-image.sh has been run by hand - it is never shipped, and
+# checks/session.sh's image ban means it never could be.
 created_on_demand = {"~/Pictures/wallpapers",
                      "~/.config/focus-music/stations.local",
-                     "~/.local/share/vm"}
+                     "~/.local/share/vm",
+                     "~/.local/share/vm/base.qcow2"}
 ignored |= created_on_demand
 
 missing = []

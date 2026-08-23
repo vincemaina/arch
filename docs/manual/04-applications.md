@@ -298,6 +298,15 @@ Machines that are not this setup work too:
 vm new debian --blank 20G --iso ~/Downloads/debian.iso
 ```
 
+**Where the base image comes from.** It is not downloaded or shipped with the
+repository — nothing image-shaped is tracked here, the same rule wallpapers
+follow. `tools/build-vm-image.sh` builds it, on the machine, using this
+repository's own installer against a scratch disk attached over `nbd`, rather
+than an ISO. It asks for a root password and a user password partway through —
+the same prompts a fresh install makes — so it needs a real terminal to run in,
+not a script driving it. See
+[Recipes](08-recipes.md) → "Build (or rebuild) the base VM image" for how.
+
 That gives a machine with an empty disk and the installer attached. Clear the
 `ISO` line in its `vm.conf` once it is installed, or it boots the installer
 again every time.
