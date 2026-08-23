@@ -108,6 +108,87 @@ alias q='exit'
 # carrying their own, so they follow the selected theme for free.
 export BAT_THEME=ansi
 
+### The bell, after a long command
+#
+# TASK-85: "when a terminal has finished executing some long task e.g. claude
+# response, or long curl command".
+#
+# All this does is print \a. Everything else already existed and is worth
+# knowing about before changing any of it, because the chain is four pieces
+# long and each one is somewhere else:
+#
+#   zsh    rings the bell here, if the command took long enough
+#   foot   [bell] visual=yes flashes the window, and notify=yes raises a
+#          desktop notification - but ONLY when the window is unfocused, which
+#          is the behaviour that makes this worth having at all
+#   mako   receives it as a notification with app-name `foot`
+#   mako   [app-name=foot] on-notify runs play-sound complete
+#
+# So a build finishing on another workspace makes a noise, and one finishing in
+# front of you flashes instead. Neither needed new plumbing; the whole
+# integration is this hook and one criteria block in mako's config.
+#
+# WHY A TIME THRESHOLD RATHER THAN EVERY COMMAND
+#
+# Because a bell on `ls` is a machine nobody can work next to. Twenty seconds
+# is long enough that you have almost certainly looked away and short enough to
+# catch a slow curl. Override it per-machine in ~/.config/zsh/local.zsh.
+: ${LONG_COMMAND_SECONDS:=20}
+
+# Programs that are long by their nature. These are not slow tasks finishing,
+# they are you closing an editor, and a bell for each would train you to ignore
+# every bell.
+#
+# `claude` is in this list deliberately, and it is the one entry that looks
+# wrong given the ticket asked for it by name. zsh cannot see a response: from
+# out here a Claude Code session is one command that runs for an hour, so the
+# only thing this hook could ring for is quitting it. Claude Code has its own
+# notification setting for the per-response case, and pointing it at the
+# terminal bell puts it back on exactly the chain above.
+typeset -ga LONG_COMMAND_IGNORE=(
+    nvim vim nano less more man btop htop top yazi ssh mosh watch tail
+    claude lazygit git-ui fzf ya bluetoothctl nmtui zsh bash sudoedit
+)
+
+autoload -Uz add-zsh-hook
+
+_long_command_begin() {
+    _long_command_at=$SECONDS
+
+    # (z) splits the line the way the shell would, so the first word is the
+    # command rather than the first thing before a space - and :t drops any
+    # leading path, so /usr/bin/nvim matches nvim.
+    #
+    # THE ARRAY IS NOT OPTIONAL. This was `${${${(z)1}[1]}:t}` and it was wrong
+    # in a way that returned an answer rather than an error: when the inner
+    # expansion yields a SINGLE word, zsh treats it as a scalar and [1]
+    # subscripts a character instead of an element. So `make -j8 all` gave
+    # `make` and a bare `claude` gave `c` - which matches nothing in the list
+    # below, so every ignored program that is run with no arguments quietly
+    # rang the bell anyway. Assigning to a declared array forces the array
+    # reading in both cases.
+    local -a words
+    words=(${(z)1})
+    _long_command_name=${words[1]:t}
+}
+
+_long_command_end() {
+    # Unset on the very first prompt of a shell, when nothing has run yet.
+    [[ -n ${_long_command_at:-} ]] || return 0
+
+    local elapsed=$(( SECONDS - _long_command_at ))
+    local name=$_long_command_name
+    unset _long_command_at _long_command_name
+
+    (( elapsed >= LONG_COMMAND_SECONDS )) || return 0
+    (( ${LONG_COMMAND_IGNORE[(I)$name]} )) && return 0
+
+    print -n '\a'
+}
+
+add-zsh-hook preexec _long_command_begin
+add-zsh-hook precmd _long_command_end
+
 ### Syntax highlighting
 #
 # Must be sourced last: it wraps the line editor and needs to see every other

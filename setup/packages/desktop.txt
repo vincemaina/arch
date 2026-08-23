@@ -47,6 +47,22 @@ polkit
 pipewire
 pipewire-pulse
 wireplumber
+
+# pw-play, which is what makes the desktop's sounds audible - see
+# ~/.local/bin/play-sound and TASK-85.
+#
+# DECLARED RATHER THAN INHERITED, for the same reason as polkit and mesa
+# further down. pipewire-audio arrives anyway as a dependency of the
+# pipewire-pulse directly above, and pacman therefore had it marked "installed
+# as a dependency" - which is precisely the state CLAUDE.md warns about, where
+# removing whatever pulled it in takes it too and nothing says so. Four session
+# sounds and every notification depend on this binary now, so a change in
+# pipewire's dependency graph should not be able to silence the desktop
+# quietly.
+#
+# It is 6.79 MiB and it was already installed on every machine here, so this
+# costs nothing but the declaration.
+pipewire-audio
 xdg-desktop-portal
 xdg-desktop-portal-wlr
 

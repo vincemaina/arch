@@ -34,6 +34,32 @@ max-visible=5
 
 format=<b>%s</b>\n%b
 
+# A notification makes a sound. TASK-85 and TASK-143.
+#
+# mako runs `exec` in a POSIX shell, so this is the one hook the notification
+# daemon offers and it is enough for everything asked for: urgency already
+# distinguishes "something happened" from "something is wrong", and it is the
+# criteria below that pick the sound rather than any logic in the player.
+#
+# ABSOLUTE PATH, AND THIS FILE IS A TEMPLATE PARTLY FOR THIS REASON.
+# mako.service is a systemd user unit, so its PATH is /usr/bin and friends -
+# ~/.local/bin is put on PATH by .zshrc, which applies to interactive shells
+# and nothing else. `play-sound` by bare name would silently never run, which
+# is the exact failure waybar's config.jsonc.tmpl carries the same warning for.
+#
+# WHAT IS NOT HERE: the sound-name hint.
+#
+# The freedesktop notification spec lets an application ask for a specific
+# sound by name, and foot already sends it - its default notify command passes
+# --hint STRING:sound-name and --hint BOOLEAN:suppress-sound. Honouring that
+# would be the better design, and mako cannot: `makoctl list -j` returns id,
+# app_name, app_icon, category, desktop_entry, summary, body, urgency and
+# actions, and hints are not among them, nor are they available as criteria.
+# Measured, not assumed. Reading hints would mean eavesdropping on the bus with
+# a second daemon, which is a lot of moving parts to choose between four
+# sounds. Urgency and app-name do the job.
+on-notify=exec {{ .chezmoi.homeDir }}/.local/bin/play-sound notify
+
 # NO MACHINE-LOCAL INCLUDE HERE, AND THAT IS DELIBERATE.
 #
 # Every other escape hatch in this setup is safe when its file is missing:
@@ -57,18 +83,52 @@ format=<b>%s</b>\n%b
 
 
 # Quieter than normal: present, but not asking for anything.
+#
+# And silent, which is the same statement made twice. A low-urgency
+# notification is one the sender said you need not act on; making a noise about
+# it is the definition of a desktop that cries wolf.
 [urgency=low]
 border-color={{ $palette.muted }}
 text-color={{ $palette.text_dim }}
+on-notify=none
 
 # Something is wrong, so it uses the palette's urgent colour and does not
 # disappear on its own - dismissing it has to be deliberate.
+#
+# It gets the alert sound rather than the notification one for the same reason:
+# critical means something is waiting on you, which is exactly what that sound
+# is for. It is the same sound the polkit dialog makes.
 [urgency=critical]
 border-color={{ $palette.urgent }}
 default-timeout=0
+on-notify=exec {{ .chezmoi.homeDir }}/.local/bin/play-sound alert
+
+# A terminal that has finished something. TASK-85.
+#
+# foot turns the terminal bell into a desktop notification, and only when the
+# window is unfocused - see the [bell] section of foot.ini.tmpl, and the
+# preexec/precmd hooks in .zshrc that ring it after a long command. So a build
+# finishing on another workspace arrives here as an ordinary notification with
+# app-name `foot`, and gets its own sound.
+#
+# This is why the "long task finished" sound needed no new plumbing at all: the
+# bell, the notification and the focus rule already existed, and this line is
+# the whole of the integration.
+#
+# It matches `foot` and not the other app-ids this desktop launches foot under -
+# monitor, network-tui, calendar - because those are TUI popups rather than
+# things you walk away from.
+[app-name=foot]
+on-notify=exec {{ .chezmoi.homeDir }}/.local/bin/play-sound complete
 
 # Do not disturb. Notifications are still received and still land in the
 # history, they are just not drawn - so nothing is lost by turning this on.
 # Toggled from the notification centre, or with: makoctl mode -t dnd
+#
+# There is deliberately no `on-notify=none` here, and it is not an omission.
+# ~/.local/bin/play-sound checks the mode itself and exits, so do not disturb
+# also silences the two sounds that never pass through mako at all - the polkit
+# dialog and the volume ceiling. Silencing it in both places would work and
+# would mean the rule lived in two files that could drift apart.
 [mode=dnd]
 invisible=1

@@ -3214,6 +3214,134 @@ it: mpv's `-play` suffix means "start playback if nothing is playing", not
 next". Playing something now is an insert followed by an explicit skip. This
 was found by testing the behaviour rather than reading the flag name.
 
+## The desktop's sounds are generated, not shipped
+
+Four sounds — `notify`, `alert`, `complete`, `limit` — are computed on the
+machine from a table of frequencies, envelopes and levels in
+`~/.local/bin/sounds`, cached in `~/.local/share/sounds/`, and played by
+`~/.local/bin/play-sound` through `pw-play`. Nothing audio-shaped is tracked in
+this repository, and `checks/session.sh` fails if anything ever is.
+
+### Why
+
+The same argument the wallpapers already settled, for the same reason: audio is
+binary, it cannot be diffed or reviewed, and a git repository keeps every
+revision of it forever. A set of four sounds is small; a set of four sounds that
+somebody re-records twice is not, and the cost arrives silently.
+
+The second reason is the one that actually decided it. What was asked for was a
+*subtle* sound for a notification and a *prominent* one for a dialog — which is
+a statement about the relationship between two sounds, not about either one.
+Generating them makes that relationship something the table states outright: one
+timbre, and the meaning carried by how many notes there are and how low they
+sit. Count and register do the work, so only `alert` needs to be loud.
+
+`sound-theme-freedesktop` was the alternative and is genuinely already on this
+machine — but only as a transitive dependency of `pavucontrol`, which is exactly
+the "installed as a dependency" trap this repository has been bitten by before.
+Using it would have meant declaring it anyway, and would still have left the
+sounds fixed: that set was designed for GNOME around 2008 and its members have
+no particular relationship to each other.
+
+### Trade-off
+
+Nobody can hear a sound by reading the diff. A change to the table has to be
+listened to, which `sounds --preview` exists for. Against that, a colour in this
+repository has exactly the same property and is handled the same way.
+
+The generator is about 350 lines of standard-library Python to avoid roughly
+100 KiB of audio, which is a poor trade measured in bytes and a good one
+measured in what a future change costs. `sounds set <event> <file>` takes a file
+of your own for any event, so nobody is stuck with the generated ones.
+
+### Alternatives considered
+
+**Honour the freedesktop `sound-name` hint.** This would be the better design
+and mako cannot do it. foot already *sends* the hint — its default notification
+command passes `--hint STRING:sound-name` and `--hint BOOLEAN:suppress-sound` —
+but `makoctl list -j` returns id, app name, icon, category, desktop entry,
+summary, body, urgency and actions, and hints are among neither those nor the
+criteria fields. Measured, not assumed. Reading them would mean a second daemon
+eavesdropping on the session bus to choose between four sounds. Urgency and
+app-name do the job.
+
+**A daemon subscribed to sway's window events**, to catch the password prompt.
+Unnecessary: `for_window [criteria] exec` fires on the window appearing, which
+was verified rather than assumed. That is one line of configuration instead of a
+fifth supervised session component.
+
+**A sound on every notification, including low urgency.** Low urgency is the
+sender saying you need not act on this. Making a noise about it is the
+definition of a desktop that cries wolf, so `[urgency=low]` is explicitly
+silent.
+
+**A separate volume for system sounds.** Asked about in the ticket, and not
+done. Each sound has a fixed level baked into the file, relative to the others;
+the system volume moves all four. One slider is what a person expects, and a
+second one is a setting to discover, remember and keep in step.
+
+**Leaving do-not-disturb to mako.** mako's `[mode=dnd]` block could silence
+notification sounds, but two of the three callers are not mako — the password
+prompt and the volume ceiling — and they would have gone on pinging. The check
+lives in `play-sound` instead, so one rule covers all of them and cannot drift
+between two files.
+
+## Volume and brightness keys go through a helper that knows their limits
+
+`XF86AudioRaiseVolume` and friends called `wpctl` and `brightnessctl` directly.
+They now call `~/.local/bin/volume` and `~/.local/bin/brightness`, which read
+the current level before stepping it.
+
+### Why
+
+The clamp at 100% was already there and is load-bearing — see *Volume has a
+ceiling* — but a clamp that works says nothing. Holding the key at maximum is
+indistinguishable from holding it while audio is routed elsewhere, or while the
+keyboard has stopped responding: the reading does not move and nothing explains
+why. A step that would change nothing now plays `limit` instead.
+
+Brightness got the same treatment though only volume was asked for. A brightness
+key that goes quiet at the top while the volume key answers reads as a bug in
+one of them rather than a decision about either.
+
+### Trade-off
+
+Two more helper scripts, and a keypress that now starts a shell rather than
+going straight to `wpctl`. Measured at about 11 ms, against a key held down at
+five steps a second, which is comfortable.
+
+`volume up` still runs the `wpctl` call even when it reports the limit, because
+`-l 1.0` is also what walks an already-over-loud machine back *down* to 100%.
+Skipping it would have left such a machine stuck, with a sound and no
+correction.
+
+## A long command rings the terminal bell
+
+`.zshrc` rings the bell after any command that took more than twenty seconds,
+excluding programs that are long by nature.
+
+### Why
+
+Because the rest of the chain already existed and nobody had connected it. foot
+turns a bell into a desktop notification and does it *only when the window is
+unfocused*, which is precisely the condition under which you want to be told.
+mako then sounds it. The whole integration is one shell hook and one criteria
+block; nothing new is supervised, and the focus logic — the hard part — is
+foot's.
+
+### Trade-off
+
+A time threshold is a guess. Twenty seconds is long enough that you have
+probably looked away and short enough to catch a slow request;
+`LONG_COMMAND_SECONDS` in `~/.config/zsh/local.zsh` overrides it per machine.
+
+The ignore list is the part that will need maintaining, and `claude` is on it —
+which looks wrong, since a Claude Code response is what prompted the request. It
+is correct: from the shell's side a session is one command that runs for an
+hour, so the only thing this hook could ring for is quitting it. Claude Code has
+its own notification setting for the per-response case, and pointing that at the
+terminal bell puts it back on this same chain.
+
 ---
 
 ## Virtual machines with qemu alone, and clones that cost nothing

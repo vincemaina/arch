@@ -233,6 +233,36 @@ Scripts in this repository run under `#!/usr/bin/env bash`, where splitting does
 happen — so this only bites in ad-hoc commands, which is exactly where it is
 least expected.
 
+## A nested `${${(z)line}[1]}` subscripts a character, not a word
+
+**Symptom.** Taking the first word of a command line works for
+`make -j8 all` and returns `make`, and returns `c` for a bare `claude`. Nothing
+errors. In `.zshrc` this meant every program on an ignore list quietly failed to
+be ignored whenever it was run with no arguments — the list matched `nvim
+notes.md` and missed `nvim`.
+
+**Cause.** In a nested parameter expansion, zsh decides whether the inner result
+is an array or a scalar by looking at how many elements it has. `${(z)1}` on a
+multi-word line yields several elements, so `[1]` is an *array* subscript and
+gives the first word. On a single-word line it yields one element, which
+collapses to a scalar — and `[1]` on a scalar is a *character* subscript.
+
+So the same expression means two different things depending on the data, and the
+wrong one is a plausible-looking single letter rather than an error.
+
+**Fix.** Assign to a declared array first. That forces the array reading in both
+cases:
+
+```zsh
+local -a words
+words=(${(z)1})
+first=${words[1]:t}
+```
+
+Test any such expression against a **single-word** input specifically. A test
+suite of realistic multi-word command lines passes completely and proves
+nothing, which is how this survived being written.
+
 ## `HOME=` is not enough to fake a home directory
 
 **Symptom.** A test of whether a config file takes effect appears to prove it

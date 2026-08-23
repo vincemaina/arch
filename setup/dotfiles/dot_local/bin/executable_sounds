@@ -1,0 +1,324 @@
+#!/usr/bin/env python3
+# requires: python3 pw-play
+
+"""The desktop's sounds: what they are, and where they come from.
+
+    sounds                    list them, and say which are yours
+    sounds --preview          play each one in turn, named
+    sounds --preview notify   play just that one
+    sounds --ensure           generate any that are missing
+    sounds --regenerate       generate them all again
+    sounds --path notify      where that sound is, generated or yours
+    sounds set notify a.wav   use a file of your own for that event
+    sounds set notify --default   go back to the generated one
+
+Playing a sound is ~/.local/bin/play-sound, not this. This is the thing that
+decides what the sounds ARE; that is the thing mako, sway and zsh call, and it
+is deliberately a shell script so that a notification does not start a Python
+interpreter to make a noise.
+
+WHY THESE ARE GENERATED AND NOT SHIPPED
+
+The same reason the wallpapers are - see ~/.local/bin/wallpaper, which this
+follows deliberately. Audio is binary, and binary in a git repository is a cost
+that only ever goes up: it cannot be diffed, cannot be reviewed, and every
+revision keeps the old copy forever. checks/session.sh already fails if anything
+image-shaped appears in setup/dotfiles/, and sound is the same class of thing.
+
+There is a second reason, and it is the one that actually decided it. Arch has
+sound-theme-freedesktop, and it is already on this machine - but only as a
+transitive dependency of pavucontrol, which is exactly the "installed as a
+dependency" trap CLAUDE.md spends a section on. Using its files would mean
+declaring it explicitly, and would still leave the sounds themselves fixed: that
+set was designed for GNOME around 2008, and its members have no particular
+relationship to each other. What was asked for was a subtle sound and a
+prominent one that clearly belong together, which is a statement about the
+INTERVAL between two sounds rather than about either one.
+
+Generating them makes that relationship something the table below states
+outright, and costs nothing per sound.
+
+WHAT THEY SOUND LIKE, AND WHY
+
+One timbre, four shapes. The timbre is a struck-glass ping: a fundamental with
+two harmonics and one deliberately inharmonic partial for a little shimmer, each
+decaying faster the higher it is - which is what real struck objects do, and
+what stops an additive tone sounding like a test signal.
+
+The shapes carry the meaning, and they are meant to be told apart with your back
+to the screen:
+
+    notify    one note, high, quiet           something happened
+    alert     two notes rising, bright, loud   something is WAITING for you
+    complete  three notes rising, warm, mid    something finished
+    limit     one note, low, blunt, short      that control has no more to give
+
+Count and register do the work, so none of them needs to be loud to be legible.
+alert is the only one that is, and that is the point of it: a dialog is a
+process blocked on you, and it should interrupt.
+
+Pitches are equal-tempered and the intervals are consonant, so two arriving
+close together do not clash.
+"""
+
+import math
+import pathlib
+import shutil
+import struct
+import subprocess
+import sys
+import wave
+
+SAMPLE_RATE = 48000
+
+# ~/.local/share/sounds holds GENERATED audio. It is disposable: delete it and
+# the next play-sound builds it again. ~/.config/sounds holds YOURS, and is
+# never written by the generator - which is the whole reason they are two
+# directories rather than one flag.
+CACHE = pathlib.Path.home() / ".local" / "share" / "sounds"
+OVERRIDE = pathlib.Path.home() / ".config" / "sounds"
+
+# The struck-glass timbre. (ratio, amplitude); ratio 1.0 is the note itself.
+#
+# 4.73 is not a harmonic and is not a mistake - it is the partial that keeps
+# this from sounding like a sine generator. Small enough not to be heard as a
+# second note, large enough to give the attack an edge.
+PARTIALS = [(1.0, 1.00), (2.0, 0.28), (3.0, 0.11), (4.73, 0.06)]
+
+# Equal temperament, A4 = 440.
+NOTES = {
+    "A3": 220.00,
+    "C5": 523.25,
+    "E5": 659.25,
+    "G5": 783.99,
+    "A5": 880.00,
+    "C6": 1046.50,
+    "F6": 1396.91,
+}
+
+# The four events.
+#
+#   notes    (start second, note name) - the shape
+#   decay    seconds for a partial to fall to 1/e; higher partials are quicker
+#   length   total file, long enough for the tail to reach silence
+#   gain     peak amplitude, 0-1. This is the RELATIVE loudness of the events
+#            and the only place it is decided. It is not a volume control:
+#            the system volume still applies on top, which is what was asked
+#            for - one slider for everything.
+#   colour   how much of the upper partials to keep, 0-1. Lower is warmer.
+SOUNDS = {
+    "notify": {
+        "what": "a notification arrived",
+        "notes": [(0.000, "A5")],
+        "decay": 0.14,
+        "length": 0.34,
+        "gain": 0.30,
+        "colour": 0.55,
+    },
+    "alert": {
+        "what": "a dialog is waiting for you",
+        "notes": [(0.000, "C6"), (0.130, "F6")],
+        "decay": 0.16,
+        "length": 0.52,
+        "gain": 0.72,
+        "colour": 1.00,
+    },
+    "complete": {
+        "what": "a long task finished",
+        "notes": [(0.000, "C5"), (0.110, "E5"), (0.220, "G5")],
+        "decay": 0.22,
+        "length": 0.78,
+        "gain": 0.50,
+        "colour": 0.45,
+    },
+    "limit": {
+        "what": "a control is already at its limit",
+        "notes": [(0.000, "A3")],
+        "decay": 0.05,
+        "length": 0.18,
+        "gain": 0.42,
+        "colour": 0.20,
+    },
+}
+
+
+def render(spec):
+    """One event, as a list of floats between -1 and 1."""
+    count = int(SAMPLE_RATE * spec["length"])
+    buffer = [0.0] * count
+
+    for start, name in spec["notes"]:
+        frequency = NOTES[name]
+        first = int(start * SAMPLE_RATE)
+        for ratio, amplitude in PARTIALS:
+            # Upper partials are quieter in a warm sound and die away sooner in
+            # every sound. Both are what makes this read as "struck" rather
+            # than "generated".
+            level = amplitude * (spec["colour"] ** (ratio - 1.0))
+            if level < 0.001:
+                continue
+            decay = spec["decay"] / (1.0 + 0.6 * (ratio - 1.0))
+            step = 2.0 * math.pi * frequency * ratio / SAMPLE_RATE
+            for index in range(first, count):
+                offset = index - first
+                t = offset / SAMPLE_RATE
+                # A 4ms ramp in. Without it the waveform starts at full height
+                # and the speaker is asked for a step change, which is heard as
+                # a click in front of the note.
+                attack = min(1.0, t / 0.004)
+                buffer[index] += (
+                    level * attack * math.exp(-t / decay) * math.sin(step * offset)
+                )
+
+    # A ramp out over the last 5ms, for the same reason as the ramp in: the
+    # tail is very quiet but it is not zero, and truncating it clicks too.
+    tail = int(0.005 * SAMPLE_RATE)
+    for index in range(count - tail, count):
+        buffer[index] *= (count - index) / tail
+
+    peak = max((abs(value) for value in buffer), default=0.0)
+    if peak > 0:
+        scale = spec["gain"] / peak
+        buffer = [value * scale for value in buffer]
+    return buffer
+
+
+def write_wav(path, samples):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frames = b"".join(
+        struct.pack("<h", max(-32768, min(32767, int(value * 32767))))
+        for value in samples
+    )
+    # Written to a temporary name and moved into place, so a play-sound running
+    # at the same moment sees either the old file or the new one, never a
+    # half-written one.
+    temporary = path.with_name(path.name + ".new")
+    with wave.open(str(temporary), "wb") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(SAMPLE_RATE)
+        handle.writeframes(frames)
+    temporary.replace(path)
+
+
+def override_for(event):
+    """A file of your own for this event, whatever its extension, or None."""
+    if not OVERRIDE.is_dir():
+        return None
+    for candidate in sorted(OVERRIDE.glob(event + ".*")):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def resolve(event):
+    """Where this event's sound is - yours if you have set one, else generated."""
+    return override_for(event) or (CACHE / (event + ".wav"))
+
+
+def ensure(events=None, force=False):
+    """Generate what is missing. Returns the events actually written."""
+    made = []
+    for event in events or SOUNDS:
+        path = CACHE / (event + ".wav")
+        if force or not path.exists():
+            write_wav(path, render(SOUNDS[event]))
+            made.append(event)
+    return made
+
+
+def play(event):
+    path = resolve(event)
+    if not path.exists():
+        ensure([event])
+    subprocess.run(["pw-play", "--media-role", "Notification", str(path)], check=False)
+
+
+def listing():
+    for event, spec in SOUNDS.items():
+        mine = override_for(event)
+        where = "yours: %s" % mine if mine else "generated"
+        print("  %-9s %-34s %s" % (event, spec["what"], where))
+
+
+def main():
+    arguments = sys.argv[1:]
+
+    if not arguments or arguments[0] in ("--list", "-l"):
+        listing()
+        return 0
+
+    if arguments[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+
+    if arguments[0] == "--ensure":
+        ensure()
+        return 0
+
+    if arguments[0] == "--regenerate":
+        # force, so this also rebuilds an event you have overridden. The
+        # generated file goes back beside your own rather than replacing it,
+        # ready for `sounds set <event> --default`.
+        made = ensure(force=True)
+        print("generated: %s" % " ".join(made))
+        return 0
+
+    if arguments[0] == "--path":
+        if len(arguments) < 2 or arguments[1] not in SOUNDS:
+            print("usage: sounds --path <%s>" % "|".join(SOUNDS), file=sys.stderr)
+            return 2
+        print(resolve(arguments[1]))
+        return 0
+
+    if arguments[0] == "--preview":
+        wanted = arguments[1:] or list(SOUNDS)
+        for event in wanted:
+            if event not in SOUNDS:
+                print("no such sound: %s" % event, file=sys.stderr)
+                return 2
+        ensure()
+        for event in wanted:
+            print("  %-9s %s" % (event, SOUNDS[event]["what"]))
+            play(event)
+        return 0
+
+    if arguments[0] == "set":
+        if len(arguments) != 3 or arguments[1] not in SOUNDS:
+            print(
+                "usage: sounds set <%s> <file|--default>" % "|".join(SOUNDS),
+                file=sys.stderr,
+            )
+            return 2
+        event, source = arguments[1], arguments[2]
+        existing = override_for(event)
+        if source == "--default":
+            if existing:
+                existing.unlink()
+                print("%s: back to the generated sound" % event)
+            else:
+                print("%s: already the generated sound" % event)
+            ensure([event])
+            return 0
+        origin = pathlib.Path(source).expanduser()
+        if not origin.is_file():
+            print("no such file: %s" % origin, file=sys.stderr)
+            return 1
+        if existing:
+            existing.unlink()
+        OVERRIDE.mkdir(parents=True, exist_ok=True)
+        destination = OVERRIDE / (event + (origin.suffix or ".wav"))
+        # Copied rather than linked. The point of an override is that it keeps
+        # working; a symlink into ~/Downloads stops making a sound the day that
+        # file is tidied away, and nothing would say so.
+        shutil.copyfile(origin, destination)
+        print("%s: now %s" % (event, destination))
+        return 0
+
+    print("unknown argument: %s" % arguments[0], file=sys.stderr)
+    print(__doc__.strip(), file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

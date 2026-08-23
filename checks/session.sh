@@ -1435,6 +1435,144 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Sounds (TASK-85, TASK-143)"
+
+SOUNDS_BIN="$HOME/.local/bin/sounds"
+PLAY_BIN="$HOME/.local/bin/play-sound"
+
+for tool in "$SOUNDS_BIN" "$PLAY_BIN"; do
+    if [[ -x "$tool" ]]; then
+        pass "$(basename "$tool") ships and is executable"
+    else
+        fail "$(basename "$tool") is missing or not executable, so the desktop is silent"
+    fi
+done
+
+# Nothing audio-shaped is tracked, for the same reason no wallpaper is: audio
+# is binary, it cannot be diffed or reviewed, and every revision keeps the old
+# copy forever. The sounds are computed from a table in the generator.
+mapfile -t TRACKED_AUDIO < <(
+    find "$CHECKS_REPO/setup/dotfiles" -type f \
+        \( -iname '*.wav' -o -iname '*.ogg' -o -iname '*.oga' \
+           -o -iname '*.mp3' -o -iname '*.flac' -o -iname '*.opus' \) \
+        -printf '%f\n' 2>/dev/null
+)
+if (( ${#TRACKED_AUDIO[@]} > 0 )); then
+    fail "${#TRACKED_AUDIO[@]} audio file(s) are tracked in setup/dotfiles/ (${TRACKED_AUDIO[*]:0:3}) - the sounds are generated, and committing them is the mistake the wallpapers already made once"
+else
+    pass "no audio is tracked; a new sound costs no bytes"
+fi
+
+# THE COUPLING THAT WOULD BREAK SILENTLY.
+#
+# play-sound validates its argument against a list, and the generator holds a
+# separate table of what it can produce. An event in one and not the other is
+# invisible: a caller asking for it either gets "no such sound" on stderr that
+# nothing reads, or a file that is never generated. Neither says anything at
+# the point it matters, which is the shape of every bug this repository finds.
+if [[ -x "$SOUNDS_BIN" && -x "$PLAY_BIN" ]]; then
+    GENERATED="$("$SOUNDS_BIN" --list 2>/dev/null | awk '{print $1}' | sort -u)"
+    ACCEPTED="$(grep -oE '^ *[a-z|]+\)' "$PLAY_BIN" | head -n1 | tr -d ' )' | tr '|' '\n' | sort -u)"
+    if [[ -z "$GENERATED" || -z "$ACCEPTED" ]]; then
+        fail "could not read the event list from one of them; the two lists cannot be compared"
+    elif [[ "$GENERATED" == "$ACCEPTED" ]]; then
+        pass "play-sound and the generator agree on the events: $(tr '\n' ' ' <<<"$GENERATED")"
+    else
+        fail "play-sound accepts [$(tr '\n' ' ' <<<"$ACCEPTED")] but the generator makes [$(tr '\n' ' ' <<<"$GENERATED")]"
+    fi
+
+    # Every event must resolve to a file that exists. --ensure is cheap and
+    # idempotent, and the whole cache is disposable by design - so generating a
+    # missing one here is the same thing the first play would do.
+    "$SOUNDS_BIN" --ensure >/dev/null 2>&1
+    missing=""
+    while read -r event; do
+        [[ -n "$event" ]] || continue
+        path="$("$SOUNDS_BIN" --path "$event" 2>/dev/null)"
+        [[ -s "$path" ]] || missing+=" $event"
+    done <<<"$GENERATED"
+    if [[ -n "$missing" ]]; then
+        fail "no audio file for:$missing - run 'sounds --regenerate'"
+    else
+        pass "every event resolves to a file that exists"
+    fi
+fi
+
+# mako runs as a systemd user service, so ~/.local/bin is not on its PATH -
+# .zshrc puts it there and applies to interactive shells only. A bare
+# `play-sound` here would silently never run, which is exactly the failure the
+# bar's click commands carry the same warning about.
+MAKO_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/mako/config"
+if [[ ! -r "$MAKO_CONF" ]]; then
+    skip "no mako config to read"
+else
+    mapfile -t EXEC_LINES < <(grep -E '^on-notify=exec ' "$MAKO_CONF" || true)
+    if (( ${#EXEC_LINES[@]} == 0 )); then
+        fail "mako's config has no on-notify=exec, so a notification makes no sound"
+    else
+        bad=0
+        for line in "${EXEC_LINES[@]}"; do
+            cmd="$(sed -E 's/^on-notify=exec[[:space:]]+//' <<<"$line" | awk '{print $1}')"
+            if [[ "$cmd" != /* ]]; then
+                fail "mako calls '$cmd' by a relative path; its PATH has no ~/.local/bin and this will never run"
+                bad=1
+            elif [[ ! -x "$cmd" ]]; then
+                fail "mako calls '$cmd', which is not executable"
+                bad=1
+            fi
+        done
+        (( bad )) || pass "${#EXEC_LINES[@]} mako on-notify command(s), all absolute and executable"
+    fi
+
+    # Urgency is what distinguishes the sounds, so all three cases must be
+    # present: something happened, something needs you, and something you were
+    # told need not be acted on.
+    if grep -qE '^on-notify=none' "$MAKO_CONF"; then
+        pass "low-urgency notifications are silent"
+    else
+        fail "nothing silences low-urgency notifications; every chatty program will ping"
+    fi
+fi
+
+# The polkit dialog. The app_id ties the rule to the agent, and nothing notices
+# when they disagree - the dialog simply appears without a sound.
+RULE_FILE="$CHECKS_REPO/setup/dotfiles/dot_config/sway/config.d/40-window-rules.conf"
+RULE_ID="$(grep -oE 'for_window \[app_id="[^"]*polkit[^"]*"\] exec' "$RULE_FILE" 2>/dev/null | sed -E 's/.*app_id="([^"]*)".*/\1/')"
+if [[ -z "$RULE_ID" ]]; then
+    fail "no for_window rule plays a sound for the polkit dialog"
+else
+    AGENT_ID="polkit-gnome-authentication-agent-1"
+    if [[ "$RULE_ID" == "$AGENT_ID" ]]; then
+        pass "the polkit dialog rule matches the agent's app_id ($RULE_ID)"
+    else
+        fail "the sound rule matches app_id '$RULE_ID' but polkit-gnome's window is '$AGENT_ID'"
+    fi
+fi
+
+# The "long task finished" chain: zsh rings the bell, foot turns it into a
+# notification when unfocused, mako sounds it. Three files, and the middle one
+# is the piece most likely to be turned off without realising what it carries.
+if grep -q '_long_command_begin' "$HOME/.zshrc" 2>/dev/null; then
+    pass "zsh rings the bell after a long command"
+else
+    fail "no long-command hook in ~/.zshrc, so a finished build makes no sound"
+fi
+FOOT_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/foot/foot.ini"
+if [[ -r "$FOOT_CONF" ]] && grep -qE '^notify=yes' "$FOOT_CONF"; then
+    pass "foot turns the bell into a notification"
+else
+    fail "foot's [bell] notify is not yes, so the bell never reaches mako and the sound is unreachable"
+fi
+
+# The limit sound is only reachable if the keys go through the helpers.
+MEDIA_CONF="$CHECKS_REPO/setup/dotfiles/dot_config/sway/config.d/52-media-keys.conf"
+if grep -q 'volume up' "$MEDIA_CONF" 2>/dev/null && grep -q 'brightness up' "$MEDIA_CONF" 2>/dev/null; then
+    pass "the volume and brightness keys go through the helpers that know their limits"
+else
+    fail "a volume or brightness key still calls wpctl/brightnessctl directly, so hitting the limit is silent"
+fi
+
+# ----------------------------------------------------------------------
 section "Bluetooth (TASK-146)"
 
 # Bluetooth here is opt-in per machine, and the entire design rests on two
@@ -2102,6 +2240,9 @@ Still needs a human, because no script can observe them:
 
   1. Press the volume and playback keys.        Expect: volume changes; with
                                                 something playing, it pauses.
+                                                Then hold volume-up past 100%:
+                                                expect one low, blunt note each
+                                                press, rather than silence.
   2. Press Print, then Shift+Print.             Expect: a file appears in your
                                                 pictures directory; Shift+Print
                                                 lets you drag a region first.
@@ -2130,6 +2271,15 @@ Still needs a human, because no script can observe them:
                                                 clicks, so the keypress itself
                                                 is the one link in the chain
                                                 nothing here can test.
+  6. Run:  sounds --preview                     Expect: four sounds, named as
+                                                they play, recognisably one
+                                                family and easy to tell apart.
+                                                The checks above prove the right
+                                                sound is SELECTED for each
+                                                event; whether the sounds are
+                                                pleasant to live with is not
+                                                something a script has an
+                                                opinion about.
 
 MANUAL
 

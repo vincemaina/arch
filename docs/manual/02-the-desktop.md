@@ -253,3 +253,87 @@ so a badge driven by `list` alone would read zero for the exact case it
 exists to catch. It counts unseen notifications instead - everything newer
 than the last time you opened the centre - and disappears entirely at zero
 rather than sitting at a permanent 0.
+
+## Sounds
+
+The desktop makes four sounds, and no more. They are meant to be told apart
+with your back to the screen, so what distinguishes them is how many notes
+they have and how low they sit, rather than how loud they are.
+
+| Sound | When | What it is |
+| --- | --- | --- |
+| `notify` | a notification arrived | one high note, quiet |
+| `alert` | something is *waiting* for you | two notes rising, bright and loud |
+| `complete` | a long task finished | three notes rising, warm |
+| `limit` | a control is already at its limit | one low, blunt, short note |
+
+`alert` is the only loud one, and that is the point of it. A password prompt
+is a process that has stopped and will wait forever; everything else is
+information you can get to when you get to it.
+
+Three things make each of them happen:
+
+- **A notification** plays `notify`. A **critical** one plays `alert`
+  instead, and a **low-urgency** one is silent - a program that told the
+  desktop you need not act on something should not then make a noise about
+  it.
+- **The password prompt** plays `alert` when it appears. Ordinary dialogs -
+  a file chooser, a save prompt - stay silent, because you opened those
+  yourself a fraction of a second earlier and announcing a window you are
+  already looking at is noise.
+- **Volume and brightness** play `limit` when the key would do nothing:
+  volume-up at 100%, volume-down at zero, brightness-up at full. The keys
+  clamp rather than running away, and before this they clamped *silently*,
+  which is indistinguishable from a key that has stopped working.
+
+A long command finishing in a terminal makes a noise too, and only when you
+are not looking at it. The shell rings the terminal bell after any command
+that took more than twenty seconds, foot turns that into a notification when
+its window is unfocused, and that arrives as `complete`. Watch the terminal
+instead and you get a flash of the window rather than a sound. Programs that
+are long by nature - an editor, a pager, `btop`, a Claude Code session - are
+excluded, because a bell every time you close your editor teaches you to
+ignore every bell.
+
+Set your own threshold, or your own exclusions, in
+`~/.config/zsh/local.zsh`:
+
+```bash
+LONG_COMMAND_SECONDS=60
+```
+
+**Do not disturb silences all of it**, including the two sounds that never
+pass through the notification daemon. A desktop that went quiet visually and
+kept pinging would be a strange one.
+
+The system volume is the only volume control: each sound has a fixed level
+relative to it, chosen so that they sit sensibly against each other, and the
+one slider moves all four.
+
+### Changing them
+
+Nothing audio-shaped is stored in this repository. The sounds are computed on
+the machine from a table of frequencies and envelopes, the same way the
+wallpapers are computed from a palette, and cached in
+`~/.local/share/sounds/` - which is disposable, and rebuilt on demand if you
+delete it.
+
+```bash
+sounds                    # what they are, and which are yours
+sounds --preview          # play each one, named
+sounds --preview alert    # just that one
+sounds --regenerate       # build them again
+```
+
+To use a file of your own for one of them, and to change your mind later:
+
+```bash
+sounds set complete ~/Music/ding.wav
+sounds set complete --default
+```
+
+To change what the generated sounds *are*, edit the `SOUNDS` table in
+`~/.local/bin/sounds` in the repository and run `./sync.sh`. Each entry is a
+list of notes with their start times, a decay, a length, a peak level and a
+`colour` that decides how bright the timbre is. They are rebuilt whenever
+that file changes, so the edit takes effect on its own.

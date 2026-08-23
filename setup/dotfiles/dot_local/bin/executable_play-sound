@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: pw-play makoctl readlink dirname setsid
+
+# Make one of the desktop's sounds. The only thing here that makes a noise.
+#
+#     play-sound notify      something happened
+#     play-sound alert       something is waiting for you
+#     play-sound complete    something finished
+#     play-sound limit       a control is already at its limit
+#
+# What the sounds ARE is ~/.local/bin/sounds, which generates them. This only
+# plays them, and is called from three places that are all awkward in the same
+# way:
+#
+#   mako        on-notify=exec, from a systemd user service
+#   sway        for_window ... exec, on the polkit dialog appearing
+#   zsh         the terminal bell, indirectly, via foot's own notification
+#
+# WHY THIS IS SHELL AND NOT PART OF THE PYTHON
+#
+# Because it runs on every notification and the generator does not. Starting a
+# Python interpreter measured 30ms here before importing anything; this script
+# reaches pw-play in about two. That is inaudible either way, but it is 30ms of
+# CPU per notification for nothing, and this desktop counts those (TASK-66).
+
+if [[ $# -ne 1 ]]; then
+    echo "usage: play-sound <notify|alert|complete|limit>" >&2
+    exit 2
+fi
+
+event="$1"
+
+case "$event" in
+    notify|alert|complete|limit) ;;
+    *)
+        echo "play-sound: no such sound: $event" >&2
+        exit 2
+        ;;
+esac
+
+# DO NOT DISTURB SILENCES EVERYTHING, INCLUDING THIS.
+#
+# mako's dnd mode already stops notifications being drawn, and it would be a
+# strange desktop that went quiet visually and kept pinging. It is checked here
+# rather than left to mako's [mode=dnd] block because two of the three callers
+# are not mako - a polkit dialog and a finished build would still make a noise
+# if this lived in the notification config.
+#
+# That does mean the volume-limit sound is silenced too, which is feedback for
+# a key you just pressed rather than an interruption. It is deliberate: on a
+# laptop, do not disturb means the machine makes no sound, and a rule with an
+# exception in it is one nobody remembers.
+#
+# Guarded, because mako is not running during an install and need not be
+# running for a sound to be wanted.
+if command -v makoctl >/dev/null 2>&1; then
+    if makoctl mode 2>/dev/null | grep -qx dnd; then
+        exit 0
+    fi
+fi
+
+# One sound per event per quarter second.
+#
+# Notifications arrive in bursts - mako groups them for exactly that reason,
+# and its max-visible is 5 - and five copies of the same ping starting a few
+# milliseconds apart do not sound like five notifications. They sound like a
+# fault. The first one is played and the rest of the burst is dropped, which is
+# also what the notification stack does visually.
+#
+# EPOCHREALTIME is bash's own clock with microsecond resolution, so this costs
+# no subprocess. Removing the dot turns 1755970000.123456 into microseconds.
+stamp_dir="${XDG_RUNTIME_DIR:-/tmp}/play-sound"
+mkdir -p "$stamp_dir"
+stamp="$stamp_dir/$event"
+now="${EPOCHREALTIME/./}"
+if [[ -f "$stamp" ]]; then
+    read -r last < "$stamp" || last=0
+    if [[ "$last" =~ ^[0-9]+$ ]] && (( now - last < 250000 )); then
+        exit 0
+    fi
+fi
+printf '%s\n' "$now" > "$stamp"
+
+# A file of your own wins over the generated one - see `sounds set`. Checked
+# here rather than by asking the generator, because asking it would start the
+# interpreter this script exists to avoid.
+sound=""
+for candidate in "${XDG_CONFIG_HOME:-$HOME/.config}/sounds/$event".*; do
+    if [[ -f "$candidate" ]]; then
+        sound="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$sound" ]]; then
+    sound="${XDG_DATA_HOME:-$HOME/.local/share}/sounds/$event.wav"
+fi
+
+# Self-healing, and only ever on the first play after the cache is emptied.
+# ~/.local/share/sounds is disposable by design, and run_onchange_after_
+# generate-sounds.sh fills it at apply time - so this is the path taken when
+# somebody has deleted it, not the normal one.
+if [[ ! -f "$sound" ]]; then
+    here="$(dirname "$(readlink -f "$0")")"
+    if [[ -x "$here/sounds" ]]; then
+        "$here/sounds" --ensure >/dev/null 2>&1 || true
+    fi
+    [[ -f "$sound" ]] || exit 0
+fi
+
+# Detached, and this is the whole point of the line.
+#
+# mako runs this inside its own event loop and sway runs it while placing a
+# window. Neither should wait half a second for a sound to finish, and a
+# backgrounded child of a systemd user service is still that service's child -
+# setsid puts it in its own session so nothing is holding it.
+#
+# --media-role Notification is what tells pipewire this is an event sound
+# rather than music, so it appears as one in pavucontrol and is a candidate for
+# whatever ducking policy wireplumber is asked for later. The level is baked
+# into the file by the generator; the system volume applies on top, which is
+# the single slider that was wanted.
+setsid -f pw-play --media-role Notification "$sound" >/dev/null 2>&1 || true
