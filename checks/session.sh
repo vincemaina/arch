@@ -1849,7 +1849,7 @@ else
         fail "keyd is not enabled, so the swap is lost at the next reboot"
     fi
 
-    # TASK-165: a VM guest cloned from this repo's own base image (TASK-69.2)
+    # TASK-160: a VM guest cloned from this repo's own base image (TASK-69.2)
     # gets this exact enabled keyd, same as bare metal - but a guest's
     # keycodes already arrive pre-swapped from the host's own keyd, sitting
     # below the compositor QEMU is a client of. A second swap inside the
@@ -1867,15 +1867,15 @@ else
         if [[ -f /etc/systemd/system/keyd.service.d/override.conf ]] \
             && grep -qF "ConditionVirtualization=!vm" \
                 /etc/systemd/system/keyd.service.d/override.conf; then
-            pass "keyd.service.d/override.conf carries ConditionVirtualization=!vm (TASK-165)"
+            pass "keyd.service.d/override.conf carries ConditionVirtualization=!vm (TASK-160)"
         else
-            fail "the keyd VM guard (ConditionVirtualization=!vm, TASK-165) is missing; a guest cloned from this image would double-swap and cancel the host's TASK-40 remap"
+            fail "the keyd VM guard (ConditionVirtualization=!vm, TASK-160) is missing; a guest cloned from this image would double-swap and cancel the host's TASK-40 remap"
         fi
 
         if systemctl is-active --quiet keyd; then
-            fail "keyd is running inside this VM guest - it will double-swap and cancel the host's TASK-40 remap (TASK-165)"
+            fail "keyd is running inside this VM guest - it will double-swap and cancel the host's TASK-40 remap (TASK-160)"
         else
-            pass "keyd is correctly inactive inside this VM guest, leaving the host's single swap in effect (TASK-165)"
+            pass "keyd is correctly inactive inside this VM guest, leaving the host's single swap in effect (TASK-160)"
         fi
     else
         if systemctl is-active --quiet keyd; then

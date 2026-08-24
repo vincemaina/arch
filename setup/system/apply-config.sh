@@ -39,7 +39,7 @@ CONFIG_FILES=(
     # Keeps keyd off inside a VM guest cloned from this repo's own base
     # image, where it would double-swap and cancel the host's TASK-40 remap
     # rather than repeat it. See setup/system/keyd/keyd.service.d/override.conf
-    # and TASK-165.
+    # and TASK-160.
     "keyd/keyd.service.d/override.conf:/etc/systemd/system/keyd.service.d/override.conf"
     "greetd/config.toml:/etc/greetd/config.toml"
     "greetd/regreet.toml:/etc/greetd/regreet.toml"
