@@ -74,10 +74,26 @@ o.undofile = true
 -- already needed it.
 o.clipboard = 'unnamedplus'
 
--- Always reserve the sign column. Without this the whole buffer shifts sideways
--- the moment a diagnostic appears, which is far more distracting than a column
--- of empty space.
-o.signcolumn = 'yes'
+-- Signs go IN the number column, and the number column is only as wide as the
+-- numbers in it. Between them these are three of the six terminal columns that
+-- used to sit between the window edge and the first character of the file -
+-- measured with wincol(), not guessed.
+--
+-- `signcolumn = 'yes'` was here first, and its reason still holds: without a
+-- reserved column the whole buffer shifts sideways the moment a diagnostic
+-- appears, which is far more distracting than the empty space. `number` keeps
+-- that promise and costs nothing, because there is no separate column to
+-- reserve - a sign is drawn over the line number of the line it belongs to.
+-- The trade is that on a line with a sign you see the sign instead of the
+-- number, which is the same information you were going to look at anyway.
+--
+-- A sign is two cells wide, so 'yes' was two columns rather than one.
+o.signcolumn = 'number'
+
+-- 'numberwidth' is a MINIMUM, not a width: nvim widens it as the line count
+-- grows, so 4 only ever meant "pad short files out". 2 is one digit and the
+-- space after it, and a file of 100 lines still gets its three digits.
+o.numberwidth = 2
 
 -- Keep some context above and below the cursor rather than working on the last
 -- line of the screen.
