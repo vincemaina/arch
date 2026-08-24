@@ -97,6 +97,7 @@ Verified by asking a headless neovim what is actually mapped (`shortcuts
 | --- | --- |
 | `<Space>` | Leader |
 | `<Esc>` | Clear search highlight |
+| `<C-s>` | Write the file, from normal or insert mode |
 | `<C-h>` / `<C-j>` / `<C-k>` / `<C-l>` | Move between splits |
 | `gc` / `gcc` | Comment a motion / comment this line |
 | `J` | Join lines, keeping the cursor in place |

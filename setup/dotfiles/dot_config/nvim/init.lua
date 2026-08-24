@@ -247,6 +247,23 @@ vim.keymap.set('n', 'J', 'mzJ`z', { desc = 'Join lines, keeping the cursor put' 
 vim.keymap.set('n', 'n', 'nzzzv', { desc = 'Next match, centred' })
 vim.keymap.set('n', 'N', 'Nzzzv', { desc = 'Previous match, centred' })
 
+-- Ctrl+S writes the file, which is the one thing every other editor on this
+-- machine already agrees on. `update` rather than `write`: an unmodified
+-- buffer is left alone rather than given a new mtime for nothing.
+--
+-- IT ARRIVES, WHICH IS NOT OBVIOUS. Ctrl+S is XOFF - the terminal's own
+-- "stop sending" - and in a shell it suspends output until Ctrl+Q. It reaches
+-- nvim because nvim puts the terminal in raw mode and turns that off, and
+-- because nothing in between claims it: keyd's [control] layer rewrites j, k,
+-- h, l and semicolon and not s, and foot binds only Ctrl+Shift+*. Measured by
+-- sending a real 0x13 down a pty and reading the file back off disk, in both
+-- modes, rather than by trying it once in a terminal.
+--
+-- `<cmd>` rather than `:` in insert mode, which is the whole reason both modes
+-- can share one right-hand side: it runs the command without leaving the mode,
+-- so you keep typing where you were.
+vim.keymap.set({ 'n', 'i' }, '<C-s>', '<cmd>update<CR>', { desc = 'Write the file' })
+
 -- ---------------------------------------------------------------------------
 -- Per-language indentation
 -- ---------------------------------------------------------------------------
