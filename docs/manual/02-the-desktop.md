@@ -163,6 +163,9 @@ A few things worth knowing about that table rather than assuming from it:
 - `$mod+Shift+b` hides and shows the bar entirely, giving its strip back to
   the windows. That binding lives with the rest of the keyboard bindings, not
   on the bar itself, since it is not a module.
+- Caffeine's menu is also reachable without the bar: type "caffeinate" into
+  the launcher (`$mod+space`), the same way "bluetooth" reaches the bluetooth
+  menu below.
 
 ## Bluetooth
 
