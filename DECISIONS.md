@@ -3697,10 +3697,14 @@ as the authenticated user via PAM, which should set `$HOME` correctly, and
 ## Keeping a VM guest's keyboard from double-swapping the host's remap
 
 **Decision:** Ship a systemd drop-in,
-`setup/system/keyd/keyd.service.d/override.conf`, with
-`ConditionVirtualization=!vm`, so `keyd` never starts inside a VM guest -
-rather than giving the guest a different `keyd` config, or teaching
-`tools/build-vm-image.sh` to strip `keyd` out of the image it builds.
+`setup/system/keyd/keyd.service.d/override.conf`, that skips starting `keyd`
+only inside a guest launched by this repository's own `~/.local/bin/vm` -
+identified by a DMI marker the tool sets on the guest, checked with
+`ExecCondition=` - rather than giving the guest a different `keyd` config, or
+teaching `tools/build-vm-image.sh` to strip `keyd` out of the image it
+builds. This is TASK-166's replacement for the first version of this
+decision, which used `ConditionVirtualization=!vm`; the trade-off below
+records why that version had to change.
 
 ### Why
 
@@ -3727,7 +3731,7 @@ keyboard precisely in the one place TASK-40 says it should be swapped. This
 reads identically to "the fix never applied" while actually being "the fix
 applied twice."
 
-**Why a `ConditionVirtualization` drop-in over the alternatives:**
+**Why a marker-based `ExecCondition` over the alternatives:**
 
 - **A different config baked into the image at build time** would need
   `tools/build-vm-image.sh` to diverge from the real install stages somewhere
@@ -3739,7 +3743,8 @@ applied twice."
 - **Stripping `keyd` from the guest entirely** (uninstalling it, or excluding
   it from the image) throws away the one thing that still legitimately needs
   it if this repository is ever installed as a VM's *only* OS, driven by a
-  host with no swap of its own - see the trade-off below.
+  host with no swap of its own - exactly the case this decision now handles
+  correctly rather than trading away.
 - **A condition on the unit** keeps the package, the config file and the
   `systemctl enable` identical in every context - satisfying the "one source
   of truth" reasoning `keyd` was chosen for in the first place - while making
@@ -3748,31 +3753,39 @@ applied twice."
   inside a guest that has an older image's `keyd` already active, with no
   extra logic anywhere in the sync path.
 
-`ConditionVirtualization=!vm` fails a unit's start (not its enablement) when
-`systemd-detect-virt` reports any VM technology, and passes cleanly on real
-hardware, which is what keeps TASK-40's swap completely unaffected outside
-this one scenario. `checks/session.sh`'s TASK-40 section is virtualization-aware
-for the same reason: "keyd is not running" is the correct state on a VM guest
-and the wrong one everywhere else, and asserting the wrong thing depending on
-which machine the check happens to run on is the exact kind of check that
-would pass by luck rather than by evidence.
+**Why not `ConditionVirtualization`, which is what this decision originally
+used:** it can only report the *hypervisor class* - kvm, qemu, and so on -
+which is identical whether the running machine is a nested guest of this
+repository's own `~/.local/bin/vm` or a top-level VM running this desktop as
+its only OS with no host-side `keyd` upstream of it. Those two need opposite
+behaviour, and `ConditionVirtualization` cannot tell them apart, because
+"is this a VM" was never the question that mattered - "did something already
+swap these keys before they reached me" was, and only the second machine can
+answer no. `ExecCondition` checks the actual fact instead of a proxy for it:
+`~/.local/bin/vm` tags every guest it launches with
+`-smbios type=1,family=arch-repo-vm-guest`, readable unprivileged inside the
+guest at `/sys/class/dmi/id/product_family`, and the override skips starting
+`keyd` only when that field carries the marker. Nothing else sets it, so its
+presence means specifically "this machine is one of this repository's own
+nested guests" - a top-level VM, or a guest built some other way, now takes
+the same path as bare metal. `checks/session.sh`'s TASK-40 section checks the
+same marker rather than `systemd-detect-virt`, for the same reason: "keyd is
+not running" is the correct state on one of this repository's own nested
+guests and the wrong one everywhere else, and the check has to ask the
+question that is actually true rather than one merely correlated with it.
 
 ### Trade-off
 
-**This cannot distinguish "a nested guest launched by this repository's own
-`vm` tooling" from "this repository installed directly as a VM's only OS,
-driven by a host with no `keyd` of its own."** The first receives
-pre-swapped keys from the host and must not swap again; the second receives
-genuinely unswapped keys and needs the guest's own swap exactly as much as
-bare metal does. `ConditionVirtualization=!vm` treats both the same,
-favouring the first because it is the scenario `~/.local/bin/vm` exists for.
-The second is not a use case this repository currently supports as a
-first-class target - "Stop the repository asserting it is running in a VM"
-(TASK-141) already removed every assumption that the reference machine
-itself is a VM - so trading it away here is a deliberate, named choice
-rather than an oversight. A machine for which it matters can override the
-condition in `/etc/systemd/system/keyd.service.d/`, the same escape hatch
-`/etc/keyd/local` gives machine-specific keyd bindings elsewhere.
+**A guest not launched by `~/.local/bin/vm` - built some other way, or
+receiving the same pre-swapped-keycode arrangement from a different tool -
+is not recognised**, and gets the bare-metal behaviour (`keyd` starts and
+swaps again) rather than the suppressed one. This repository only builds and
+launches guests one way, so nothing here currently produces that situation;
+if a second guest-launching path is ever added, it would need to set the
+same marker or this decision would need revisiting. A machine for which
+neither answer fits can still override the unit in
+`/etc/systemd/system/keyd.service.d/`, the same escape hatch `/etc/keyd/local`
+gives machine-specific keyd bindings elsewhere.
 
 **Not verified against a real running VM guest.** The systemd unit merge was
 checked with `systemd-analyze verify --root=...` against a throwaway root
@@ -3780,11 +3793,15 @@ carrying only `keyd.service` and this drop-in, which confirms the directive
 parses and applies with no error from the override itself - `systemd-analyze`
 got past parsing straight to complaints about the throwaway root's missing
 `sysinit.target` and missing `/usr/bin/keyd`, neither of which involves this
-change. The actual keycode path - a real keypress on a real host, through a
-real `vm`-launched guest, observed with `keyd monitor` or `keyd listen`
-inside the guest the way TASK-40 itself was verified - was not exercised in
-this environment and is a real gap between this decision and TASK-40's own
-standard of evidence.
+change. The marker-absent path (this fix's actual motivating scenario, a
+top-level VM) was verified live: on a machine `systemd-detect-virt` reports as
+`kvm`, with no `arch-repo-vm-guest` marker set, `keyd.service` previously
+failed its start condition and left the keyboard unswapped; after this
+change it starts and the swap works. The marker-present path - a real
+keypress on a real host, through a real `vm`-launched guest, observed with
+`keyd monitor` or `keyd listen` inside the guest the way TASK-40 itself was
+verified - was not exercised in this environment and is a real gap between
+this decision and TASK-40's own standard of evidence.
 
 ---
 

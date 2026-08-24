@@ -1849,33 +1849,40 @@ else
         fail "keyd is not enabled, so the swap is lost at the next reboot"
     fi
 
-    # TASK-160: a VM guest cloned from this repo's own base image (TASK-69.2)
-    # gets this exact enabled keyd, same as bare metal - but a guest's
-    # keycodes already arrive pre-swapped from the host's own keyd, sitting
-    # below the compositor QEMU is a client of. A second swap inside the
-    # guest would cancel the host's, so keyd.service.d/override.conf refuses
-    # to let the unit start there. "keyd is not running" is therefore the
-    # CORRECT state on a VM guest and the WRONG one everywhere else - decide
-    # which is being looked at before judging whether it is running.
-    is_vm_guest=false
-    if command -v systemd-detect-virt &>/dev/null \
-        && systemd-detect-virt --vm -q; then
-        is_vm_guest=true
+    # TASK-160/TASK-166: a VM guest cloned from this repo's own base image
+    # (TASK-69.2) gets this exact enabled keyd, same as bare metal - but a
+    # guest's keycodes already arrive pre-swapped from the host's own keyd,
+    # sitting below the compositor QEMU is a client of. A second swap inside
+    # the guest would cancel the host's, so keyd.service.d/override.conf
+    # refuses to let the unit start there. "keyd is not running" is therefore
+    # the CORRECT state on one of THIS REPO'S OWN nested guests and the WRONG
+    # one everywhere else, including a top-level VM with no host-side keyd -
+    # decide which is being looked at before judging whether it is running.
+    #
+    # NOT systemd-detect-virt --vm: that reports the hypervisor class, which
+    # is identical for a nested guest of ~/.local/bin/vm and a top-level VM
+    # running this desktop as its only OS. Only the DMI marker
+    # ~/.local/bin/vm sets on guests it launches (-smbios
+    # type=1,family=arch-repo-vm-guest) distinguishes them; see
+    # keyd.service.d/override.conf.
+    is_nested_vm_guest=false
+    if [[ "$(cat /sys/class/dmi/id/product_family 2>/dev/null)" == "arch-repo-vm-guest" ]]; then
+        is_nested_vm_guest=true
     fi
 
-    if $is_vm_guest; then
+    if $is_nested_vm_guest; then
         if [[ -f /etc/systemd/system/keyd.service.d/override.conf ]] \
-            && grep -qF "ConditionVirtualization=!vm" \
+            && grep -qF "product_family" \
                 /etc/systemd/system/keyd.service.d/override.conf; then
-            pass "keyd.service.d/override.conf carries ConditionVirtualization=!vm (TASK-160)"
+            pass "keyd.service.d/override.conf carries the nested-guest marker check (TASK-160/TASK-166)"
         else
-            fail "the keyd VM guard (ConditionVirtualization=!vm, TASK-160) is missing; a guest cloned from this image would double-swap and cancel the host's TASK-40 remap"
+            fail "the keyd nested-guest guard (TASK-160/TASK-166) is missing; this guest would double-swap and cancel the host's TASK-40 remap"
         fi
 
         if systemctl is-active --quiet keyd; then
-            fail "keyd is running inside this VM guest - it will double-swap and cancel the host's TASK-40 remap (TASK-160)"
+            fail "keyd is running inside this nested VM guest - it will double-swap and cancel the host's TASK-40 remap (TASK-160)"
         else
-            pass "keyd is correctly inactive inside this VM guest, leaving the host's single swap in effect (TASK-160)"
+            pass "keyd is correctly inactive inside this nested VM guest, leaving the host's single swap in effect (TASK-160)"
         fi
     else
         if systemctl is-active --quiet keyd; then
@@ -1891,8 +1898,8 @@ else
         # pipe under it and this check reported that keyd had grabbed
         # nothing while it was working. Unique device ids, not match lines:
         # keyd logs a match every time it restarts, so counting lines would
-        # claim six keyboards where there is one. Skipped on a VM guest,
-        # where keyd is deliberately never started and so never grabs
+        # claim six keyboards where there is one. Skipped on a nested VM
+        # guest, where keyd is deliberately never started and so never grabs
         # anything - see above.
         matched="$(journalctl -u keyd -b --no-pager 2>/dev/null \
             | grep "DEVICE: match" | awk '{print $4}' | sort -u | grep -c .)"
