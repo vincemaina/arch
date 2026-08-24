@@ -1,6 +1,6 @@
 # Software this setup installs
 
-One hundred and eleven packages are declared across [`setup/packages/`](../../setup/packages/).
+One hundred and thirteen packages are declared across [`setup/packages/`](../../setup/packages/).
 This document accounts for every one of them: what it is for, where its
 rationale lives, and what it costs on the machine.
 
@@ -836,6 +836,58 @@ the default is half of host RAM, which is 3840 MiB here.
 base image is **196 KiB** on disk at creation. That is the overlay working as
 intended rather than an estimate.
 
+### power-profiles-daemon, python-gobject
+
+**Problem.** TASK-140: an easy way to switch the CPU between Performance,
+Balanced and Power Saving, from the bar rather than a terminal.
+
+**Choice.** `power-profiles-daemon`, opened from
+[`~/.local/bin/power-profile`](../../setup/dotfiles/dot_local/bin/executable_power-profile).
+The obvious alternative to a daemon at all was writing the sysfs knobs
+directly from a plain script - no daemon, matching `theme`/`sounds`/`wallpaper`
+elsewhere in this setup - and that was the first plan. It does not survive
+contact with what those knobs actually are: `energy_performance_preference`
+and `platform_profile` are root-only sysfs writes, so a script-only approach
+would mean inventing our own privilege-escalation mechanism (a udev rule
+loosening permissions on those specific attributes, or a sudoers/polkit rule)
+rather than using the one already vetted for exactly this - run as root,
+authorise a client's request over D-Bus via polkit. `power-profiles-daemon`
+exists to be that safely, not to schedule anything ongoing: it is
+event-driven, not polling.
+
+**Alternatives.** TLP manages more hardware surface overall - USB
+autosuspend, PCIe ASPM, disk APM, per-AC/battery charge thresholds - but is a
+static config file re-applied on AC/battery transitions, not a live "pick one
+of three modes and it takes effect now" tool. Making it behave like a 3-way
+switch would need scripting on top of it that TLP was never shaped for, where
+`power-profiles-daemon` already exposes exactly `performance` / `balanced` /
+`power-saver` through one command, `powerprofilesctl set <mode>`.
+
+**How it works.** `powerprofilesctl` is the CLI ~/.local/bin/power-profile
+actually calls - `get` to read the current profile, `set` to change it. It is
+not part of the `power-profiles-daemon` package itself: pacman lists it as an
+*Optional Dep*, needing `python-gobject`, so both have to be declared or the
+daemon installs with no command-line client. The daemon exposes
+`org.freedesktop.UPower.PowerProfiles` on the system bus; changing a profile
+writes `energy_performance_preference` (or the scaling governor as a
+fallback) and, on hardware whose firmware exposes it, `platform_profile` -
+which is also what can shift fan curves and thermal limits on supporting
+laptops.
+
+On the bar, `battery`'s `on-click` and a new `custom/power-profile` module
+both open the same menu - never both visible on one machine, since one hides
+itself with no battery hardware and the other hides itself when a battery
+*is* present. See `docs/manual/02-the-desktop.md` → "Power profiles".
+
+**Cost.** `power-profiles-daemon`: **141.95 KiB** installed
+(`pacman -Si`, 2026-08-24 - not yet installed on the reference machine, see the
+gap below). `polkit`, `glib2`, `glibc`, `gcc-libs` and `upower` are already
+declared or installed elsewhere in this setup; the one genuinely new
+transitive dependency is `libgudev`. `python-gobject`: **1541.82 KiB**
+installed (`pacman -Si`, 2026-08-24); `glib2`, `glibc` and `libffi` are
+already present, so the real new weight is `gobject-introspection-runtime`.
+Resident cost is **not measured** - see the gap below.
+
 ## Gaps this document does not close
 
 Named rather than left silent, because a gap that is written down can be filled.
@@ -849,6 +901,15 @@ Named rather than left silent, because a gap that is written down can be filled.
   over every unit, not a one-line fix, and that pass is the separate ticket
   for a general resource-cost register. Until it happens, read the session-cost
   table as a snapshot of a software-rendered machine, not this one.
+- **`power-profiles-daemon` and `python-gobject` are sized from `pacman -Si`,
+  not `pacman -Qi`.** Both were left uninstalled on the reference machine
+  deliberately - a running sway session was live during TASK-140's
+  implementation, and installing packages plus restarting a session-adjacent
+  daemon on someone's active desktop is exactly the kind of outward-facing
+  change this repository's own conventions say to confirm first rather than
+  just do. `sync.sh` installs them the same way it does everything else;
+  once it has, this entry's Cost section should move to measured figures
+  and the daemon's resident memory should be added.
 - **Several entries above say no alternative was recorded**, and it is worth
   being explicit about which: `linux`, `btrfs-progs`, `sudo`,
   `swaybg`/`swayidle`/`swaylock`, `brightnessctl`, `papirus-icon-theme`,

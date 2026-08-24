@@ -225,7 +225,7 @@ if command -v keyd &>/dev/null; then
     fi
 fi
 
-ENABLE_UNITS=(earlyoom greetd keyd brightness-floor)
+ENABLE_UNITS=(earlyoom greetd keyd brightness-floor power-profiles-daemon)
 
 for unit in "${ENABLE_UNITS[@]}"; do
     # Checked by file rather than with systemctl, because this also runs inside
@@ -380,6 +380,14 @@ fi
 # rather than waiting for a reboot.
 if ! systemctl restart keyd; then
     echo "    WARNING: could not restart keyd; key remapping is unchanged" >&2
+fi
+
+# Also safe: power-profiles-daemon owns no session either. Restarting it picks
+# up the package having just been installed, rather than leaving the bar's
+# power-profile menu talking to a D-Bus name nothing is listening on until
+# next boot.
+if ! systemctl restart power-profiles-daemon; then
+    echo "    WARNING: could not restart power-profiles-daemon" >&2
 fi
 
 # Also safe: systemd-vconsole-setup owns no session either, and the keymap it

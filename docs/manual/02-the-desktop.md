@@ -142,7 +142,8 @@ to right as the bar itself is laid out.
 | CPU | Usage percentage | Opens `btop` |
 | Memory | Usage percentage, tooltip shows used of total | Opens `btop` - the same window CPU opens, since `btop` already shows both |
 | Volume | Icon and percentage, "muted" when muted | Left: `pavucontrol`. Right: toggle mute. Scroll: volume up/down in 5% steps, capped at 100% |
-| Battery | Charge icon and percentage | Toggles to showing time remaining instead, and back |
+| Battery | Charge icon and percentage. **Absent entirely on a machine with no battery** | Opens the [power profile](#power-profiles) menu |
+| Power profile | A plug/lightning icon. **Absent entirely on a machine WITH a battery** - Battery, above, covers that case | Opens the same [power profile](#power-profiles) menu |
 
 A few things worth knowing about that table rather than assuming from it:
 
@@ -155,7 +156,10 @@ A few things worth knowing about that table rather than assuming from it:
   instead.
 - The battery module reads the real charge on laptop hardware. On a machine
   with no battery — a desktop, or a virtual machine — Waybar logs "No
-  batteries" and the module shows nothing at all.
+  batteries" and the module shows nothing at all. The power profile module
+  is the mirror image of that: it shows nothing when a battery IS present,
+  so exactly one of the two is ever visible. See
+  [Power profiles](#power-profiles).
 - `$mod+Shift+b` hides and shows the bar entirely, giving its strip back to
   the windows. That binding lives with the rest of the keyboard bindings, not
   on the bar itself, since it is not a module.
@@ -256,6 +260,35 @@ machine, or power it off. The confirmation lists **Cancel** first, so the
 accidental answer is also the safe one. **Suspend does not confirm** — it is
 fully reversible, waking the machine undoes it completely, and asking twice
 would only be friction on the action used most often.
+
+## Power profiles
+
+Clicking the battery (laptop) or the plug/lightning icon (desktop, or any
+machine with no battery) opens a menu: **Performance**, **Balanced**, **Power
+Saving** — the current one marked. Choosing a row applies it immediately
+through `powerprofilesctl`, no confirmation needed since none of the three is
+destructive.
+
+The menu's prompt doubles as the battery readout this replaced: on a machine
+with a battery it shows the charge percentage and time remaining, in place of
+the tooltip or click-to-toggle a plain battery display would otherwise need.
+On a machine with none, the prompt just reads "Power".
+
+What "profile" actually changes is real, live hardware behaviour, not a
+process-priority hint: the CPU's `energy_performance_preference` (or the
+scaling governor as a fallback), and `platform_profile` on hardware whose
+firmware exposes one — both of which also shift fan curves and thermal limits
+on laptops that support it. `power-profiles-daemon` runs as a system service
+so that changing them, which needs root, can be authorised per request over
+D-Bus rather than the desktop needing its own privilege-escalation setup for
+a handful of sysfs writes.
+
+```bash
+power-profile              # the menu
+power-profile performance  # set directly, no menu
+power-profile balanced
+power-profile power-saver
+```
 
 ## Notifications
 

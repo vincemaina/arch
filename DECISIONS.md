@@ -3805,6 +3805,85 @@ this decision and TASK-40's own standard of evidence.
 
 ---
 
+## Power profiles switch through a daemon, for privilege rather than scheduling
+
+**Decision:** Switch the CPU power profile (Performance/Balanced/Power Saving)
+through `power-profiles-daemon` and `powerprofilesctl`, opened from one rofi
+menu that both the battery module (laptop) and a new `custom/power-profile`
+module (desktop, or any machine with no battery) share.
+
+### Why
+
+A dedicated power-profile button on the bar was rejected before it was ever
+drawn: on a laptop it would sit next to the battery module, both about power,
+cluttering the bar for no reason a single click can't already cover. So the
+battery module's own click opens the profile menu instead, and a machine with
+no battery hardware gets a second module - a plug/lightning glyph - that
+opens the identical menu. Exactly one of the two is ever visible on a given
+machine: `battery` is already invisible with no hardware (Waybar's own "No
+batteries" behaviour), and the new module hides itself, the same way, when a
+battery *is* present. Neither needs to know what kind of machine it is
+running on; each only has to check for a battery.
+
+The first plan for what actually applies a profile was no daemon at all - a
+plain script writing `energy_performance_preference` and `platform_profile`
+directly, in the shape `theme`/`sounds`/`wallpaper` already use elsewhere in
+this setup: set it, leave it, no resident process. That does not survive
+contact with what those sysfs attributes actually are: root-only writes. A
+script-only approach would mean building a privilege-escalation mechanism of
+our own - a udev rule loosening permissions on those specific attributes, or
+a sudoers/polkit rule - rather than using the one already vetted for exactly
+this: run as root, and authorise a client's request over D-Bus via polkit.
+`power-profiles-daemon` is a daemon for that reason alone, not because
+switching a profile is ongoing work; it is event-driven, not polling, and its
+own real dependencies (`polkit`, `upower`) are already installed here for
+other reasons.
+
+### Where the state is shown, not just changed
+
+rofi's `-mesg` widget is never placed by this repository's theme -
+`config.rasi` does not list `message` among a window's `children`, so text
+passed via `-mesg` is accepted and silently never drawn (see the
+`scripting-traps` skill). So the charge percentage and time remaining - the
+detail a click on the battery module used to reveal by toggling
+`format-alt` - now live in the rofi *prompt* instead, and which profile is
+currently active is marked directly in a row's label ("Balanced (current)"),
+the same idiom `~/.local/bin/bluetooth` already uses for "is bluetooth on".
+Both are widgets the theme actually places.
+
+### Trade-off
+
+The battery module's format-alt charge/time toggle is gone: that detail now
+takes one more click (open the menu) to see, rather than a click that stayed
+on the battery module itself. Traded for one shared control instead of two
+separate ones fighting for the same bar space.
+
+No GNOME integration, and no reaction to ACPI thermal events - both real
+things `power-profiles-daemon` can do that this setup does not use. Neither
+matters here: nothing else on this desktop consumes its D-Bus service, and a
+manual three-way switch is what was asked for.
+
+### Alternatives considered
+
+**TLP.** Manages more hardware surface overall - USB autosuspend, PCIe ASPM,
+disk APM, per-AC/battery charge thresholds - but is a static config file
+re-applied on AC/battery transitions, not a live "pick one of three modes and
+it takes effect now" tool. Making it behave like a three-way switch would
+mean scripting on top of a tool never shaped for that, where
+`power-profiles-daemon` already exposes exactly `performance` / `balanced` /
+`power-saver` through one command.
+
+**A privilege mechanism built by hand** (a udev rule or sudoers entry granting
+a plain script write access to the relevant sysfs attributes). See "Why"
+above - rejected because it means owning a security surface the daemon
+already solves, correctly, for the cost of 141.95 KiB and one small
+dependency (`libgudev`).
+
+**A separate power-profile button.** Rejected before being built - see "Why"
+above.
+
+---
+
 # Guiding principle
 
 When evaluating future changes, prefer the option that best preserves this balance:

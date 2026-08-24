@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires:
+
+# Prints the desktop's power-profile bar icon, empty when a battery is
+# present. The battery module already covers laptops (waybar hides it
+# natively with no battery hardware); this module exists only for machines
+# battery does not cover, and stays invisible everywhere else - the same
+# "empty text hides the module" idiom the bluetooth module uses. See
+# waybar/config.jsonc.tmpl's custom/power-profile block and TASK-140.
+#
+# The requires header above is deliberately empty: compgen and printf are
+# both bash builtins, and /sys/class/power_supply is read directly rather
+# than through upower, so this script calls nothing external at all.
+
+if compgen -G '/sys/class/power_supply/BAT*' >/dev/null; then
+    exit 0
+fi
+
+# Nerd Font glyph nf-fa-bolt, U+F0E7 - written by codepoint through printf's own
+# \uHHHH escape, never pasted (checked present in JetBrainsMono
+# Nerd Font via the literal command: fc-list ":charset=f0e7"), per
+# CLAUDE.md's Nerd Font rule.
+printf '\uf0e7'
