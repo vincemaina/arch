@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: rofi systemctl swaymsg
+
+# The power menu: log out, restart, suspend, or power off - from the keyboard
+# or from the bar, without dropping to a terminal.
+#
+#   power-menu            the menu
+#   power-menu logout     end the sway session directly, no confirmation
+#   power-menu restart    reboot the machine directly, no confirmation
+#   power-menu suspend    suspend the machine directly, no confirmation
+#   power-menu poweroff   power the machine off directly, no confirmation
+#
+# WHY THIS REPLACED THE SWAYNAG "EXIT SWAY" PROMPT
+#
+# $mod+Shift+e used to open a swaynag bar asking "do you really want to exit
+# sway?", with one answer: yes. That is a quarter of what a session actually
+# needs to do from the keyboard - restart and power off were reachable only by
+# opening a terminal and typing systemctl, which is not a thing to hunt for the
+# one time in the day you are trying to leave. This menu replaces that prompt
+# outright, on the same binding, and gives the other three actions a home.
+#
+# WHY THE DESTRUCTIVE THREE STILL CONFIRM
+#
+# swaynag's whole reason for existing here was "one wrong keystroke should not
+# end the session", and that reasoning is exactly as true for a rofi menu: a
+# single stray Enter on the wrong row would otherwise reboot or power off the
+# machine outright. So Log out, Restart and Power off all ask a second
+# question before doing anything, in the same rofi menu rather than a second
+# tool. Suspend is the one exception - it is fully reversible, waking the
+# machine undoes it completely - so asking twice would only be friction.
+#
+# WHY systemctl RATHER THAN loginctl
+#
+# Either reaches logind and both need the same polkit authorisation, but
+# systemctl's verbs (reboot/poweroff/suspend) read as plainly as the menu rows
+# naming them, where loginctl's are the session-management vocabulary
+# (terminate-session, and reboot/poweroff/suspend only as of fairly recent
+# systemd). Authorisation itself needs nothing extra here: the existing
+# polkit-gnome agent this desktop already runs (see ~/.local/bin/bluetooth for
+# the same point) puts up a password prompt if and when polkit asks for one -
+# it normally will not for the single active session these machines run.
+#
+# WHY swaymsg exit RATHER THAN A systemd VERB FOR LOG OUT
+#
+# Logging out means ending THIS Wayland session, not the machine. `swaymsg
+# exit` is sway's own command for that and is exactly what the swaynag prompt
+# this replaces used to run.
+
+die() { echo "power-menu: $*" >&2; exit 1; }
+
+log_out()  { exec swaymsg exit; }
+restart()  { exec systemctl reboot; }
+suspend()  { exec systemctl suspend; }
+power_off() { exec systemctl poweroff; }
+
+# One confirmation step, shared by the three destructive actions. "Cancel" is
+# the first row - and therefore where the rofi cursor starts - so the safe
+# answer is also the accidental one.
+confirm() {
+    local label="$1" choice
+    choice="$(printf 'Cancel\nYes, %s\n' "$label" |
+        rofi -dmenu -i -p "$label?" -no-custom -replace || true)"
+    [[ "$choice" == "Yes, $label" ]]
+}
+
+menu() {
+    local choice
+    choice="$(printf 'Log out\nRestart\nSuspend\nPower off\n' |
+        rofi -dmenu -i -p "Power" -no-custom -replace || true)"
+    [[ -n "$choice" ]] || return 0
+
+    case "$choice" in
+        "Log out")   confirm "log out"   && log_out ;;
+        "Restart")   confirm "restart"   && restart ;;
+        "Suspend")   suspend ;;
+        "Power off") confirm "power off" && power_off ;;
+    esac
+}
+
+case "${1:-}" in
+    "")         menu ;;
+    logout)     log_out ;;
+    restart)    restart ;;
+    suspend)    suspend ;;
+    poweroff)   power_off ;;
+    -h|--help)  sed -n '7,12p' "$0" | sed 's/^# \?//' ;;
+    *)          die "unknown argument '$1'. Try --help." ;;
+esac
