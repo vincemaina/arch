@@ -258,7 +258,7 @@ Three keys, three different destinations:
 | --- | --- | --- |
 | `Print` | The whole screen | A file |
 | `Shift+Print` | A region you drag to select | A file |
-| `$mod+Shift+s` | A region you drag to select | The clipboard only, no file |
+| `Ctrl+Shift+Print` | A region you drag to select | The clipboard only, no file |
 
 Files land in your XDG Pictures directory (`xdg-user-dir PICTURES`, falling
 back to `~/Pictures` if that is not configured), named
