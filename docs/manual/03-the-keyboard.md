@@ -99,6 +99,13 @@ often and sits under the weakest finger, Alt is used far less and sits under
 a stronger one - is in
 [DECISIONS.md](../../DECISIONS.md) if you want the full argument.
 
+**A guest's own keyd is deliberately switched off**, for the same
+below-the-compositor reason: a machine started with `vm` receives keys the
+host has already swapped, so a second swap inside the guest would put them
+back the way they started. See [Applications](04-applications.md) →
+"Virtual machines" and `DECISIONS.md` → "Keeping a VM guest's keyboard from
+double-swapping the host's remap".
+
 ## Modes
 
 A **mode** temporarily changes what keys do, shown by a name appearing in

@@ -3694,6 +3694,100 @@ as the authenticated user via PAM, which should set `$HOME` correctly, and
 
 ---
 
+## Keeping a VM guest's keyboard from double-swapping the host's remap
+
+**Decision:** Ship a systemd drop-in,
+`setup/system/keyd/keyd.service.d/override.conf`, with
+`ConditionVirtualization=!vm`, so `keyd` never starts inside a VM guest -
+rather than giving the guest a different `keyd` config, or teaching
+`tools/build-vm-image.sh` to strip `keyd` out of the image it builds.
+
+### Why
+
+The "Key remapping with keyd" decision above chose `keyd` specifically
+because it remaps at the evdev layer, below the compositor, so every
+consumer - Sway, the console, the greeter, XWayland - inherits one swap
+instead of four independent ones that can drift. `tools/build-vm-image.sh`
+(see "Building the base image with the repository's own installer") builds
+the VM base image by running the real, unmodified `03-system.sh` and
+`04-desktop.sh`, so `apply-config.sh` installs and enables that exact `keyd`
+config inside the guest too - correct in isolation, and the reason a guest
+booted from this image swapped its own physical keyboard just as reliably as
+bare metal.
+
+The trouble is what "below the compositor" means once the compositor is
+running a VM. `~/.local/bin/vm` (see "Virtual machines with qemu alone")
+presents the guest a `virtio-keyboard` device. QEMU is itself a Wayland
+client of the host's Sway, so by the time a keypress reaches QEMU, the host's
+own `keyd` has already swapped it - Sway never sees an unswapped keycode to
+begin with. QEMU forwards that already-swapped keycode into the guest
+unchanged. If the guest's own `keyd` is also active, it swaps the same key
+a second time, and the two swaps cancel: the user is left with an unswapped
+keyboard precisely in the one place TASK-40 says it should be swapped. This
+reads identically to "the fix never applied" while actually being "the fix
+applied twice."
+
+**Why a `ConditionVirtualization` drop-in over the alternatives:**
+
+- **A different config baked into the image at build time** would need
+  `tools/build-vm-image.sh` to diverge from the real install stages somewhere
+  after `04-desktop.sh` runs - exactly the kind of parallel path the previous
+  decision rejected `install.sh` itself for needing. It would also need
+  re-applying by hand (or by another special case) every time `sync.sh` runs
+  inside the guest, since `sync.sh` would otherwise reinstall the ordinary
+  swapped `default.conf` and silently undo the fix on the next boot.
+- **Stripping `keyd` from the guest entirely** (uninstalling it, or excluding
+  it from the image) throws away the one thing that still legitimately needs
+  it if this repository is ever installed as a VM's *only* OS, driven by a
+  host with no swap of its own - see the trade-off below.
+- **A condition on the unit** keeps the package, the config file and the
+  `systemctl enable` identical in every context - satisfying the "one source
+  of truth" reasoning `keyd` was chosen for in the first place - while making
+  whether it *starts* depend on a fact about the running machine, checked
+  fresh on every start. That means it self-corrects if `sync.sh` is run
+  inside a guest that has an older image's `keyd` already active, with no
+  extra logic anywhere in the sync path.
+
+`ConditionVirtualization=!vm` fails a unit's start (not its enablement) when
+`systemd-detect-virt` reports any VM technology, and passes cleanly on real
+hardware, which is what keeps TASK-40's swap completely unaffected outside
+this one scenario. `checks/session.sh`'s TASK-40 section is virtualization-aware
+for the same reason: "keyd is not running" is the correct state on a VM guest
+and the wrong one everywhere else, and asserting the wrong thing depending on
+which machine the check happens to run on is the exact kind of check that
+would pass by luck rather than by evidence.
+
+### Trade-off
+
+**This cannot distinguish "a nested guest launched by this repository's own
+`vm` tooling" from "this repository installed directly as a VM's only OS,
+driven by a host with no `keyd` of its own."** The first receives
+pre-swapped keys from the host and must not swap again; the second receives
+genuinely unswapped keys and needs the guest's own swap exactly as much as
+bare metal does. `ConditionVirtualization=!vm` treats both the same,
+favouring the first because it is the scenario `~/.local/bin/vm` exists for.
+The second is not a use case this repository currently supports as a
+first-class target - "Stop the repository asserting it is running in a VM"
+(TASK-141) already removed every assumption that the reference machine
+itself is a VM - so trading it away here is a deliberate, named choice
+rather than an oversight. A machine for which it matters can override the
+condition in `/etc/systemd/system/keyd.service.d/`, the same escape hatch
+`/etc/keyd/local` gives machine-specific keyd bindings elsewhere.
+
+**Not verified against a real running VM guest.** The systemd unit merge was
+checked with `systemd-analyze verify --root=...` against a throwaway root
+carrying only `keyd.service` and this drop-in, which confirms the directive
+parses and applies with no error from the override itself - `systemd-analyze`
+got past parsing straight to complaints about the throwaway root's missing
+`sysinit.target` and missing `/usr/bin/keyd`, neither of which involves this
+change. The actual keycode path - a real keypress on a real host, through a
+real `vm`-launched guest, observed with `keyd monitor` or `keyd listen`
+inside the guest the way TASK-40 itself was verified - was not exercised in
+this environment and is a real gap between this decision and TASK-40's own
+standard of evidence.
+
+---
+
 # Guiding principle
 
 When evaluating future changes, prefer the option that best preserves this balance:
