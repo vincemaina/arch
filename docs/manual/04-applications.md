@@ -376,3 +376,19 @@ this screen too dim or too bright, the fix today is a normal login, adjust
 it there, then switch sessions - the level Sway leaves the backlight at
 carries over to whatever runs next, cage-hosted or not, because it is the
 one physical panel underneath all of it.
+
+**One boot-time exception to "carries over": a fixed floor of about 70%,
+applied once, before the greeter appears.** The backlight is real kernel
+state - TASK-162's finding above, that it "carries over to whatever runs
+next" - and that cuts the other way if a session ends with the panel left
+near-black: a crash or a dead battery leaves that same near-black level
+sitting there through the next boot and into the greeter, which looks like a
+dead screen rather than a login prompt turned down low. `brightness-floor.service`
+resets brightness to the floor early in boot, ordered before
+`greetd.service` so it runs before the greeter is shown, and it always wins
+over whatever was last set - even a deliberately low value from the previous
+session. It is `Type=oneshot`: it runs once at boot and then does nothing,
+so it never fights the brightness keybinding (`XF86MonBrightness{Up,Down}`
+in `52-media-keys.conf`) once a session is running, and adjusting brightness
+during a session is unaffected and does not carry over any less than before -
+only a boot in between resets it back to the floor.

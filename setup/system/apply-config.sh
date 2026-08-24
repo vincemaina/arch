@@ -43,6 +43,11 @@ CONFIG_FILES=(
     "keyd/keyd.service.d/override.conf:/etc/systemd/system/keyd.service.d/override.conf"
     "greetd/config.toml:/etc/greetd/config.toml"
     "greetd/regreet.toml:/etc/greetd/regreet.toml"
+    # Resets brightness to a fixed floor before greetd starts, so a session
+    # that ended with the panel near-black (crash, or a deliberate low
+    # setting left in place) never leaves the greeter looking like a dead
+    # screen. See setup/system/systemd/brightness-floor.service and TASK-165.
+    "systemd/brightness-floor.service:/etc/systemd/system/brightness-floor.service"
     # Local session entries. /usr/local/share is the directory the desktop
     # entry spec reserves for these, and it takes precedence over /usr/share,
     # which is what lets sway.desktop hide the packaged entry rather than
@@ -220,7 +225,7 @@ if command -v keyd &>/dev/null; then
     fi
 fi
 
-ENABLE_UNITS=(earlyoom greetd keyd)
+ENABLE_UNITS=(earlyoom greetd keyd brightness-floor)
 
 for unit in "${ENABLE_UNITS[@]}"; do
     # Checked by file rather than with systemctl, because this also runs inside

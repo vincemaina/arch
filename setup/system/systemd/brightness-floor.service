@@ -1,0 +1,44 @@
+# Resets display brightness to a fixed floor early in boot, before the
+# greeter is shown. See TASK-165 and docs/manual/04-applications.md.
+#
+# ~/.local/bin/brightness (setup/dotfiles/dot_local/bin/executable_brightness)
+# writes straight to the kernel backlight sysfs interface via brightnessctl -
+# real hardware state that outlives the session. It is never reset by logout,
+# a crash, or a reboot (TASK-162 established this: the panel stays at
+# whatever level it was last set to, clean shutdown or not). If a session
+# ends with brightness left near zero, the panel stays near-black through
+# boot and into the greeter, which looks like a dead screen rather than a
+# login prompt turned down low.
+#
+# This unit always wins over whatever was last set - a low value from a
+# previous session is discarded on purpose, on the reasoning that a visible
+# greeter beats preserving an intentional low setting across a boot nobody
+# was present for.
+#
+# No explicit After= is needed to run later than systemd-backlight@.service
+# (the unit that restores the previous saved brightness on some hardware).
+# That unit declares Before=sysinit.target with DefaultDependencies=no, so it
+# always completes before sysinit.target is reached - and this unit, pulled
+# in by multi-user.target, only starts once sysinit.target (by way of
+# basic.target) is already behind it. That holds regardless of the specific
+# backlight device's instance name, which is hardware-specific and not
+# something to hardcode here.
+#
+# Before=greetd.service is what actually matters: it guarantees the floor is
+# applied before the greeter's window is shown, not merely before login.
+#
+# This runs once, at boot, and never again - it must not fight the brightness
+# keybinding (~/.local/bin/brightness, bound in 52-media-keys.conf) once a
+# session is running. It has no [Install] wiring beyond WantedBy=multi-user.target
+# and nothing re-triggers it during a session or a sync.
+[Unit]
+Description=Reset display brightness to a fixed floor before the greeter starts
+Before=greetd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/brightnessctl set 70%
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1690,6 +1690,46 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Brightness floor (TASK-165)"
+
+# TASK-162 established that backlight is real kernel state, never reset by
+# logout, a crash, or a reboot - so a session that ends with the panel near-
+# black leaves the greeter looking dead. brightness-floor.service resets it
+# to a fixed floor once, early in boot, before greetd starts.
+BRIGHTNESS_FLOOR_UNIT="/etc/systemd/system/brightness-floor.service"
+
+if [[ -f "$BRIGHTNESS_FLOOR_UNIT" ]]; then
+    pass "brightness-floor.service is installed"
+else
+    fail "brightness-floor.service is not installed; a session that ends near-black leaves the greeter looking dead (TASK-162)"
+fi
+
+if systemctl is-enabled --quiet brightness-floor 2>/dev/null; then
+    pass "brightness-floor.service is enabled at boot"
+else
+    fail "brightness-floor.service is not enabled, so the floor is never applied at boot"
+fi
+
+# The ordering is what actually delivers the fix: enabled-but-unordered would
+# still let greetd start before the floor is applied. `systemctl show`
+# reports the unit's declared Before=, not merely that it parses.
+BEFORE_UNITS="$(systemctl show -p Before --value brightness-floor.service 2>/dev/null || true)"
+if [[ " $BEFORE_UNITS " == *" greetd.service "* ]]; then
+    pass "brightness-floor.service is ordered before greetd.service"
+else
+    fail "brightness-floor.service has no Before=greetd.service ordering (got: '$BEFORE_UNITS'); the floor could apply after the greeter is already shown"
+fi
+
+# It must run once, at boot, and never fight the keybinding once a session is
+# running - so it must never be WantedBy anything session-scoped, and it must
+# not be a persistent/repeating service.
+if grep -qE '^Type=oneshot' "$BRIGHTNESS_FLOOR_UNIT" 2>/dev/null; then
+    pass "brightness-floor.service is oneshot, so it runs once and does not fight the brightness keybinding"
+else
+    fail "brightness-floor.service is not Type=oneshot; it could keep running and fight the brightness keybinding"
+fi
+
+# ----------------------------------------------------------------------
 section "Bluetooth (TASK-146)"
 
 # Bluetooth here is opt-in per machine, and the entire design rests on two
