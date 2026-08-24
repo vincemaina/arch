@@ -1,16 +1,16 @@
 ---
 id: TASK-100
 title: have claude ask me for sudo access
-status: To Do
+status: Done 
 assignee: []
 created_date: '2026-08-22 01:57'
+updated_date: '2026-08-23 15:21'
 labels: []
 dependencies: []
 priority: low
 type: feature
 ordinal: 102000
 ---
-
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->

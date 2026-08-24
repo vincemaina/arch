@@ -1,11 +1,11 @@
 ---
 id: TASK-171
 title: Ctrl+S writes the file in neovim
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-24 21:40'
-updated_date: '2026-08-24 21:42'
+updated_date: '2026-08-24 21:43'
 labels: []
 dependencies: []
 ordinal: 178000
@@ -19,11 +19,11 @@ Saving means typing :w. Ctrl+S is what every other editor uses for it and reache
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Ctrl+S writes the buffer from normal mode
-- [ ] #2 Ctrl+S writes the buffer from insert mode without leaving insert mode
-- [ ] #3 An unmodified buffer is not rewritten
-- [ ] #4 The binding appears in shortcuts --mode nvim and in the manual, like every other chosen mapping
-- [ ] #5 Verified by sending a real 0x13 down a pty and reading the file off disk
+- [x] #1 Ctrl+S writes the buffer from normal mode
+- [x] #2 Ctrl+S writes the buffer from insert mode without leaving insert mode
+- [x] #3 An unmodified buffer is not rewritten
+- [x] #4 The binding appears in shortcuts --mode nvim and in the manual, like every other chosen mapping
+- [x] #5 Verified by sending a real 0x13 down a pty and reading the file off disk
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -45,3 +45,9 @@ Driven with a real 0x13 down a pty against the rendered config:
 - after Ctrl+S in insert mode: 'before\nchangedmore\n'
 - still in insert afterwards: True
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ctrl+S maps to <cmd>update<CR> in normal and insert mode. update rather than write leaves an unmodified buffer alone; <cmd> rather than : means saving from insert mode does not drop you into normal mode. Verified by sending a real 0x13 down a pty against the rendered config - written in both modes, still in insert afterwards, mtime unchanged when nothing had been edited - and the binding is listed by shortcuts --mode nvim and in the manual's neovim table. checks/manual.sh passes; checks/session.sh on merged main is 129 passed, 1 failed (shell startup time, unrelated and pre-existing).
+<!-- SECTION:FINAL_SUMMARY:END -->
