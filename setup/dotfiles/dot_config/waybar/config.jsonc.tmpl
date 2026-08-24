@@ -217,9 +217,24 @@
     // swayidle.service - see that script's own header for why) and this
     // module only displays what it reports and opens its menu.
     //
-    // return-type json plus a plain interval, not restart-interval: unlike
-    // the focus timer this does not need second-by-second ticking, and a
-    // periodic poll is the same idiom cpu/memory already use.
+    // return-type json, a signal for instant updates, plus a long interval as
+    // a fallback rather than the primary mechanism.
+    //
+    // exec-on-event (waybar's default) already re-runs "exec" after on-click
+    // finishes, so clicking the module itself refreshes for free - which is
+    // why that alone looked sufficient until TASK-168's own follow-up: the
+    // menu is also reachable from the rofi launcher and from a terminal,
+    // neither of which is a click on this module, and a scheduled duration
+    // expiring is not a click on anything. None of those paths touch waybar
+    // at all, so without a signal the bar only caught up at the next
+    // interval tick - stale for up to 30s after using the feature the way
+    // the whole point of TASK-168 was to make possible. caffeinate itself
+    // sends SIGRTMIN+8 after every state change, mirroring sway-toggle-bar's
+    // use of a signal for the same reason: instant, without waybar re-reading
+    // anything it does not need to. The interval stays, at 90s, as a safety
+    // net for state changing outside caffeinate entirely (someone running
+    // `systemctl --user stop swayidle.service` by hand, or a crash) - not
+    // because the signal is expected to be missed.
     //
     // The glyph itself is drawn by the script, not this file - see
     // ~/.local/bin/caffeinate's own header for the codepoint it uses and a
@@ -231,7 +246,8 @@
     "custom/caffeine": {
         "exec": "{{ .chezmoi.homeDir }}/.local/bin/caffeinate --bar",
         "return-type": "json",
-        "interval": 30,
+        "signal": 8,
+        "interval": 90,
         "on-click": "{{ .chezmoi.homeDir }}/.local/bin/caffeinate"
     },
 

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@vincemaina'
 created_date: '2026-08-24 14:19'
-updated_date: '2026-08-24 18:34'
+updated_date: '2026-08-24 18:43'
 labels: []
 dependencies: []
 ordinal: 175000
@@ -54,6 +54,8 @@ Separate finding, not fixed here: U+F0F4 (used for the icon, carried over unchan
 Follow-up fix, same session: the user reported caffeinate wasn't reachable from the launcher after merge. AC #3 said 'reachable from rofi ... like bluetooth/power-profile' but I only made it a standalone script (like power-profile, which has no launcher entry) rather than adding a .desktop entry (like bluetooth, which does) - power-profile was the wrong model to have actually verified against, since it IS bar-only by design. Added setup/dotfiles/dot_local/share/applications/caffeinate.desktop.tmpl (same pattern as bluetooth.desktop.tmpl: absolute Exec via chezmoi homeDir). Applied live with 'chezmoi apply' and confirmed 'Caffeinate' now appears via rofi -show drun -filter caffeinate on a throwaway headless output, with the preferences-desktop-screensaver icon rendering. docs/manual/02-the-desktop.md notes the launcher entry alongside the bar table.
 
 Also found and fixed a real gap in checks/session.sh while re-running it: the session-units check unconditionally fails when swayidle.service is stopped, with no awareness that caffeinate stops it on purpose - it flagged FAIL against the user's own real 4-hour caffeinate session they'd just started to try the feature. Fixed the swayidle case to ask '~/.local/bin/caffeinate status' (mirroring what the bar module already asks) before failing, captured into a variable rather than piped through 'grep -q' per the scripting-traps skill. checks/session.sh: 126 passed, 0 failed with that real caffeinate session still running - left it running rather than turning it off, since it is the user's own deliberate state, not test leftover.
+
+Second follow-up, same session: user reported the waybar module doesn't update when caffeinate is changed via rofi (only clicking the bar itself refreshed it). Cause: waybar's custom modules only auto-refresh after their own on-click runs (exec-on-event, default true) - the rofi launcher, a terminal, and the scheduled auto-off timer all change state without ever going through the bar's on-click, so the display was stale until the next interval poll (30s). Added 'signal': 8 to custom/caffeine in config.jsonc.tmpl and a notify_bar() in caffeinate that sends SIGRTMIN+8 to waybar.service (--kill-whom=main, same idiom sway-toggle-bar uses for SIGUSR1) after every state change - turn_on, turn_off (which also covers the timer's own auto-off), and turn_on_for. Interval kept as a 90s fallback for state changes outside caffeinate's own control (e.g. someone stopping swayidle.service by hand). Applied live (chezmoi apply + waybar restart) and verified against the real bar: toggling state directly (bypassing the bar entirely) now updates the bar's icon/text within about a second, confirmed with before/after screenshots. The user's own real ~55m-remaining caffeinate session was captured exactly (state file's UNTIL epoch) before testing and re-scheduled byte-for-byte afterward - checks/session.sh's new swayidle/caffeinate check confirms it (126 passed, 0 failed).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

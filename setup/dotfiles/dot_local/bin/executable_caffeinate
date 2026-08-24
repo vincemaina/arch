@@ -49,6 +49,17 @@ set -euo pipefail
 # reports what is actually happening rather than what the file last said. The
 # file only supplies the extra detail an inactive swayidle can't: whether the
 # stop is indefinite or timed, and until when.
+#
+# WHY THIS ALSO SIGNALS WAYBAR
+#
+# waybar refreshes a custom module for free after its own on-click runs, so
+# clicking the bar module looked sufficient - until it became clear this is
+# reachable from the rofi launcher and a terminal too, and a timed session
+# expires on its own. None of those touch waybar at all, so without this the
+# bar only caught up at its next poll - stale for up to a minute after using
+# the feature the rofi menu exists to offer. notify_bar sends the signal
+# custom/caffeine's config names, the same idiom sway-toggle-bar already uses
+# for waybar's own SIGUSR1.
 
 STATE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/caffeinate/state"
 TIMER="caffeinate-timer"
@@ -71,6 +82,18 @@ cancel_timer() {
 }
 
 write_state() { mkdir -p "$(dirname "$STATE")"; printf '%s\n' "$1" > "$STATE"; }
+
+# Signal number must match "signal" in waybar/config.jsonc.tmpl's
+# custom/caffeine block - nothing enforces that agreement but this comment
+# and the one there. --kill-whom=main, not the cgroup default: waybar's own
+# click commands run as its children, and a signal a process does not handle
+# terminates it, so the default would take down whatever the bar just opened.
+# `|| true`: refreshing the bar is a nicety, not the point of any command
+# that calls this - waybar being stopped, or not installed at all on a
+# minimal machine, must never fail a state change that already happened.
+notify_bar() {
+    systemctl --user kill --kill-whom=main --signal=SIGRTMIN+8 waybar.service >/dev/null 2>&1 || true
+}
 
 # One of: off | indefinite | timed <remaining-seconds>
 read_state() {
@@ -106,6 +129,7 @@ turn_on() {
     write_state "MODE=indefinite"
     cancel_timer
     systemctl --user stop swayidle.service
+    notify_bar
     echo "Caffeinated indefinitely."
 }
 
@@ -113,6 +137,7 @@ turn_off() {
     rm -f "$STATE"
     cancel_timer
     systemctl --user start swayidle.service
+    notify_bar
     echo "Caffeinate off."
 }
 
@@ -135,6 +160,7 @@ turn_on_for() {
     cancel_timer
     systemctl --user stop swayidle.service
     systemd-run --user --unit="$TIMER" --on-active="$dur" -- "$0" off >/dev/null
+    notify_bar
     echo "Caffeinated for $dur."
 }
 
