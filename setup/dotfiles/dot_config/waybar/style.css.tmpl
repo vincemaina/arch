@@ -156,7 +156,7 @@ window#waybar > box {
  * gets shadows, gradients and rounded corners - none of which sway itself can
  * draw. A client can decorate its own surface however it likes; the compositor
  * drawing borders around windows cannot. */
-#image.arch-logo,
+#custom-arch-logo,
 #idle_inhibitor,
 #cpu,
 #memory,
@@ -179,20 +179,28 @@ window#waybar > box {
     border-radius: {{ $pillRadius }}px;
 }
 
-/* The logo is an image, not text, so it carries no colour rule of its own
- * here - the SVG itself is already rendered in @accent, at template time, by
- * arch-logo.svg.tmpl. All this module needs from the bar's CSS is the resting
- * pill above and a hover state to show where the click lands, matching every
- * other clickable module.
+/* Was an image module (gdk-pixbuf, loading a themed SVG) - see the config
+ * comment above "custom/arch-logo" for why that hung the whole bar on this
+ * machine and was replaced with a Nerd Font glyph drawn as text instead. The
+ * colour rule below is what that change actually needed: a fill baked into
+ * an SVG at template time becomes an ordinary `color` on a label, the same
+ * as every other themed glyph on this bar.
  *
- * #image.arch-logo, NOT #arch-logo: waybar turns a module's "type#name" into
+ * #custom-arch-logo, NOT #arch-logo: waybar turns a module's "type#name" into
  * the type's own CSS id plus the name as a CLASS, not a new id of its own -
- * "image#arch-logo" in the config is "#image.arch-logo" in the stylesheet.
+ * "custom/arch-logo" in the config is "#custom-arch-logo" in the stylesheet.
  * Checked against Waybar's own configuration docs rather than assumed, since
  * an id that never matches would silently leave this module unstyled - the
  * same failure mode as `-mesg` in the scripting-traps skill: an option
  * accepted, and never actually applied. */
-#image.arch-logo:hover {
+#custom-arch-logo {
+    color: @accent;
+{{- if $glow }}
+    text-shadow: 0 0 3px @accent;
+{{- end }}
+}
+
+#custom-arch-logo:hover {
     background: @surface_alt;
     box-shadow: 0 3px 8px rgba(0, 0, 0, {{ if eq $palette.mode "light" }}0.25{{ else }}0.9{{ end }});
 }
