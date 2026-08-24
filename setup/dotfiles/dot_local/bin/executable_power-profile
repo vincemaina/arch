@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: rofi powerprofilesctl upower
+
+# Switches the CPU power profile - Performance, Balanced, or Power Saving -
+# through power-profiles-daemon. See TASK-140.
+#
+#   power-profile              the menu
+#   power-profile performance  set directly, no menu
+#   power-profile balanced     set directly, no menu
+#   power-profile power-saver  set directly, no menu
+#
+# ONE MENU, TWO BAR MODULES
+#
+# Rather than a dedicated power-profile button plus a separate battery
+# readout - which would double up on a laptop and leave the button orphaned
+# on a desktop - this is opened from whichever of waybar's battery module or
+# custom/power-profile module is actually present: battery hides itself with
+# no hardware (waybar's own "No batteries" behaviour), power-profile-icon
+# hides itself when a battery IS present. Exactly one is ever visible. See
+# waybar/config.jsonc.tmpl.
+#
+# WHY THE PROMPT CARRIES BATTERY DETAIL INSTEAD OF -mesg
+#
+# rofi's -mesg widget is never placed by this repository's theme - "children"
+# in config.rasi does not list "message", so text passed via -mesg is
+# accepted and never drawn (see the scripting-traps skill). State goes where
+# IS placed instead: the prompt and the rows, the same idiom
+# ~/.local/bin/bluetooth already uses for "is bluetooth on".
+
+die() { echo "power-profile: $*" >&2; exit 1; }
+
+profile_label() {
+    case "$1" in
+        performance) echo "Performance" ;;
+        balanced)    echo "Balanced" ;;
+        power-saver) echo "Power Saving" ;;
+        *)           die "unknown profile '$1'" ;;
+    esac
+}
+
+set_profile() { exec powerprofilesctl set "$1"; }
+
+# The prompt: battery detail when a battery exists, otherwise just "Power".
+# Reads upower rather than sysfs directly because upower already computes
+# the time-to-empty/time-to-full figure a menu wants to show, in one call.
+prompt() {
+    local dev info pct time_left
+    dev="$(upower -e 2>/dev/null | grep -m1 'battery_BAT' || true)"
+    [[ -n "$dev" ]] || { echo "Power"; return; }
+
+    info="$(upower -i "$dev" 2>/dev/null || true)"
+    pct="$(awk -F': +' '/percentage:/ {print $2; exit}' <<<"$info")"
+    time_left="$(awk -F': +' '/time to (empty|full):/ {print $2; exit}' <<<"$info")"
+
+    if [[ -n "$pct" && -n "$time_left" ]]; then
+        echo "$pct - $time_left"
+    elif [[ -n "$pct" ]]; then
+        echo "$pct"
+    else
+        echo "Power"
+    fi
+}
+
+menu() {
+    local current profile rows choice
+    current="$(powerprofilesctl get 2>/dev/null || true)"
+    [[ -n "$current" ]] || die "powerprofilesctl get failed - is power-profiles-daemon running?"
+
+    rows=""
+    for profile in performance balanced power-saver; do
+        if [[ "$profile" == "$current" ]]; then
+            rows+="$(profile_label "$profile") (current)"$'\n'
+        else
+            rows+="$(profile_label "$profile")"$'\n'
+        fi
+    done
+
+    choice="$(printf '%s' "$rows" |
+        rofi -dmenu -i -p "$(prompt)" -no-custom -replace || true)"
+    [[ -n "$choice" ]] || return 0
+    choice="${choice% (current)}"
+
+    for profile in performance balanced power-saver; do
+        [[ "$(profile_label "$profile")" == "$choice" ]] && { set_profile "$profile"; return; }
+    done
+}
+
+case "${1:-}" in
+    "")                                menu ;;
+    performance|balanced|power-saver) set_profile "$1" ;;
+    -h|--help)                        sed -n '9,12p' "$0" | sed 's/^# \?//' ;;
+    *)                                 die "unknown argument '$1'. Try --help." ;;
+esac

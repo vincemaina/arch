@@ -27,11 +27,16 @@
 //   bluetooth     the bluetooth menu: connect, pair, or turn it off
 //   cpu, memory   btop
 //   pulseaudio    pavucontrol; right-click mutes; scroll changes the volume
-//   battery       swap between the charge and the time left on it
+//   battery, power-profile  the power-profile menu: performance, balanced,
+//                 power saving - see TASK-140. Exactly one of these two
+//                 modules is ever visible on a given machine, see the note
+//                 above modules-right below.
 //
 // Everything that opens a window goes through sway-toggle-window, so clicking
-// twice closes it rather than leaving a second one behind. arch-logo does not:
-// ~/.local/bin/power-menu is a rofi menu, not a toggled window - see TASK-163.
+// twice closes it rather than leaving a second one behind. arch-logo does
+// not: ~/.local/bin/power-menu is a rofi menu, not a toggled window - see
+// TASK-163. battery and custom/power-profile don't either, for the same
+// reason: ~/.local/bin/power-profile is also a rofi menu.
 //
 // Removed: the focused window's title, which used to occupy the centre. Sway
 // already says which window is focused by giving it the accent border, and the
@@ -48,6 +53,14 @@
 // one removed here was waybar's own custom/power-menu-style config, unused and
 // undisplayed; this is a themed Nerd Font glyph whose click opens the rofi
 // menu TASK-163 built, which is a different mechanism entirely.
+//
+// TASK-140 brings power profiles back for real, and it is worth being just
+// as explicit about why this is not the same dead weight the paragraph above
+// removed: what was cut before was waybar's own unused custom/power-profiles
+// widget, never wired to anything. This is battery's on-click and a new
+// custom/power-profile module, both opening ~/.local/bin/power-profile - a
+// script that talks to power-profiles-daemon, not more waybar config nobody
+// looks at.
 {{/* The bar's size - see style.css.tmpl for the full explanation. Spacing is
      the one geometry value that lives in this file rather than the
      stylesheet, so it gets the same scale computed the same way. */}}
@@ -62,7 +75,14 @@
     // bluetooth sits next to network because they are the two radios, and it is
     // the only module here that is usually absent entirely - see its own block
     // at the end of this file for why that is the point rather than a quirk.
-    "modules-right": ["idle_inhibitor", "network", "bluetooth", "cpu", "memory", "pulseaudio", "battery"],
+    //
+    // battery and custom/power-profile are BOTH listed, deliberately, and are
+    // not a duplicate: battery is invisible with no battery hardware (waybar's
+    // own "No batteries" behaviour) and power-profile-icon prints empty text
+    // when a battery IS present (the same "empty text hides the module" idiom
+    // bluetooth uses above). Exactly one of the two is ever visible on a given
+    // machine - see TASK-140 and each module's own block below.
+    "modules-right": ["idle_inhibitor", "network", "bluetooth", "cpu", "memory", "pulseaudio", "battery", "custom/power-profile"],
 
     // The Arch logo, first thing on the bar - TASK-164. Originally a themed
     // SVG rendered through waybar's "image" module (gdk-pixbuf), because that
@@ -237,18 +257,37 @@
         "on-scroll-down": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%-"
     },
 
-    // The one module whose click opens nothing. There is no battery
-    // application worth installing, and the useful second fact - how
-    // long the charge has left - is a number waybar already holds.
-    // format-alt swaps to it on click and back, which is the whole
-    // interaction.
+    // Click opens the power-profile menu (TASK-140): Performance, Balanced,
+    // Power Saving, with the charge percentage and time remaining shown as
+    // the rofi prompt rather than a tooltip or a format-alt toggle - see
+    // ~/.local/bin/power-profile for why (rofi's -mesg widget is never
+    // placed by this repository's theme, so state has to live in the prompt
+    // and rows instead - the scripting-traps skill has the detail). That
+    // replaces the format-alt charge/time-toggle this module used to click
+    // to, since the same detail now lives one click away in the menu itself.
     "battery": {
         "states": { "warning": 30, "critical": 15 },
         "format": "{icon} {capacity}%",
-        "format-charging": " {capacity}%",
+        "format-charging": " {capacity}%",
         "format-icons": ["", "", "", "", ""],
         "tooltip": false,
-        "format-alt": "{icon} {time}"
+        "on-click": "{{ .chezmoi.homeDir }}/.local/bin/power-profile"
+    },
+
+    // The desktop counterpart to battery, above - same click, same menu,
+    // different icon, and never visible on the same machine as battery. See
+    // ~/.local/bin/power-profile-icon, which prints the glyph below only
+    // when it finds no /sys/class/power_supply/BAT*, and empty text
+    // otherwise - waybar hides a module whose label is empty, the same idiom
+    // bluetooth's format-no-controller uses.
+    //
+    // interval "once": presence of battery hardware does not change while
+    // the bar is running, so there is nothing to poll for.
+    "custom/power-profile": {
+        "exec": "{{ .chezmoi.homeDir }}/.local/bin/power-profile-icon",
+        "interval": "once",
+        "tooltip-format": "Power profile",
+        "on-click": "{{ .chezmoi.homeDir }}/.local/bin/power-profile"
     },
 
     // The centre of the bar, and the reason the window title is not.

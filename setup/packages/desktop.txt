@@ -245,6 +245,29 @@ firefox
 # See setup/system/keyd/default.conf.
 keyd
 
+# Switches the CPU power profile (Performance/Balanced/Power Saving) live -
+# ~/.local/bin/power-profile, opened from the bar. See TASK-140.
+#
+# A DAEMON EARNS ITS PLACE HERE FOR ONE REASON: PRIVILEGE, NOT SCHEDULING.
+# The knobs it turns - energy_performance_preference, platform_profile - are
+# root-only sysfs writes. Doing this without the daemon would mean building
+# our own privilege-escalation path (a udev rule loosening permissions on
+# those attributes, or a sudoers/polkit rule) rather than using the one
+# already vetted for exactly this: run as root, authorise a client's request
+# over D-Bus via polkit. It is not otherwise long-running work - no polling,
+# event-driven - and 141.95 KiB installed. polkit and upower, its other real
+# dependencies, are already declared above and installed; the only new
+# transitive dependency is libgudev.
+power-profiles-daemon
+
+# The powerprofilesctl CLI ~/.local/bin/power-profile actually calls.
+# NOT pulled in by power-profiles-daemon itself - pacman lists it as an
+# Optional Dep, not a Depends On, so it has to be declared here or the
+# daemon installs with no command-line client at all. 1.5 MiB; glib2,
+# glibc and libffi are already installed, so the real new weight is
+# gobject-introspection-runtime.
+python-gobject
+
 # Picks the sway split direction from the shape of the focused container: a
 # wide one splits beside, a tall one splits below. Removes the need to decide
 # the split before opening each window, which was the friction. It is not full
