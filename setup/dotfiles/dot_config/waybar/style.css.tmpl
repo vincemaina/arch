@@ -157,7 +157,7 @@ window#waybar > box {
  * draw. A client can decorate its own surface however it likes; the compositor
  * drawing borders around windows cannot. */
 #custom-arch-logo,
-#idle_inhibitor,
+#custom-caffeine,
 #cpu,
 #memory,
 #pulseaudio,
@@ -224,7 +224,7 @@ window#waybar > box {
  * sizes the halo reached well past the glyph and neighbouring readouts bled
  * into each other on a bar only 34 pixels tall; the point of the effect is
  * that the text looks lit, which needs the light to stay where the text is. */
-#idle_inhibitor { color: @muted;    {{ if $glow }} text-shadow: 0 0 3px @muted;{{ end }} }
+#custom-caffeine { color: @muted;   {{ if $glow }} text-shadow: 0 0 3px @muted;{{ end }} }
 #cpu            { color: @info;     {{ if $glow }} text-shadow: 0 0 3px @info;{{ end }} }
 #memory         { color: @secondary;{{ if $glow }} text-shadow: 0 0 3px @secondary;{{ end }} }
 #pulseaudio     { color: @ok;       {{ if $glow }} text-shadow: 0 0 3px @ok;{{ end }} }
@@ -321,7 +321,7 @@ window#waybar > box {
 /* The pill comes back on hover, so the shape is still there when you reach for
  * something - it just is not there when you are only reading. Dark text on the
  * module's own colour, which is the inverse of the resting state. */
-#idle_inhibitor:hover,
+#custom-caffeine:hover,
 #cpu:hover,
 #memory:hover,
 #pulseaudio:hover,
@@ -344,7 +344,7 @@ window#waybar > box {
     box-shadow: 0 3px 8px rgba(0, 0, 0, {{ if eq $palette.mode "light" }}0.25{{ else }}0.9{{ end }});
 }
 
-#idle_inhibitor:hover { background: @surface_alt; color: @text; }
+#custom-caffeine:hover { background: @surface_alt; color: @text; }
 #cpu:hover            { background: @info; }
 #memory:hover         { background: @secondary; }
 #pulseaudio:hover     { background: @ok; }
@@ -438,7 +438,8 @@ window#waybar > box {
  * Bright against muted is a large enough difference to read at a glance, and
  * it is the same language the workspaces now use. The glow sharpens it where
  * a theme wants one, and is not what carries it. */
-#idle_inhibitor.activated {
+#custom-caffeine.indefinite,
+#custom-caffeine.timed {
     background: transparent;
     color: @warning;
 {{- if $glow }}
