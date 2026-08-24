@@ -83,6 +83,12 @@ o.signcolumn = 'yes'
 -- line of the screen.
 o.scrolloff = 8
 
+-- Nothing below the end of the buffer. The column of ~ is vim saying a line
+-- does not exist, which the absent line number already says - and it says it
+-- in the same column the numbers use, so removing it hands that space back
+-- rather than leaving a gap where it was.
+o.fillchars:append({ eob = ' ' })
+
 -- New splits go where the eye expects: to the right, and below.
 o.splitright = true
 o.splitbelow = true
@@ -257,6 +263,105 @@ vim.api.nvim_create_autocmd('FileType', {
     vim.wo.linebreak = true
   end,
   desc = 'Wrap prose at word boundaries',
+})
+
+-- ---------------------------------------------------------------------------
+-- Lists continue themselves
+-- ---------------------------------------------------------------------------
+--
+-- Enter in a markdown list item starts the next one: same bullet, same indent,
+-- next number, an empty checkbox. Writing a list otherwise means retyping the
+-- marker on every line, which is the kind of thing the editor should be doing.
+--
+-- `formatoptions+=r` is the built-in half of this and is not enough. It
+-- continues the leaders in `comments`, which for markdown are -, *, + and >:
+-- a numbered item does not increment, and a checkbox comes back as a bare
+-- bullet with the box lost. The `n` flag does know about numbered lists, but
+-- only to tell `gq` how to wrap one - it has nothing to do with Enter.
+--
+-- Buffer-local and markdown only, which also makes it the one mapping here
+-- that checks/session.sh's "every mapping carries a description" pass cannot
+-- see: that reads the global table. The description is written anyway, because
+-- the reason for the rule does not depend on the check reaching it.
+
+-- The marker the NEXT line should start with, the indent to put it at, and
+-- whatever content this item already has. nil when the line is not a list item.
+local function list_marker(line)
+  local indent, bullet, rest = line:match('^([ \t]*)([-*+])[ \t]+(.*)$')
+
+  -- A numbered item cannot also match the bullet pattern, so this is an
+  -- alternative rather than a second chance: 1. or 2), incremented.
+  local n_indent, number, punct, n_rest = line:match('^([ \t]*)(%d+)([.)])[ \t]+(.*)$')
+  if n_indent then
+    indent, bullet, rest = n_indent, (tonumber(number) + 1) .. punct, n_rest
+  end
+  if not indent then return nil end
+
+  -- A checkbox is a bullet with a box in front of the content, and the new box
+  -- is always unticked - copying [x] down the list would be actively wrong.
+  local box, body = rest:match('^(%[[ xX]%])[ \t]+(.*)$')
+  if box then return indent, bullet .. ' [ ] ', body end
+
+  return indent, bullet .. ' ', rest
+end
+
+-- THE SPLIT IS DONE TO THE BUFFER, NOT BY SENDING KEYS, and the two attempts
+-- that came first are worth recording because both looked right.
+--
+-- Returning `<CR>` and letting autoindent reproduce the indent works today and
+-- only because `smartindent` happens to copy it; the moment markdown gets an
+-- indentexpr it is someone else's decision. Returning `<CR><C-u>` and writing
+-- the whole leader out to be sure is worse: measured, `<C-u>` at column 0 of
+-- the fresh line finds nothing before the cursor and eats the line break
+-- instead, because `backspace` contains `eol` - so Enter silently did nothing
+-- at all on any unindented item, and worked on the indented ones.
+--
+-- Editing the text directly has no such question in it. It also means the
+-- mapping cannot be an expr one, which may not change text.
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = 'markdown',
+  callback = function(args)
+    vim.keymap.set('i', '<CR>', function()
+      local line = vim.api.nvim_get_current_line()
+      local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+
+      -- With the completion popup open, Enter belongs to the popup.
+      local indent, marker, content
+      if vim.fn.pumvisible() == 0 then
+        indent, marker, content = list_marker(line)
+      end
+
+      -- Not a list, or the cursor is still inside the marker rather than past
+      -- it - splitting a marker in half should split a line, not make two.
+      if not marker or col < #line - #content then
+        -- 'i' rather than a bare 'n': feedkeys APPENDS to the typeahead by
+        -- default, so a fast typist whose next keystrokes are already queued
+        -- gets the newline after them rather than where it was pressed. That
+        -- is not a theoretical race - it is what a scripted test does every
+        -- time, which is how it was found.
+        vim.api.nvim_feedkeys(vim.keycode('<CR>'), 'ni', false)
+        return
+      end
+
+      -- An empty item is how you stop. Enter clears the marker instead of
+      -- adding another one nobody asked for, which otherwise leaves deleting
+      -- it by hand as the only way out of a list.
+      if content == '' then
+        vim.api.nvim_set_current_line('')
+        vim.api.nvim_win_set_cursor(0, { row, 0 })
+        return
+      end
+
+      local leader = indent .. marker
+      vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, #line,
+        { '', leader .. line:sub(col + 1) })
+      vim.api.nvim_win_set_cursor(0, { row + 1, #leader })
+    end, {
+      buffer = args.buf,
+      desc = 'Continue the list on the next line',
+    })
+  end,
+  desc = 'Markdown lists continue themselves on Enter',
 })
 
 -- Briefly highlight whatever was just yanked, so it is obvious what went to the
