@@ -343,3 +343,24 @@ session you started and preselects it next time - so a boot after using the
 Virtual machine session opens back to Virtual machine, not Sway, until you
 change the dropdown again. This is ReGreet's own behaviour, not something
 configured here.
+
+**Screen brightness follows from the same fact.** "Every Sway keybinding"
+above includes the brightness keys in `52-media-keys.conf`, so a guest run
+with `vm run` from inside Sway already responds to them exactly as the rest
+of the desktop does - Sway intercepts the key and adjusts the host's real
+backlight before the guest ever sees it; nothing guest-side is involved, and
+nothing needed to change for this to work. The picture is the opposite in
+the two contexts cage hosts before any Sway session exists - ReGreet itself,
+and this "Virtual machine" login session: cage's own lack of a keybinding
+mechanism, cited above, cuts both ways, so a brightness key reaches the one
+client directly and nothing on the host reads it as a shortcut. This was
+looked at directly rather than assumed - see TASK-162 in `backlog/` - and
+left unsolved on purpose: the only real fix is a new daemon reading raw input
+below any compositor, which would then have to detect whether Sway currently
+owns the seat to avoid double-handling the same key press once you *have*
+logged in. That is a lot of new, privileged, always-running machinery for a
+screen seen for a few seconds at a time, so it was not built. If you meet
+this screen too dim or too bright, the fix today is a normal login, adjust
+it there, then switch sessions - the level Sway leaves the backlight at
+carries over to whatever runs next, cage-hosted or not, because it is the
+one physical panel underneath all of it.
