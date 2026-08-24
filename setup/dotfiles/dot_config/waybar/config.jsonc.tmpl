@@ -46,8 +46,8 @@
 // second battery, power profiles - which made the file look far busier than
 // the bar ever was. THE ARCH LOGO BELOW IS NOT THAT POWER MENU COMING BACK: the
 // one removed here was waybar's own custom/power-menu-style config, unused and
-// undisplayed; this is a themed image module whose click opens the rofi menu
-// TASK-163 built, which is a different mechanism entirely.
+// undisplayed; this is a themed Nerd Font glyph whose click opens the rofi
+// menu TASK-163 built, which is a different mechanism entirely.
 {{/* The bar's size - see style.css.tmpl for the full explanation. Spacing is
      the one geometry value that lives in this file rather than the
      stylesheet, so it gets the same scale computed the same way. */}}
@@ -57,33 +57,44 @@
     "position": "top",
     "spacing": {{ round (mulf 4.0 $scale) 0 }},
 
-    "modules-left": ["image#arch-logo", "sway/workspaces", "sway/mode", "sway/scratchpad", "custom/notifications", "custom/focus-timer"],
+    "modules-left": ["custom/arch-logo", "sway/workspaces", "sway/mode", "sway/scratchpad", "custom/notifications", "custom/focus-timer"],
     "modules-center": ["clock", "mpris"],
     // bluetooth sits next to network because they are the two radios, and it is
     // the only module here that is usually absent entirely - see its own block
     // at the end of this file for why that is the point rather than a quirk.
     "modules-right": ["idle_inhibitor", "network", "bluetooth", "cpu", "memory", "pulseaudio", "battery"],
 
-    // The Arch logo, first thing on the bar - TASK-164. A themed SVG rather
-    // than a shipped image, per CLAUDE.md's theming rules: arch-logo.svg.tmpl
-    // renders the mark in the active theme's accent colour and is re-rendered
-    // by chezmoi on every apply, the same as every other themed consumer here.
+    // The Arch logo, first thing on the bar - TASK-164. Originally a themed
+    // SVG rendered through waybar's "image" module (gdk-pixbuf), because that
+    // was the obvious way to get a re-colourable mark. It does not work: on
+    // this machine gdk-pixbuf2 ships no loader plugins at all - not even for
+    // PNG - because the distro has moved GTK4 image loading to the sandboxed
+    // "glycin" library and waybar is GTK3, which never learned to use it.
+    // The "image" module doesn't error or draw nothing when this happens -
+    // the whole bar surface never receives its first commit from the
+    // compositor, so waybar keeps running with zero visible output on every
+    // display, on every restart, silently. Confirmed with waybar itself: a
+    // one-module config containing only "image" reproduces the hang with no
+    // log line above [info] level, whether the file is the SVG, a rasterised
+    // PNG, or "size" is omitted entirely - this is not a librsvg problem, it
+    // is the image module itself on this gdk-pixbuf. See docs/software/
+    // README.md's librsvg entry for what was tried and why it was removed.
     //
-    // waybar's own "image" module type, which loads a file path through
-    // gdk-pixbuf rather than drawing text - see the librsvg entry in
-    // docs/software/README.md for why that package had to be declared for
-    // this to render at all.
+    // Nerd Font glyph in a "custom" module instead - drawn as text through
+    // Pango, the same path every other icon on this bar already uses, so it
+    // can't hit the same failure. Themed the same way too: no colour rule of
+    // its own beyond `color`, set from the palette in style.css.tmpl, rather
+    // than a baked-in fill the way the SVG needed. Size follows the bar's
+    // own font-size ($barFont), so it scales with `bar-size` for free.
     //
-    // size is in the bar's own scale, matching the workspace discs
-    // ($wsSize in style.css.tmpl) rather than a fixed pixel count, so the logo
-    // grows and shrinks with the rest of the bar under `bar-size`.
+    // codepoint written literally rather than pasted, per CLAUDE.md's Nerd
+    // Font rule - this is nf-linux-archlinux, U+F303.
     //
     // on-click is the absolute path to the power menu this desktop already
     // has (TASK-163) - not a bare command, for the reason every other click
     // handler in this file is absolute: waybar's PATH is not ~/.local/bin.
-    "image#arch-logo": {
-        "path": "{{ .chezmoi.homeDir }}/.config/waybar/arch-logo.svg",
-        "size": {{ round (mulf 16.0 $scale) 0 }},
+    "custom/arch-logo": {
+        "format": "\uf303",
         "tooltip-format": "Power menu",
         "on-click": "{{ .chezmoi.homeDir }}/.local/bin/power-menu"
     },
