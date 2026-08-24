@@ -1,0 +1,22 @@
+# Exec is an absolute path for the same reason bluetooth's and theme's are:
+# ~/.local/bin is not on the PATH sway and rofi hand to what they spawn, so a
+# bare `Exec=caffeinate` works when tested from a terminal and silently does
+# nothing from the launcher.
+#
+# This is what makes TASK-168's acceptance criterion true - reachable from
+# rofi without touching the bar. Without this entry, caffeinate was only ever
+# a click on the bar module or a command typed in a terminal; neither is
+# "search for it in the launcher", which is what every other rofi-menu
+# feature here (bluetooth, the power menu) already offers.
+
+[Desktop Entry]
+Type=Application
+Name=Caffeinate
+GenericName=Keep the screen awake
+Comment=Stop the screen locking or sleeping, indefinitely or for a fixed time
+Icon=preferences-desktop-screensaver
+Exec={{ .chezmoi.homeDir }}/.local/bin/caffeinate
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=caffeine;caffeinate;awake;idle;lock;screensaver;sleep;coffee;
+NoDisplay=false

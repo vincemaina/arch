@@ -157,6 +157,20 @@ else
             else
                 fail "$unit is running but Restart=${restart:-no}, so a crash would be permanent"
             fi
+        elif [[ "$unit" == swayidle && -x "$HOME/.local/bin/caffeinate" ]] &&
+             caffeine_status="$("$HOME/.local/bin/caffeinate" status 2>/dev/null)" &&
+             [[ "$caffeine_status" != "Not caffeinated"* ]]; then
+            # swayidle.service being stopped is not always a problem: TASK-168's
+            # caffeinate feature stops it on purpose, indefinitely or for a fixed
+            # time, and that is meant to look exactly like this from the outside -
+            # see caffeinate's own header for why it reuses swayidle.service
+            # rather than a Wayland idle-inhibit client of its own. Ask the same
+            # script the bar asks, rather than re-deciding "is this deliberate"
+            # from a state file of this check's own - and captured into a
+            # variable, not piped through grep -q, which would SIGPIPE the
+            # writer under this script's pipefail (see the scripting-traps
+            # skill's "grep -q in a pipeline" entry).
+            pass "swayidle is stopped, but caffeinate says so on purpose ($caffeine_status)"
         else
             fail "$unit is not running"
         fi

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@vincemaina'
 created_date: '2026-08-24 14:19'
-updated_date: '2026-08-24 14:42'
+updated_date: '2026-08-24 18:34'
 labels: []
 dependencies: []
 ordinal: 175000
@@ -50,6 +50,10 @@ Bug caught and fixed during live verification: cancel_timer() originally stopped
 Verified live on the actual session (not just read back): on/off/2h/status/--bar all exercised directly against the real swayidle.service, restored to normal (active, no state file, no timer) afterward. Rofi menu and both bar states (off muted, timed warning+'1h 59m') screenshotted via a throwaway waybar+headless-output instance per the desktop-verification skill, then torn down (focus restored to Virtual-1, HEADLESS output unplugged, no processes left behind). chezmoi render to a scratch destination (--exclude=scripts) succeeded for all themes both before and after a follow-up comment edit. checks/session.sh (125 passed/0 failed), checks/sway-commands.sh, checks/sway-bindings.sh and checks/manual.sh all pass.
 
 Separate finding, not fixed here: U+F0F4 (used for the icon, carried over unchanged from the old idle_inhibitor module) renders as a desktop/monitor glyph on the JetBrainsMono Nerd Font actually installed on this machine, not a coffee cup - confirmed by isolating the codepoint with pango-view. This predates TASK-168 (the old module used the identical codepoint) and is out of this task's scope; left both the script and a comment flagging it for whoever picks the icon mismatch up.
+
+Follow-up fix, same session: the user reported caffeinate wasn't reachable from the launcher after merge. AC #3 said 'reachable from rofi ... like bluetooth/power-profile' but I only made it a standalone script (like power-profile, which has no launcher entry) rather than adding a .desktop entry (like bluetooth, which does) - power-profile was the wrong model to have actually verified against, since it IS bar-only by design. Added setup/dotfiles/dot_local/share/applications/caffeinate.desktop.tmpl (same pattern as bluetooth.desktop.tmpl: absolute Exec via chezmoi homeDir). Applied live with 'chezmoi apply' and confirmed 'Caffeinate' now appears via rofi -show drun -filter caffeinate on a throwaway headless output, with the preferences-desktop-screensaver icon rendering. docs/manual/02-the-desktop.md notes the launcher entry alongside the bar table.
+
+Also found and fixed a real gap in checks/session.sh while re-running it: the session-units check unconditionally fails when swayidle.service is stopped, with no awareness that caffeinate stops it on purpose - it flagged FAIL against the user's own real 4-hour caffeinate session they'd just started to try the feature. Fixed the swayidle case to ask '~/.local/bin/caffeinate status' (mirroring what the bar module already asks) before failing, captured into a variable rather than piped through 'grep -q' per the scripting-traps skill. checks/session.sh: 126 passed, 0 failed with that real caffeinate session still running - left it running rather than turning it off, since it is the user's own deliberate state, not test leftover.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
