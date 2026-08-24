@@ -1803,31 +1803,64 @@ else
         fi
     done
 
-    if systemctl is-active --quiet keyd; then
-        pass "keyd is running"
-    else
-        fail "keyd is not running, so the keyboard is unswapped despite the config"
-    fi
-
     if systemctl is-enabled --quiet keyd 2>/dev/null; then
         pass "keyd is enabled at boot"
     else
         fail "keyd is not enabled, so the swap is lost at the next reboot"
     fi
 
-    # The daemon can be running and still have grabbed nothing, which looks
-    # identical from systemctl and leaves the keyboard unremapped.
-    # Counted rather than tested with grep -q: see the note on swapon above.
-    # journalctl writes plenty, so grep -q reliably closed the pipe under it and
-    # this check reported that keyd had grabbed nothing while it was working.
-    # Unique device ids, not match lines: keyd logs a match every time it
-    # restarts, so counting lines would claim six keyboards where there is one.
-    matched="$(journalctl -u keyd -b --no-pager 2>/dev/null \
-        | grep "DEVICE: match" | awk '{print $4}' | sort -u | grep -c .)"
-    if [[ "$matched" -gt 0 ]]; then
-        pass "keyd grabbed $matched keyboard device(s)"
+    # TASK-165: a VM guest cloned from this repo's own base image (TASK-69.2)
+    # gets this exact enabled keyd, same as bare metal - but a guest's
+    # keycodes already arrive pre-swapped from the host's own keyd, sitting
+    # below the compositor QEMU is a client of. A second swap inside the
+    # guest would cancel the host's, so keyd.service.d/override.conf refuses
+    # to let the unit start there. "keyd is not running" is therefore the
+    # CORRECT state on a VM guest and the WRONG one everywhere else - decide
+    # which is being looked at before judging whether it is running.
+    is_vm_guest=false
+    if command -v systemd-detect-virt &>/dev/null \
+        && systemd-detect-virt --vm -q; then
+        is_vm_guest=true
+    fi
+
+    if $is_vm_guest; then
+        if [[ -f /etc/systemd/system/keyd.service.d/override.conf ]] \
+            && grep -qF "ConditionVirtualization=!vm" \
+                /etc/systemd/system/keyd.service.d/override.conf; then
+            pass "keyd.service.d/override.conf carries ConditionVirtualization=!vm (TASK-165)"
+        else
+            fail "the keyd VM guard (ConditionVirtualization=!vm, TASK-165) is missing; a guest cloned from this image would double-swap and cancel the host's TASK-40 remap"
+        fi
+
+        if systemctl is-active --quiet keyd; then
+            fail "keyd is running inside this VM guest - it will double-swap and cancel the host's TASK-40 remap (TASK-165)"
+        else
+            pass "keyd is correctly inactive inside this VM guest, leaving the host's single swap in effect (TASK-165)"
+        fi
     else
-        fail "keyd matched no input device this boot, so nothing is being remapped"
+        if systemctl is-active --quiet keyd; then
+            pass "keyd is running"
+        else
+            fail "keyd is not running, so the keyboard is unswapped despite the config"
+        fi
+
+        # The daemon can be running and still have grabbed nothing, which
+        # looks identical from systemctl and leaves the keyboard unremapped.
+        # Counted rather than tested with grep -q: see the note on swapon
+        # above. journalctl writes plenty, so grep -q reliably closed the
+        # pipe under it and this check reported that keyd had grabbed
+        # nothing while it was working. Unique device ids, not match lines:
+        # keyd logs a match every time it restarts, so counting lines would
+        # claim six keyboards where there is one. Skipped on a VM guest,
+        # where keyd is deliberately never started and so never grabs
+        # anything - see above.
+        matched="$(journalctl -u keyd -b --no-pager 2>/dev/null \
+            | grep "DEVICE: match" | awk '{print $4}' | sort -u | grep -c .)"
+        if [[ "$matched" -gt 0 ]]; then
+            pass "keyd grabbed $matched keyboard device(s)"
+        else
+            fail "keyd matched no input device this boot, so nothing is being remapped"
+        fi
     fi
 fi
 

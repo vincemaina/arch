@@ -36,6 +36,11 @@ CONFIG_FILES=(
     "tmpfiles.d/zswap.conf:/etc/tmpfiles.d/zswap.conf"
     "earlyoom.conf:/etc/default/earlyoom"
     "keyd/default.conf:/etc/keyd/default.conf"
+    # Keeps keyd off inside a VM guest cloned from this repo's own base
+    # image, where it would double-swap and cancel the host's TASK-40 remap
+    # rather than repeat it. See setup/system/keyd/keyd.service.d/override.conf
+    # and TASK-165.
+    "keyd/keyd.service.d/override.conf:/etc/systemd/system/keyd.service.d/override.conf"
     "greetd/config.toml:/etc/greetd/config.toml"
     "greetd/regreet.toml:/etc/greetd/regreet.toml"
     # Local session entries. /usr/local/share is the directory the desktop

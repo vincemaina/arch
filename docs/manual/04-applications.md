@@ -301,6 +301,18 @@ the same prompts a fresh install makes — so it needs a real terminal to run in
 not a script driving it. See
 [Recipes](08-recipes.md) → "Build (or rebuild) the base VM image" for how.
 
+**The left Alt / left Control swap (see [The keyboard](03-the-keyboard.md))
+still works inside a guest, and only because the guest's own copy of it is
+switched off.** The base image is built from this same repository, so a
+freshly cloned machine has `keyd` installed and enabled exactly like the
+host - but by the time a keypress reaches a guest window, the host's `keyd`
+has already swapped it, and a second swap inside the guest would cancel the
+first. `setup/system/keyd/keyd.service.d/override.conf` keeps `keyd` from
+starting whenever the machine it is running on is itself a VM, which is
+every guest built from this image. Nothing to configure; it is why the swap
+"just works" the same way in a guest as it does everywhere else, rather than
+a coincidence worth relying on.
+
 Machines that are not this setup work too:
 
 ```bash
