@@ -16,6 +16,7 @@
 // trains you to ignore it; a readout that opens the thing explaining it is
 // worth glancing at. What each one does:
 //
+//   arch-logo     opens the power menu: log out, restart, suspend, power off
 //   workspaces    switch to it
 //   notifications open the notification centre (dismiss / restore / DND)
 //   focus-timer   the timer menu: stop it, or skip to the next phase
@@ -29,7 +30,8 @@
 //   battery       swap between the charge and the time left on it
 //
 // Everything that opens a window goes through sway-toggle-window, so clicking
-// twice closes it rather than leaving a second one behind.
+// twice closes it rather than leaving a second one behind. arch-logo does not:
+// ~/.local/bin/power-menu is a rofi menu, not a toggled window - see TASK-163.
 //
 // Removed: the focused window's title, which used to occupy the centre. Sway
 // already says which window is focused by giving it the accent border, and the
@@ -42,7 +44,10 @@
 // Also removed a large amount of configuration for modules that were never
 // displayed at all - mpd, a media widget, a power menu, keyboard state, a
 // second battery, power profiles - which made the file look far busier than
-// the bar ever was.
+// the bar ever was. THE ARCH LOGO BELOW IS NOT THAT POWER MENU COMING BACK: the
+// one removed here was waybar's own custom/power-menu-style config, unused and
+// undisplayed; this is a themed image module whose click opens the rofi menu
+// TASK-163 built, which is a different mechanism entirely.
 {{/* The bar's size - see style.css.tmpl for the full explanation. Spacing is
      the one geometry value that lives in this file rather than the
      stylesheet, so it gets the same scale computed the same way. */}}
@@ -52,12 +57,36 @@
     "position": "top",
     "spacing": {{ round (mulf 4.0 $scale) 0 }},
 
-    "modules-left": ["sway/workspaces", "sway/mode", "sway/scratchpad", "custom/notifications", "custom/focus-timer"],
+    "modules-left": ["image#arch-logo", "sway/workspaces", "sway/mode", "sway/scratchpad", "custom/notifications", "custom/focus-timer"],
     "modules-center": ["clock", "mpris"],
     // bluetooth sits next to network because they are the two radios, and it is
     // the only module here that is usually absent entirely - see its own block
     // at the end of this file for why that is the point rather than a quirk.
     "modules-right": ["idle_inhibitor", "network", "bluetooth", "cpu", "memory", "pulseaudio", "battery"],
+
+    // The Arch logo, first thing on the bar - TASK-164. A themed SVG rather
+    // than a shipped image, per CLAUDE.md's theming rules: arch-logo.svg.tmpl
+    // renders the mark in the active theme's accent colour and is re-rendered
+    // by chezmoi on every apply, the same as every other themed consumer here.
+    //
+    // waybar's own "image" module type, which loads a file path through
+    // gdk-pixbuf rather than drawing text - see the librsvg entry in
+    // docs/software/README.md for why that package had to be declared for
+    // this to render at all.
+    //
+    // size is in the bar's own scale, matching the workspace discs
+    // ($wsSize in style.css.tmpl) rather than a fixed pixel count, so the logo
+    // grows and shrinks with the rest of the bar under `bar-size`.
+    //
+    // on-click is the absolute path to the power menu this desktop already
+    // has (TASK-163) - not a bare command, for the reason every other click
+    // handler in this file is absolute: waybar's PATH is not ~/.local/bin.
+    "image#arch-logo": {
+        "path": "{{ .chezmoi.homeDir }}/.config/waybar/arch-logo.svg",
+        "size": {{ round (mulf 16.0 $scale) 0 }},
+        "tooltip-format": "Power menu",
+        "on-click": "{{ .chezmoi.homeDir }}/.local/bin/power-menu"
+    },
 
     "sway/workspaces": {
         "disable-scroll": true,

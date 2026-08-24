@@ -128,6 +128,7 @@ to right as the bar itself is laid out.
 
 | Module | Shows | Click |
 | --- | --- | --- |
+| Arch logo | A small Arch Linux mark, coloured with the theme's accent | Opens the [power menu](#power) |
 | Workspaces | Every workspace, current one highlighted | Switch to the one clicked |
 | Mode | The active binding mode's name (for example "resize") while one is active | - |
 | Scratchpad | How many windows are stashed, hidden when there are none | `scratchpad show` - brings one back |
@@ -231,6 +232,30 @@ aptX, LDAC and the headset ones — is part of PipeWire and is already
 installed on every machine here, so a paired pair of headphones appears as an
 output device as soon as it connects, and the volume module controls it like
 any other.
+
+## Power
+
+`$mod+Shift+e`, the small Arch logo at the left of the bar, and the launcher
+(type "power") all open the same menu: **Log out**, **Restart**, **Suspend**,
+**Power off**. It replaces what used to be a single swaynag prompt asking only
+"exit sway?" — that covered a quarter of what leaving a session actually
+means, and the other three were reachable only by opening a terminal and
+typing `systemctl` at the one moment you are trying to get away from the
+keyboard.
+
+Log out ends the Wayland session (`swaymsg exit`) and returns you to the login
+screen. Restart, Suspend and Power off go through `systemctl` to systemd-logind
+— the same route `bluetooth on`/`off` use to start and stop a service, so the
+polkit agent this desktop already runs is what would prompt for a password,
+if logind ever asked for one.
+
+**Log out, Restart and Power off ask once more before doing anything.** That
+is the swaynag prompt's old reasoning, carried into the new menu rather than
+dropped: a stray Enter on the wrong row should not end the session, reboot the
+machine, or power it off. The confirmation lists **Cancel** first, so the
+accidental answer is also the safe one. **Suspend does not confirm** — it is
+fully reversible, waking the machine undoes it completely, and asking twice
+would only be friction on the action used most often.
 
 ## Notifications
 

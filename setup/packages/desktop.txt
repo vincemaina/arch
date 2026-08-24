@@ -199,6 +199,16 @@ gnome-themes-extra
 papirus-icon-theme
 xdg-desktop-portal-gtk
 
+# SVG rendering, DECLARED RATHER THAN INHERITED - the same reasoning as polkit
+# and mesa above. The bar's Arch logo (TASK-159) is a themed SVG rendered
+# through waybar's image module, which reaches gdk-pixbuf's SVG loader and
+# therefore this. It arrives anyway - papirus-icon-theme is itself all SVG,
+# and gtk3/gtk4/greetd-regreet all pull it through gdk-pixbuf2 - so pacman
+# already had it marked "installed as a dependency", precisely the state
+# CLAUDE.md warns about: removing whatever pulled it in would take the bar's
+# logo with it and nothing would say so.
+librsvg
+
 # Fonts
 noto-fonts
 noto-fonts-emoji

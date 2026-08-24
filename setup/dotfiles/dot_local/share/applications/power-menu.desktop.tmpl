@@ -1,0 +1,20 @@
+# Exec is an absolute path, rendered by chezmoi, and that is load-bearing.
+#
+# ~/.local/bin is not on the PATH that sway and rofi hand to the things they
+# spawn - it is added by .zshrc, which only applies to interactive shells. A
+# bare `Exec=power-menu` therefore resolves when tested from a terminal and
+# fails from the launcher, silently, because Terminal=false means nothing is
+# ever shown. The sway config learned the same lesson about keybindings; this
+# is the desktop-entry version of it.
+
+[Desktop Entry]
+Type=Application
+Name=Power
+GenericName=Power menu
+Comment=Log out, restart, suspend, or power off this machine
+Icon=system-shutdown
+Exec={{ .chezmoi.homeDir }}/.local/bin/power-menu
+Terminal=false
+Categories=System;
+Keywords=power;shutdown;poweroff;restart;reboot;suspend;logout;log out;exit;
+NoDisplay=false
