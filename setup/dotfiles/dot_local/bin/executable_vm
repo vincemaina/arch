@@ -408,6 +408,17 @@ cmd_run() {
         -drive "if=pflash,format=raw,readonly=on,file=$code"
         -drive "if=pflash,format=raw,file=$vars"
         -drive "file=$dir/disk.qcow2,if=virtio,format=qcow2,cache=writeback,discard=unmap"
+        # A guest cloned from this repo's own base image is another copy of
+        # this desktop, and its own keyd would double-swap left Alt/left
+        # Control - the keycodes it receives already went through the host's
+        # swap, since keyd sits below the compositor QEMU is a client of. The
+        # DMI product family is how the guest's keyd override tells this case
+        # apart from a machine that IS a top-level VM with no host-side keyd
+        # upstream of it - see setup/system/keyd/keyd.service.d/override.conf
+        # and TASK-166. Readable unprivileged at
+        # /sys/class/dmi/id/product_family in the guest; nothing else on this
+        # machine sets it.
+        -smbios type=1,family=arch-repo-vm-guest
         -netdev user,id=net0
         -device virtio-net,netdev=net0
         # A tablet rather than a mouse: it reports absolute coordinates, so the

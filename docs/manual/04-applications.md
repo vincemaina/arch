@@ -308,10 +308,14 @@ freshly cloned machine has `keyd` installed and enabled exactly like the
 host - but by the time a keypress reaches a guest window, the host's `keyd`
 has already swapped it, and a second swap inside the guest would cancel the
 first. `setup/system/keyd/keyd.service.d/override.conf` keeps `keyd` from
-starting whenever the machine it is running on is itself a VM, which is
-every guest built from this image. Nothing to configure; it is why the swap
-"just works" the same way in a guest as it does everywhere else, rather than
-a coincidence worth relying on.
+starting whenever the machine it is running on carries the marker `vm` sets
+on every guest it launches, which is every guest built from this image.
+Nothing to configure; it is why the swap "just works" the same way in a
+guest as it does everywhere else, rather than a coincidence worth relying
+on. This is deliberately not "whenever the machine is a VM at all" - a
+top-level VM running this desktop as its only OS, with no host-side `keyd`
+above it, gets the swap applied exactly like bare metal. See `DECISIONS.md`
+→ "Keeping a VM guest's keyboard from double-swapping the host's remap".
 
 Machines that are not this setup work too:
 
