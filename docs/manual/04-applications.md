@@ -116,6 +116,17 @@ Verified by asking a headless neovim what is actually mapped (`shortcuts
 Completion is on and triggers automatically as you type — not only on
 `Ctrl-X Ctrl-O` — for any server that supports it.
 
+**Markdown lists continue themselves.** Enter inside a bullet, a numbered item
+or a checkbox starts the next one: same marker, same indent, the number
+incremented, the box unticked. Enter again on an item you have not typed
+anything into clears the marker instead — which is how a list ends, without
+deleting anything by hand. It is the one binding missing from the table above,
+and deliberately so: it exists only in markdown buffers, and the table is
+derived from the ones that exist everywhere.
+
+There is no column of `~` below the last line of a file. The missing line
+number already says the line is not there, and it says it in the same column.
+
 **Which language servers attach depends on the file, and is worth checking
 directly rather than assuming.** Verified live on this machine:
 
