@@ -128,6 +128,7 @@ to right as the bar itself is laid out.
 
 | Module | Shows | Click |
 | --- | --- | --- |
+| Arch logo | A small Arch Linux mark, coloured with the theme's accent | Opens the [power menu](#power) |
 | Workspaces | Every workspace, current one highlighted | Switch to the one clicked |
 | Mode | The active binding mode's name (for example "resize") while one is active | - |
 | Scratchpad | How many windows are stashed, hidden when there are none | `scratchpad show` - brings one back |

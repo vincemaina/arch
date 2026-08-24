@@ -1,6 +1,6 @@
 # Software this setup installs
 
-One hundred and nine packages are declared across [`setup/packages/`](../../setup/packages/).
+One hundred and eleven packages are declared across [`setup/packages/`](../../setup/packages/).
 This document accounts for every one of them: what it is for, where its
 rationale lives, and what it costs on the machine.
 
@@ -310,6 +310,7 @@ the line, **↓** means an entry below in this document.
 | `noto-fonts-emoji` | Colour emoji | D: Noto Fonts |
 | `ttf-jetbrains-mono-nerd` | Monospace plus the Nerd Font glyphs the bar uses | D: JetBrains Mono Nerd Font |
 | `ttf-dejavu` | Fallback for glyphs Noto lacks | ↓ |
+| `librsvg` | SVG rendering for the bar's themed Arch logo | see below |
 
 ### dev.txt — shell
 
@@ -573,6 +574,30 @@ packages and the Nerd Font, 466.7 MiB, 30.6% of the install (re-derived
 declared set costs on disk" above). Zero at runtime beyond what is rendered.
 That is the trade this setup has made; it is defensible, and it should be made
 knowingly.
+
+### librsvg
+
+**Problem.** The bar's Arch logo (TASK-159) is a small SVG, rendered once per
+theme with the accent colour baked in, through waybar's `image` module. GTK
+loads that through `gdk-pixbuf`, and `gdk-pixbuf2` itself does not decode SVG -
+the loader lives in a separate package.
+**Choice.** `librsvg`, the only SVG loader `gdk-pixbuf` has. There is no
+alternative to choose between.
+**How it works.** `librsvg` installs
+`/usr/lib/gdk-pixbuf-2.0/*/loaders/libpixbufloader-svg.so`, a `gdk-pixbuf`
+loader module. Anything asking `gdk-pixbuf` to open a `.svg` - waybar's `image`
+module here, GTK icon themes generally - goes through it. Without it, waybar
+would log a `GdkPixbuf` error and the module would draw nothing.
+**Declared rather than inherited.** It was already installed - `pactree -r
+librsvg` shows it pulled in by `gdk-pixbuf2` (itself required by `gtk3`,
+`gtk4`, `greetd-regreet` and others) and separately by `ffmpeg` - so pacman had
+it marked "installed as a dependency", the exact state `polkit`, `mesa` and
+`adwaita-cursors` were rescued from in TASK-13. The bar now relies on it
+directly, so it is declared for the same reason: a change in `gdk-pixbuf2`'s or
+`ffmpeg`'s own dependencies must not be able to take the SVG loader, and the
+logo, with it silently.
+**Cost.** 10.26 MiB, measured with `pacman -Qi`. Nothing at runtime beyond
+decoding one small file once per theme change.
 
 ### zoxide
 
