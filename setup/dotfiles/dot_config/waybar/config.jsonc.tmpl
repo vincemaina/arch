@@ -22,7 +22,8 @@
 //   focus-timer   the timer menu: stop it, or skip to the next phase
 //   clock         a calendar, three months, toggled
 //   mpris         play/pause; middle goes back, right skips forward
-//   idle_inhibitor  stop the screen locking, or let it again
+//   custom/caffeine  the caffeinate menu: off, on indefinitely, or for a
+//                 fixed time - see TASK-168
 //   network       nmtui, to change connection
 //   bluetooth     the bluetooth menu: connect, pair, or turn it off
 //   cpu, memory   btop
@@ -82,7 +83,7 @@
     // when a battery IS present (the same "empty text hides the module" idiom
     // bluetooth uses above). Exactly one of the two is ever visible on a given
     // machine - see TASK-140 and each module's own block below.
-    "modules-right": ["idle_inhibitor", "network", "bluetooth", "cpu", "memory", "pulseaudio", "battery", "custom/power-profile"],
+    "modules-right": ["custom/caffeine", "network", "bluetooth", "cpu", "memory", "pulseaudio", "battery", "custom/power-profile"],
 
     // The Arch logo, first thing on the bar - TASK-164. Originally a themed
     // SVG rendered through waybar's "image" module (gdk-pixbuf), because that
@@ -207,23 +208,31 @@
         "on-click": "{{ .chezmoi.homeDir }}/.local/bin/focus-timer"
     },
 
-    // Caffeine: keep the screen awake. Click to stop it locking or sleeping -
-    // for watching something, or during a long build.
+    // Caffeine: keep the screen awake, indefinitely or for a fixed time -
+    // for watching something, or during a long build. TASK-168 replaced
+    // waybar's own idle_inhibitor module with this custom one, because
+    // idle_inhibitor is a plain click-to-toggle with no way to set a
+    // duration and no way to reach it except the bar itself. ~/.local/bin/
+    // caffeinate does the actual work (stopping and starting
+    // swayidle.service - see that script's own header for why) and this
+    // module only displays what it reports and opens its menu.
     //
-    // The module type has to be idle_inhibitor because that is what waybar
-    // calls it, but everything a person sees says caffeinated. The name is the
-    // useful metaphor: this is not "inhibiting an idle timer", it is "do not
-    // let the machine nod off".
+    // return-type json plus a plain interval, not restart-interval: unlike
+    // the focus timer this does not need second-by-second ticking, and a
+    // periodic poll is the same idiom cpu/memory already use.
     //
-    // One glyph for both states, by codepoint - U+F0F4, a coffee cup, checked
-    // against the font's charset rather than pasted. Colour carries the state
-    // the way it does everywhere else on this bar: muted when off, warning
-    // when on, since a machine deliberately kept awake is exactly "attention,
-    // nothing wrong yet".
-    "idle_inhibitor": {
-        "format": "\uf0f4",
-        "tooltip-format-activated": "Caffeinated: the screen will not lock or sleep",
-        "tooltip-format-deactivated": "Not caffeinated: locking and sleeping as normal"
+    // The glyph itself is drawn by the script, not this file - see
+    // ~/.local/bin/caffeinate's own header for the codepoint it uses and a
+    // flag about what it actually renders as. Colour still carries the
+    // state the way it does everywhere else on this bar: muted when off,
+    // warning when caffeinated - and a timed session additionally shows the
+    // time left as text, which is what tells it apart from an indefinite
+    // one at a glance.
+    "custom/caffeine": {
+        "exec": "{{ .chezmoi.homeDir }}/.local/bin/caffeinate --bar",
+        "return-type": "json",
+        "interval": 30,
+        "on-click": "{{ .chezmoi.homeDir }}/.local/bin/caffeinate"
     },
 
     "cpu": {

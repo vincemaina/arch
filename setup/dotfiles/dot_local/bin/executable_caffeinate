@@ -1,0 +1,235 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: systemctl systemd-run rofi date
+
+# Caffeinate: stop the screen locking or sleeping, indefinitely or for a
+# fixed time, from a rofi menu rather than only from the bar. See TASK-168.
+#
+#   caffeinate            the menu
+#   caffeinate on         caffeinate indefinitely
+#   caffeinate off        stop caffeinating
+#   caffeinate 1h|2h|4h|8h caffeinate for a fixed time
+#   caffeinate status     one sentence: what state this session is in
+#   caffeinate --bar      JSON for waybar - {text, tooltip, class}
+#
+# WHY swayidle.service, NOT WAYLAND'S idle-inhibit PROTOCOL
+#
+# swayidle is already this repository's one place that decides when to lock
+# and when to sleep - see ~/.local/bin/sway-idle and its own header. Stopping
+# swayidle.service is the whole effect a caffeinate feature needs: no timeout
+# ever fires while it is not running. That means this needs no idle-inhibit
+# Wayland client of its own (which is what waybar's built-in idle_inhibitor
+# module used to be, before this replaced it) - just systemctl, which every
+# other on/off feature here (bluetooth, power profiles) already uses.
+#
+# WHY A SYSTEMD TIMER RATHER THAN A LOOP LIKE focus-timer-bar
+#
+# focus-timer-bar deliberately does not advance while waybar is not running,
+# because a countdown nobody can see has no business pausing music - see its
+# own header. Caffeinate is not that: leaving the screen unable to lock is a
+# security/battery property, not a display, so its expiry must not depend on
+# waybar being alive to notice. `systemd-run --on-active` schedules a one-shot
+# unit through systemd itself, independent of whether anything is watching -
+# `caffeinate off` runs at the right time whether or not the bar is up.
+#
+# WHY A STATE FILE AS WELL AS THE TIMER
+#
+# The timer is what makes "off" happen on time; it is not queried for how much
+# time is left. Reading a scheduled unit's remaining time means reconciling
+# systemd's monotonic clock with wall time, for no benefit - this script
+# already knows the target epoch the moment it schedules the timer, so it
+# writes that once to a small state file (the same idiom focus-timer's ENDS
+# field uses) and every later read is a plain subtraction.
+#
+# THE RUNNING SYSTEM IS STILL THE TRUTH
+#
+# swayidle.service's own ActiveState decides "caffeinated or not", never the
+# state file alone - if something else stopped or started swayidle, this
+# reports what is actually happening rather than what the file last said. The
+# file only supplies the extra detail an inactive swayidle can't: whether the
+# stop is indefinite or timed, and until when.
+
+STATE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/caffeinate/state"
+TIMER="caffeinate-timer"
+
+die() { echo "caffeinate: $*" >&2; exit 1; }
+
+swayidle_running() {
+    [[ "$(systemctl --user is-active swayidle.service 2>/dev/null || true)" == "active" ]]
+}
+
+cancel_timer() {
+    # The .timer only - never the .service. When the timer fires, "off" runs
+    # AS caffeinate-timer.service; stopping that unit from inside itself is
+    # `kill -TERM` on the process running this line, and the rest of "off"
+    # (starting swayidle again) never executes. Caught live: swayidle stayed
+    # stopped through a whole timed session because of exactly this. The
+    # service is Type=oneshot and exits on its own once its command returns,
+    # so it never needs stopping - only a pending future fire does.
+    systemctl --user stop "$TIMER.timer" >/dev/null 2>&1 || true
+}
+
+write_state() { mkdir -p "$(dirname "$STATE")"; printf '%s\n' "$1" > "$STATE"; }
+
+# One of: off | indefinite | timed <remaining-seconds>
+read_state() {
+    if swayidle_running; then
+        echo off
+        # Nothing should be scheduled once swayidle is running on its own -
+        # clean up a timer left behind by a race (e.g. "off" ran just as the
+        # timer also fired) rather than let it linger unnoticed.
+        cancel_timer
+        rm -f "$STATE"
+        return
+    fi
+
+    local mode until_epoch now left
+    mode="indefinite"
+    if [[ -r "$STATE" ]]; then
+        while IFS='=' read -r k v; do
+            case "$k" in MODE) mode="$v" ;; UNTIL) until_epoch="$v" ;; esac
+        done < "$STATE"
+    fi
+
+    if [[ "$mode" == "timed" && -n "${until_epoch:-}" ]]; then
+        now="$(date +%s)"
+        left=$(( until_epoch - now ))
+        (( left < 0 )) && left=0
+        echo "timed $left"
+    else
+        echo indefinite
+    fi
+}
+
+turn_on() {
+    write_state "MODE=indefinite"
+    cancel_timer
+    systemctl --user stop swayidle.service
+    echo "Caffeinated indefinitely."
+}
+
+turn_off() {
+    rm -f "$STATE"
+    cancel_timer
+    systemctl --user start swayidle.service
+    echo "Caffeinate off."
+}
+
+# $1 is one of the fixed menu durations, e.g. "2h". systemd-run's --on-active
+# understands that shorthand directly; `date -d` does not (`date -d "+2h"` is
+# rejected outright - it wants "2 hours"), so the target epoch for the state
+# file is computed from an expanded form instead. Both ultimately parse the
+# same number, just spelled differently, so there is no drift between them.
+turn_on_for() {
+    local dur="$1" spelled until_epoch
+    case "$dur" in
+        1h) spelled="1 hour" ;;
+        2h) spelled="2 hours" ;;
+        4h) spelled="4 hours" ;;
+        8h) spelled="8 hours" ;;
+        *)  die "unrecognised duration '$dur' - try 1h, 2h, 4h or 8h" ;;
+    esac
+    until_epoch="$(date -d "+$spelled" +%s 2>/dev/null)" || die "unrecognised duration '$dur'"
+    write_state "MODE=timed"$'\n'"UNTIL=$until_epoch"
+    cancel_timer
+    systemctl --user stop swayidle.service
+    systemd-run --user --unit="$TIMER" --on-active="$dur" -- "$0" off >/dev/null
+    echo "Caffeinated for $dur."
+}
+
+describe() {
+    local st
+    st="$(read_state)"
+    case "$st" in
+        off)         echo "Not caffeinated: locking and sleeping as normal." ;;
+        indefinite)  echo "Caffeinated indefinitely: the screen will not lock or sleep." ;;
+        timed\ *)    echo "Caffeinated: $(fmt_left "${st#timed }") left, then locking resumes." ;;
+    esac
+}
+
+# Seconds -> "1h 23m", or "<1m" for anything under a minute.
+fmt_left() {
+    local s="$1" h m
+    h=$(( s / 3600 )); m=$(( (s % 3600) / 60 ))
+    if (( h > 0 )); then
+        printf '%dh %dm' "$h" "$m"
+    elif (( m > 0 )); then
+        printf '%dm' "$m"
+    else
+        echo "<1m"
+    fi
+}
+
+# JSON for waybar's custom/caffeine module. Glyph by codepoint (U+F0F4),
+# never pasted - see CLAUDE.md's Nerd Font rule. Carried over unchanged from
+# the idle_inhibitor module this replaced, which is worth a flag rather than
+# an assumption: rendered against the JetBrainsMono Nerd Font actually
+# installed here, this codepoint is a desktop/monitor glyph, not the coffee
+# cup its name implies - a pre-existing mismatch, not something this change
+# introduced, and not fixed here (see TASK-168's notes for how it was found).
+# class "off" is the resting muted colour; "indefinite" and "timed" are both
+# the warning colour the icon used to escalate to as idle_inhibitor.activated,
+# and the timed case additionally carries the remaining time as visible text,
+# which is what tells the two active states apart at a glance.
+bar() {
+    local st glyph
+    glyph=$'\uf0f4'
+    st="$(read_state)"
+    case "$st" in
+        off)
+            printf '{"text":"%s","tooltip":"%s","class":"off"}\n' \
+                "$glyph" "Not caffeinated: locking and sleeping as normal"
+            ;;
+        indefinite)
+            printf '{"text":"%s","tooltip":"%s","class":"indefinite"}\n' \
+                "$glyph" "Caffeinated: the screen will not lock or sleep"
+            ;;
+        timed\ *)
+            local left; left="$(fmt_left "${st#timed }")"
+            printf '{"text":"%s %s","tooltip":"%s","class":"timed"}\n' \
+                "$glyph" "$left" "Caffeinated: $left left, then locking resumes"
+            ;;
+    esac
+}
+
+menu() {
+    local rows=() choice
+    if [[ "$(read_state)" != off ]]; then
+        rows+=("Turn off")
+    fi
+    rows+=(
+        "Caffeinate indefinitely"
+        "Caffeinate for 1 hour"
+        "Caffeinate for 2 hours"
+        "Caffeinate for 4 hours"
+        "Caffeinate for 8 hours"
+    )
+
+    # No -mesg: this repository's rofi theme never places the "message"
+    # widget - see the scripting-traps skill. The prompt carries the state
+    # instead, the same idiom power-profile and bluetooth use.
+    choice="$(printf '%s\n' "${rows[@]}" |
+        rofi -dmenu -i -p "$(describe)" -no-custom -replace || true)"
+    [[ -n "$choice" ]] || return 0
+
+    case "$choice" in
+        "Turn off")                  turn_off ;;
+        "Caffeinate indefinitely")   turn_on ;;
+        "Caffeinate for 1 hour")     turn_on_for 1h ;;
+        "Caffeinate for 2 hours")    turn_on_for 2h ;;
+        "Caffeinate for 4 hours")    turn_on_for 4h ;;
+        "Caffeinate for 8 hours")    turn_on_for 8h ;;
+    esac
+}
+
+case "${1:-}" in
+    "")        menu ;;
+    on)        turn_on ;;
+    off)       turn_off ;;
+    status)    describe ;;
+    --bar)     bar ;;
+    -h|--help) sed -n '9,14p' "$0" | sed 's/^# \?//' ;;
+    [0-9]*)    turn_on_for "$1" ;;
+    *)         die "unknown argument '$1'. Try --help." ;;
+esac

@@ -136,7 +136,7 @@ to right as the bar itself is laid out.
 | Focus timer | The running timer's countdown, hidden when no timer is running | Opens the timer menu: stop it, or skip to the next phase |
 | Clock | Date and time together | Opens a three-month calendar |
 | mpris (now playing) | Track and artist for whatever is playing, hidden when nothing is | Left click: play/pause. Middle: previous track. Right: next track |
-| Caffeine (idle inhibitor) | A cup icon, muted when off and warning-coloured when on | Toggle: stop the screen locking and sleeping, or let it again |
+| Caffeine | A cup icon, muted when off, warning-coloured when caffeinated - with time remaining shown as text for a fixed-time session | Opens the caffeinate menu: turn off, caffeinate indefinitely, or for 1/2/4/8 hours |
 | Network | Ethernet or Wi-Fi icon, with signal strength on Wi-Fi | Opens `nmtui` to change connection |
 | Bluetooth | A bluetooth icon, and the connected device's name when there is one. **Absent entirely unless the bluetooth daemon is running** | Opens the bluetooth menu: connect, pair, or turn it off |
 | CPU | Usage percentage | Opens `btop` |
