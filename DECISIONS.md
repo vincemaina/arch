@@ -1074,6 +1074,67 @@ Current configuration includes workspace information and useful system status wh
 
 ---
 
+## Launching an application gives you a new instance of it
+
+**Decision:** `$mod+b` opens a new browser window rather than fetching the one
+already open, and the mechanism is qutebrowser's `new_instance_open_target`
+rather than the sway binding.
+
+### Why
+
+Every other launch binding answers with a new instance — `$mod+Return` a
+terminal, `$mod+e` a file manager — and the browser was the exception. It ran
+`~/.local/bin/browser`, which found the most recently focused qutebrowser
+window and moved it to the current workspace. That helper existed for a
+measured reason: focusing costs 1ms against 553ms for a new window and 942ms
+cold, and saving half a second on a key pressed dozens of times a day is a
+real argument.
+
+It was still the wrong behaviour. Asking for a browser and being given a
+window from somewhere else is a different action wearing the same key, and
+when the window arrives from another workspace the effect is that the desktop
+rearranged itself unasked. Reaching an existing window is what window
+switching is for.
+
+Putting it in qutebrowser's config rather than on the binding is the part
+worth keeping. qutebrowser's default `new_instance_open_target` is `tab`, so
+*every* launch route — the launcher, `gio open`, a link handed over by another
+application, the terminal — opened a tab in the last-focused window and raised
+it. `--target window` on the sway binding would have fixed one route and left
+the rest disagreeing. Measured before deciding: with one qutebrowser open,
+`qutebrowser https://example.com` produced no `window::new` event on sway's
+IPC and left the window count unchanged.
+
+### Trade-off
+
+Every browser launch now costs a window creation instead of 1ms. Measured on
+this machine at full clock: about 680ms with the process already running, and
+about 1050ms from cold.
+
+It also means this repository ships a qutebrowser config file, which it
+deliberately did not before. That file has to call `config.load_autoconfig()`
+as its first statement or qutebrowser silently ignores `autoconfig.yml` —
+which already held a real setting on this machine — so the cost of the file is
+one more place where an omission is invisible.
+
+### Alternatives considered
+
+**`--target window` on the sway binding.** Rejected: fixes the keybinding and
+leaves the launcher, the default link handler and every inter-application link
+still opening tabs. The inconsistency was the complaint.
+
+**Keeping the helper and adding a separate "new window" binding.** Rejected as
+two keys for what should be one, and it leaves the surprising behaviour on the
+key most likely to be pressed by reflex.
+
+**Keeping the process warm to hide the cost.** Investigated under TASK-134 and
+rejected on measurement: a parked blank qutebrowser holds ~238 MiB resident
+against a desktop that idles near 350 MiB, and it only ever saves the
+difference between cold and warm. It does not touch window-creation time,
+which is where the wait actually is.
+
+---
+
 ## Two browsers: qutebrowser for everything, firefox for DRM and extensions
 
 **Decision:** qutebrowser as the everyday browser, firefox declared alongside it
@@ -2172,9 +2233,11 @@ relaunch-and-place script is exactly the fragile machinery this repository
 avoids — for a fault seen once in roughly twenty hours of session time.
 
 What was *inside* a window is mostly handled already, checked rather than
-assumed: qutebrowser has no dotfile in this repository at all and runs stock,
-where `auto_save.session` defaults to true; neovim already sets `undofile` and
-has swapfile recovery on. Neither restores layout automatically, and scripting
+assumed: qutebrowser now carries a small config that turns `auto_save.session`
+on — this paragraph previously said it ran stock "where `auto_save.session`
+defaults to true", and that was simply wrong, the default is false, so the
+session recovery this claimed to rely on was never enabled (corrected in
+TASK-174); neovim already sets `undofile` and has swapfile recovery on. Neither restores layout automatically, and scripting
 that on would be new machinery for the rare case rather than the common one.
 
 A terminal's live state is the one genuine gap, and it is cheap to close.

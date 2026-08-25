@@ -169,22 +169,32 @@ mapping already sends links to the right one: qutebrowser handles
 automatically and is reached deliberately.
 
 **qutebrowser** is the everyday, keyboard-driven browser and the one you
-should reach for first. `$mod+b` does not simply launch it — it runs
-`~/.local/bin/browser`, which finds the most recently focused qutebrowser
-window (if any) and moves it to your current workspace instead of opening a
-new one. Measured on this machine: a cold start takes roughly 940ms; focusing
-an existing window takes about 1ms. qutebrowser is *not* started at login to
-save that cost once a day — its QtWebEngine footprint is the single largest
-resident thing this desktop can run, and that trade was rejected on purpose.
-Its window floats and opens at 1500×900.
+should reach for first. `$mod+b` launches it, and every launch gives you a
+new window — the same as `$mod+e` for the file manager and `$mod+Return`
+for the terminal. Reaching a window you already have open is what window
+switching is for, not what the launch key does. Its window floats and opens
+at 1500×900.
+
+That is not qutebrowser's own default, which opens a *tab* in whichever
+window you used last and raises that window — easy to mistake for the key
+doing nothing at all. `new_instance_open_target` in the qutebrowser config
+changes it, which is why the launcher, a link opened by another application
+and `$mod+b` all behave the same way.
+
+Starting the browser is not fast: roughly a second cold, and about 680ms for
+a second window on an already-running process. If it feels far worse than
+that, check the power profile before anything else — on `power-saver` this
+machine clocks down to 800MHz and the same cold start measures over three
+seconds. That is the battery icon in the bar.
 
 Closing qutebrowser's *last* window quits the whole process, so the next
-`$mod+b` press pays the full startup cost again — this is why the helper
-never uses the same close-toggle mechanism the bar's glance-and-close windows
-use.
+`$mod+b` press pays the full cold start again. The open tabs survive it:
+the config turns on session auto-save, and restored tabs load only when you
+focus them.
 
-This repository ships no qutebrowser configuration file, so it runs on
-qutebrowser's own defaults: vim-style navigation (`hjkl` to scroll, `o` to
+The repository ships a small qutebrowser configuration — window-per-launch
+and session restore, and nothing about appearance or keys. So navigation is
+still qutebrowser's own: vim-style (`hjkl` to scroll, `o` to
 open a URL, `O` to open one in a new tab, `d` to close a tab, `u` to reopen
 it, `/` to search the page, `f` to click a link by hint). Those were not
 re-verified against a running session for this chapter — press `:bind` inside
