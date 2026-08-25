@@ -224,6 +224,22 @@ btop
 # very small coat, not a small browser.
 qutebrowser
 
+# vimb is ON TRIAL, not a decision - see TASK-177 and TASK-178. It is declared
+# because it is reachable from $mod+b, and checks/sway-commands.sh requires every
+# command the session can invoke to come from a declared package.
+#
+# 193 KiB of browser on top of webkit2gtk-4.1's 133 MiB. Measured cold start,
+# keypress to mapped window: vimb 354ms against qutebrowser's 1673ms. Because
+# vimb is so nearly nothing, that figure IS the WebKitGTK engine starting - so
+# no lighter graphical browser exists to look for, and epiphany's 843ms is its
+# own GTK4 interface rather than the engine.
+#
+# The open question is not speed. WebKitGTK is weaker than Blink on recent
+# JavaScript, and whether that matters is answered by using it, not measuring
+# it. `browser --use qutebrowser` reverts; if the trial ends that way, this
+# line and the switch in ~/.local/bin/browser both come out.
+vimb
+
 # firefox is the one for what qutebrowser cannot do, and the list is short but
 # unavoidable: WebExtensions, and DRM. qt6-webengine ships zero Widevine files,
 # so qutebrowser cannot play Netflix or anything else behind DRM at all - not a
