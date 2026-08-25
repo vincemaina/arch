@@ -20,8 +20,29 @@
 # started it, which is sway, and ~/.local/bin is not on the session PATH - the
 # same trap that made the bar's click commands and the desktop entries silently
 # do nothing.
+#
+# WHY `%s` AND NOT `"$@"`
+#
+# This said `"$@"` until yazi 26.8, and it worked because yazi used to run an
+# opener as `sh -c '<run>' <files...>` - the files really were shell positional
+# arguments. It does not any more. `run` is now a template yazi substitutes
+# itself before handing one finished string to `sh -c`, with no arguments at
+# all. Measured on 26.8.15, all three of `$@`, `$0` and `$1` come through empty:
+#
+#     %s    every selected file, each already quoted
+#     %s1   just the first one          %d1   the directory containing it
+#
+# So `"$@"` became the shell's own empty argument list and the opener ran
+# `yazi-open` with nothing - `set -u` on `$1`, and that error in a blocking
+# opener is the whole of "Enter no longer opens the file" (TASK-172). Nothing
+# warned, because the old syntax is still perfectly valid shell; it just expands
+# to nothing now.
+#
+# Do not quote `%s`. yazi quotes each path as it substitutes - a filename with
+# spaces was checked and arrives as one argument - and a `"%s"` would collapse a
+# multi-file selection into a single argument.
 
 [opener]
 edit = [
-    { run = '{{ .chezmoi.homeDir }}/.local/bin/yazi-open "$@"', desc = "nvim", block = true, for = "unix" },
+    { run = '{{ .chezmoi.homeDir }}/.local/bin/yazi-open %s', desc = "nvim", block = true, for = "unix" },
 ]

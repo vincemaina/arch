@@ -1008,6 +1008,72 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "File manager (TASK-172)"
+
+# yazi substitutes the selection into an opener - and into a `shell` command in
+# the keymap - itself, before handing one finished string to sh. When the
+# placeholder is one it does not recognise it substitutes nothing: no warning,
+# no error, the helper simply runs with no file.
+#
+# That is exactly how Enter stopped opening files. The config said `"$@"`,
+# which was right while yazi passed the selection as shell positional
+# arguments, and became the shell's own empty argument list when 26.8 moved to
+# `%s`. Perfectly valid shell either way, which is why nothing complained.
+#
+# So this does not look for a fixed spelling - the next change of syntax would
+# walk straight past that. It asks the installed yazi which spelling IT uses,
+# by reading the default config compiled into the binary, and fails if the
+# config disagrees. grep -a rather than `strings`, because binutils is not in
+# the manifests and this has to run on the built machine.
+
+yazi_bin="$(command -v yazi 2>/dev/null || true)"
+yazi_conf="$HOME/.config/yazi/yazi.toml"
+yazi_keymap="$HOME/.config/yazi/keymap.toml"
+
+if [[ -z "$yazi_bin" ]]; then
+    skip "yazi is not installed"
+elif [[ ! -f "$yazi_conf" ]]; then
+    fail "$yazi_conf does not exist, so Enter uses yazi's \$EDITOR default rather than the wrapper that also handles directories"
+elif ! grep -aq 'EDITOR:-vi' "$yazi_bin"; then
+    skip "cannot read yazi's built-in defaults out of $yazi_bin, so the placeholder syntax cannot be confirmed"
+elif ! grep -aq '${EDITOR:-vi} %s' "$yazi_bin"; then
+    fail "this yazi's own default opener no longer passes the selection with %s, so the placeholder syntax has changed again - compare ~/.config/yazi against the defaults in $yazi_bin"
+else
+    # Any `run` still written in shell positionals. Comments are excluded by
+    # requiring no # before the `run`, because the ones above these lines
+    # quote the old syntax while explaining why it is gone.
+    #
+    # A `run` naming no path at all is fine: Ctrl+o deliberately passes nothing
+    # and lands in the directory yazi is showing.
+    stale_runs="$(grep -hnE '^[^#]*run = .*(\$@|\$[0-9]|\$\{[0-9])' \
+        "$yazi_conf" "$yazi_keymap" 2>/dev/null || true)"
+
+    if [[ -n "$stale_runs" ]]; then
+        fail "this yazi substitutes %s, but the config still uses shell positionals, which now expand to nothing:"
+        sed 's/^/          /' <<<"$stale_runs"
+    elif ! grep -q 'yazi-open %s' "$yazi_conf"; then
+        fail "the edit opener in $yazi_conf does not pass the selection with %s, so Enter on a file opens nothing"
+    else
+        pass "yazi's openers and keymap use the %s placeholder this version substitutes"
+    fi
+
+    # The helpers the config names, by absolute path because yazi's PATH comes
+    # from sway. One that is not there fails at the moment the key is pressed
+    # and nowhere else.
+    missing_yazi_helpers=""
+    while IFS= read -r helper; do
+        [[ -n "$helper" ]] || continue
+        [[ -x "$helper" ]] || missing_yazi_helpers+="  $helper"$'\n'
+    done < <(grep -hoE "$HOME/\.local/bin/[a-z-]+" "$yazi_conf" "$yazi_keymap" 2>/dev/null | sort -u)
+
+    if [[ -n "$missing_yazi_helpers" ]]; then
+        fail "yazi is configured to run helpers that are not executable:"$'\n'"${missing_yazi_helpers%$'\n'}"
+    else
+        pass "every helper yazi names exists and is executable"
+    fi
+fi
+
+# ----------------------------------------------------------------------
 section "Editor (TASK-24)"
 
 if ! command -v nvim &>/dev/null; then
