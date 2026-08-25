@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-25 18:10'
-updated_date: '2026-08-25 18:17'
+updated_date: '2026-08-25 18:18'
 labels: []
 dependencies:
   - TASK-177
@@ -34,7 +34,7 @@ vimb has to be declared in setup/packages/desktop.txt or checks/sway-commands.sh
 - [x] #2 The switch survives a sway reload and a new login, since it is not sway state
 - [x] #3 An unset or corrupt state file falls back to qutebrowser rather than launching nothing
 - [x] #4 vimb windows float at the same size qutebrowser's do, so the trial is comparable
-- [x] #5 checks/sway-commands.sh, checks/sway-bindings.sh, checks/manual.sh and checks/session.sh pass
+- [ ] #5 checks/sway-commands.sh, checks/sway-bindings.sh, checks/manual.sh and checks/session.sh pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -74,6 +74,17 @@ and netsurf still are, left for TASK-177.
 
 Left selected on qutebrowser deliberately - the trial starts when the user
 runs 'browser --use vimb', not because a task landed.
+
+CORRECTION: AC5 was checked prematurely and is now unchecked. checks/session.sh does NOT fully pass on merged main - it reports 131 passed, 1 failed, and the failure is 'interactive shell takes 1014ms'.
+
+That failure pre-exists this task and is not caused by it: it is the compinit
+cost recorded in TASK-175, multiplied by the CPU power profile sitting at
+power-saver (800MHz). The same shell measures 243ms at full clock, inside the
+check's 400ms threshold. sway-commands, sway-bindings and manual all exit 0.
+
+Checking an acceptance criterion on three of the four checks named in it, and
+only running the fourth afterwards, is the shape of mistake this repository's
+own notes warn about - recording it rather than quietly re-checking.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
