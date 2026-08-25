@@ -5,21 +5,31 @@
 
 [mgr]
 prepend_keymap = [
-    # A terminal where you are looking, and then get out of the way.
+    # A terminal in the directory you are looking at, and then get out of the
+    # way. yazi's own defaults leave Ctrl+o unbound, so this shadows nothing.
     #
-    # `o` for the thing under the cursor and Ctrl+o for the directory you are
-    # in. `o` is unbound in yazi's defaults - checked by extracting all 73 of
-    # them from the binary rather than by remembering - so neither shadows
-    # anything.
-    #
-    # Both close yazi afterwards, and the helper does that itself with
+    # It closes yazi afterwards, and the helper does that itself with
     # `ya emit quit`. Chaining `quit` into the array here does quit, but it
     # races the shell command and the shell never runs at all - so the order
     # has to be enforced from inside the helper, after the terminal is up.
     #
-    # $0 is the hovered entry. Absolute path to the helper for the same reason
-    # the opener uses one: yazi's PATH comes from sway, which does not have
-    # ~/.local/bin on it.
-    { on = "o", run = "shell '{{ .chezmoi.homeDir }}/.local/bin/yazi-terminal \"$0\"' --orphan", desc = "Terminal at cursor" },
+    # Absolute path to the helper: yazi's PATH comes from sway, which does not
+    # have ~/.local/bin on it.
+    #
+    # `o` USED TO BE HERE, AND IS NOT ANY MORE
+    #
+    # It ran the same helper on the hovered entry rather than the current
+    # directory, passed as `$0`. Two things ended that (TASK-172). yazi 26.8
+    # stopped substituting shell positionals in a `shell` command - `$0` is now
+    # the literal string "sh" and the helper silently fell back to the current
+    # directory, so `o` and Ctrl+o had quietly become the same key. And 26.8
+    # binds `o` itself, to `open`: the comment that used to sit here claimed `o`
+    # was unbound in yazi's defaults, which was true when it was written and is
+    # not now. Opening the thing under the cursor is what `o` should do, so it
+    # has been given back to yazi.
+    #
+    # To put a terminal-at-the-cursor back on some free key, the substitution
+    # yazi wants today is `%s1` - the first selected file, already quoted - and
+    # `yazi-terminal` needs its `[[ -d "$1" ]] || dirname` fallback returned.
     { on = "<C-o>", run = "shell '{{ .chezmoi.homeDir }}/.local/bin/yazi-terminal' --orphan", desc = "Terminal here" },
 ]

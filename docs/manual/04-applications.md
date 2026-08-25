@@ -209,13 +209,14 @@ the keyboard.
 Two things are specific to this setup rather than yazi defaults:
 
 - `Enter` on a directory moves into it; `Enter` on a file opens it in neovim
-  and returns to yazi when you quit. Both use `Enter` because a small wrapper
-  script (`~/.local/bin/yazi-open`) decides which one you meant — yazi's own
-  default rule for a directory would otherwise try to *edit* it.
-- `o` opens a terminal at the entry under the cursor; `Ctrl+o` opens one in
-  the directory you are standing in. Either closes yazi behind it — the
-  terminal is a place to go and do something, and yazi has done its job by
-  finding the location.
+  and returns to yazi when you quit. `o` does the same thing, because that is
+  yazi's own binding for it. Both use one wrapper script
+  (`~/.local/bin/yazi-open`) to decide which one you meant — yazi's own default
+  rule for a directory would otherwise try to *edit* it.
+- `Ctrl+o` opens a terminal in the directory you are standing in, and closes
+  yazi behind it — the terminal is a place to go and do something, and yazi has
+  done its job by finding the location. `o` used to open one at the entry under
+  the cursor; it was given back to yazi, and nothing is bound to that now.
 
 ## The git tool: lazygit
 

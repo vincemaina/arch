@@ -22,8 +22,18 @@ set -euo pipefail
 #
 # Because yazi does not run openers through a full shell. `run = 'touch /tmp/x'`
 # works and `run = 'if [ -d "$1" ]; then ...; fi'` silently does nothing at all -
-# no error, no window, nothing. Substitution like "$@" works, control flow does
+# no error, no window, nothing. Substitution like `%s` works, control flow does
 # not. A script is a single command, which is what the opener can actually run.
+
+# The one thing this cannot do is guess. yazi.toml passes the selection with the
+# `%s` placeholder, and when that placeholder is wrong yazi substitutes nothing
+# rather than complaining - which is how TASK-172 arrived as `$1: unbound
+# variable` on a screen the user could not scroll back. Say what is actually
+# wrong instead.
+if [[ $# -eq 0 ]]; then
+    echo "yazi-open: no file given - check the %s placeholder in ~/.config/yazi/yazi.toml" >&2
+    exit 1
+fi
 
 if [[ -d "$1" ]]; then
     # Enter on a directory means go into it.

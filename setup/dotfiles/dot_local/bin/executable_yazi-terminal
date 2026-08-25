@@ -3,27 +3,25 @@ set -euo pipefail
 
 # requires: foot ya
 
-# Open a terminal from yazi, at the place you are looking at.
+# Open a terminal in the directory yazi is showing. Bound to Ctrl+o.
 #
-#   yazi-terminal            the directory yazi is showing
-#   yazi-terminal <path>     that directory, or the one containing that file
+# It used to take an optional path, because `o` passed the hovered entry and
+# this fell back to the containing directory when that entry was a file. `o`
+# now belongs to yazi again (see keymap.toml), so nothing passes anything and
+# the fallback went with it - an unreachable branch in a repository whose
+# characteristic bug is code that looks configured and does nothing. If a
+# terminal-at-the-cursor is ever wanted back, the keymap substitution is `%s1`
+# and the two lines to restore here are:
 #
-# Called from two bindings: `o` passes the hovered entry, Ctrl+o passes nothing
-# and so lands where you are standing. Hovering a file rather than a folder
-# gives a terminal in the folder that file is in, which is the only useful
-# reading of "open a terminal here" when "here" is a file.
+#     target="${1:-$PWD}"
+#     [[ -d "$target" ]] || target="$(dirname "$target")"
 #
 # setsid and a background job rather than yazi's own --orphan flag: yazi does
 # not validate command flags when it loads a keymap - an invented flag was
 # accepted in silence - so a wrong one would fail at the moment the key was
 # pressed and nowhere else. These are shell features that are certain.
 
-target="${1:-$PWD}"
-[[ -d "$target" ]] || target="$(dirname "$target")"
-
-setsid foot --working-directory="$target" >/dev/null 2>&1 &
-
-
+setsid foot --working-directory="$PWD" >/dev/null 2>&1 &
 
 # And close the file manager behind us. The reason to want a terminal here is
 # to do something, and yazi has served its purpose by finding the place -
