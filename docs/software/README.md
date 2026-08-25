@@ -279,6 +279,7 @@ the line, **↓** means an entry below in this document.
 | `yazi` | The file manager, on `$mod+e`. It replaced Thunar rather than sitting beside it | M, D: No graphical file manager, reversing an earlier decision |
 | `imv` | Image viewer | M |
 | `btop` | System monitor | D: btop |
+| `vimb` | Minimal WebKitGTK browser, **on trial** against qutebrowser: 354ms cold vs 1673ms. `browser --use vimb` | D: Launching an application gives you a new instance of it |
 | `qutebrowser` | Web browser, the everyday one | D: Two browsers: qutebrowser for everything, firefox for DRM and extensions |
 | `firefox` | The other browser, for WebExtensions and DRM that `qutebrowser`'s webengine cannot do at all | M, D: Two browsers: qutebrowser for everything, firefox for DRM and extensions |
 | `rofi` | The launcher — one prompt, several sources via `combi` | M, D: rofi, reversing an earlier decision |

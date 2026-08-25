@@ -1074,6 +1074,69 @@ Current configuration includes workspace information and useful system status wh
 
 ---
 
+## The everyday browser is on trial, behind a one-line switch
+
+**Decision:** Not a decision yet, deliberately. `$mod+b` opens whichever of
+qutebrowser and vimb a one-line state file names, so the question can be
+answered by use rather than by argument.
+
+### Why
+
+TASK-91 chose the *heavy* browser and never asked whether qutebrowser is the
+right *light* one — it recorded that it settled the matter "deliberately
+without an extensive measurement exercise". TASK-177 did the measurement. Cold
+start, keypress to a mapped window, on the balanced power profile:
+
+| | | |
+| --- | --- | --- |
+| foot | 135 ms | the target: a terminal |
+| **vimb** | **354 ms** | webkit2gtk-4.1, 133 MiB |
+| netsurf | 432 ms | its own engine |
+| epiphany | 843 ms | webkitgtk-6.0, 131 MiB |
+| **qutebrowser** | **1673 ms** | qt6-webengine, 282 MiB |
+
+The useful result is not the ranking, it is the floor. vimb is 193 KiB of
+browser on top of WebKitGTK, so its 354 ms *is* the engine starting. No
+WebKitGTK browser can be faster, and epiphany's extra half second is its own
+GTK4 interface rather than anything to do with rendering. There is no lighter
+graphical browser to go looking for, and qutebrowser's extra 1.3 s is
+QtWebEngine.
+
+What none of that settles is whether WebKitGTK renders the sites actually used
+well enough to live with — it is weaker than Blink on recent JavaScript. That
+is answered by a week of use, so the switch exists to make the week cheap and
+abandoning it cheaper.
+
+### Trade-off
+
+Two browsers' worth of engine installed while the trial runs: webkit2gtk-4.1's
+133 MiB on top of qt6-webengine's 282 MiB. That is the price of deciding by
+use instead of by argument, and it is refundable.
+
+`$mod+b` also gains a shell process between the keypress and the browser,
+where TASK-174 had just removed one. Bash reading a one-line file is a couple
+of milliseconds against a 354 ms floor, so it does not show.
+
+### Alternatives considered
+
+**Store the choice in `chezmoi.toml`**, where the theme, wallpaper style and
+glow setting all live. Rejected on the grounds that make the rest of this
+entry worth having: reading it needs `desktop_config.py`, which shells out to
+`chezmoi data` at upwards of 100 ms, and this is the exact path whose latency
+is the subject. A switch that made the fast browser slower would be
+self-defeating. It is a plain file in `~/.local/state` for the same reason the
+sound pack is — see *Sound packs*.
+
+**Switch the xdg-mime handlers too**, so links from other applications follow
+the trial. Rejected for now: that is the change that makes reverting expensive,
+and it is not needed to answer the question.
+
+**Just switch to vimb.** Rejected as premature. The measurement says vimb is
+faster; it does not say vimb is usable, and this repository has a history of
+keeping changes that did not work because nobody wrote down that they had not.
+
+---
+
 ## Launching an application gives you a new instance of it
 
 **Decision:** `$mod+b` opens a new browser window rather than fetching the one

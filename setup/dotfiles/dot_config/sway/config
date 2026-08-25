@@ -23,17 +23,20 @@ set $term ~/.local/bin/terminal
 # The file explorer is a terminal one, so it is a terminal with a distinct
 # app_id - otherwise the window rule that floats it would float every terminal.
 set $explorer foot --app-id=explorer -e yazi
-# `qutebrowser` directly, and the absence of a helper here is the point.
-# ~/.local/bin/browser used to bring an already-open window to the current
-# workspace rather than opening one, on the grounds that focusing costs 1ms
-# against 553ms for a new window. TASK-174 reversed that: every other launch
-# binding answers with a new instance, and a browser that instead teleported
-# an existing window was the odd one out. What makes a bare `qutebrowser`
-# open a WINDOW rather than a tab in the window you already had is
-# `new_instance_open_target` in dot_config/qutebrowser/config.py - set there
-# rather than as `--target window` here, so the launcher, the default link
-# handler and the terminal all behave the same way as this key.
-set $browser qutebrowser
+# The helper chooses WHICH browser, not how to open it. TASK-177 measured vimb
+# at 354ms cold against qutebrowser's 1673ms, and vimb is 193 KiB on top of
+# WebKitGTK so that figure is the engine itself - there is no lighter GUI
+# browser to find. Whether WebKitGTK renders real sites well enough to live
+# with is not a benchmark question, so TASK-178 put both behind a one-line
+# state file and this key follows it. `browser --use vimb` switches.
+#
+# Each launch still opens a new WINDOW rather than a tab in the window you
+# used last. For qutebrowser that is `new_instance_open_target` in
+# dot_config/qutebrowser/config.py - set there rather than as `--target
+# window` here, so the launcher, the default link handler and the terminal
+# behave the same way as this key. vimb needs nothing: it is one process per
+# invocation already.
+set $browser ~/.local/bin/browser
 # One prompt, several sources. `combi` merges the modes listed in
 # config.rasi - applications, open windows, files, calculator - so there is a
 # single thing to reach for rather than one launcher per kind of question.

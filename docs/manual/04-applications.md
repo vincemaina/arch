@@ -181,11 +181,28 @@ doing nothing at all. `new_instance_open_target` in the qutebrowser config
 changes it, which is why the launcher, a link opened by another application
 and `$mod+b` all behave the same way.
 
-Starting the browser is not fast: roughly a second cold, and about 680ms for
-a second window on an already-running process. If it feels far worse than
-that, check the power profile before anything else — on `power-saver` this
-machine clocks down to 800MHz and the same cold start measures over three
-seconds. That is the battery icon in the bar.
+Starting the browser is not fast: roughly 1.7 seconds cold. If it feels far
+worse than that, check the power profile before anything else — on
+`power-saver` this machine clocks down to 800MHz and multiplies every figure
+by about three. That is the battery icon in the bar.
+
+**A second browser is on trial.** `vimb` starts in 354ms against
+qutebrowser's 1673ms, and `$mod+b` opens whichever of the two you have
+selected:
+
+```
+browser --current       which one $mod+b opens
+browser --list          both, marking the selected one
+browser --use vimb      switch
+browser --use qutebrowser
+```
+
+The choice is one line in `~/.local/state/browser` and survives logging out.
+Nothing else moves: links from other applications still open qutebrowser, and
+the launcher still reaches either by name. vimb is a very small browser on
+the same engine GNOME Web uses — it renders ordinary sites correctly, has no
+tab bar or address bar at all, and is weaker than qutebrowser's Chromium
+engine on recent JavaScript. That last point is the thing the trial is for.
 
 Closing qutebrowser's *last* window quits the whole process, so the next
 `$mod+b` press pays the full cold start again. The open tabs survive it:

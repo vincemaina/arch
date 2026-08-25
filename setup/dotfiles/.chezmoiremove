@@ -62,9 +62,3 @@
 .config/systemd/user/wayland-session@sway.target.wants/greeting.service
 .local/bin/sway-workspace-greeter
 
-# ~/.local/bin/browser moved an already-open qutebrowser window to the current
-# workspace instead of opening one. TASK-174 made every launch answer with a
-# new window, which is `new_instance_open_target` in the qutebrowser config and
-# leaves the helper with nothing to do - so $browser is the bare command now and
-# the script is removed rather than left on disk doing nothing.
-.local/bin/browser
