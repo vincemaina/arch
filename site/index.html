@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en" data-theme="neon">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swaystone — a considered Arch Linux desktop</title>
+<meta name="description" content="A reproducible Arch Linux desktop built on Sway. Light enough to feel instant, considered enough to live in. 116 packages, 550–650 MiB at idle, 76 keyboard bindings.">
+<meta property="og:title" content="Swaystone">
+<meta property="og:description" content="Fast because it is small. Pleasant because it was thought about.">
+<meta property="og:type" content="website">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip" href="#premise">Skip to content</a>
+
+<header class="nav">
+  <a class="brand" href="#top">
+    <svg class="gem" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M7 2h10l5 7-10 13L2 9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M2 9h20M7 2l-1 7 6 13 6-13-1-7" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round" opacity=".55"/>
+    </svg>
+    <span class="wordmark">swaystone</span>
+  </a>
+  <nav class="navlinks" aria-label="Sections">
+    <a href="#premise">Premise</a>
+    <a href="#numbers">Numbers</a>
+    <a href="#keyboard">Keyboard</a>
+    <a href="#themes">Themes</a>
+    <a href="#install">Install</a>
+    <a class="ghlink" href="https://github.com/vincemaina/arch">GitHub</a>
+  </nav>
+</header>
+
+<main id="top">
+
+  <!-- ───────────────────────────── hero ───────────────────────────── -->
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">A reproducible Arch&nbsp;Linux desktop</p>
+      <h1 class="title">swaystone</h1>
+      <p class="lede">Fast because it is small.<br>Pleasant because it was thought&nbsp;about.</p>
+      <p class="sub">
+        Most lightweight desktops are lightweight <em>instead</em> of being nice to use.
+        Most nice desktops buy it with half a gigabyte of daemons you never asked for.
+        Swaystone is an attempt at the point in between — and a git repository that can
+        rebuild the whole thing from a blank disk.
+      </p>
+      <div class="cta">
+        <a class="btn btn-primary" href="#install">Install it</a>
+        <a class="btn" href="https://github.com/vincemaina/arch">Read the source</a>
+      </div>
+      <p class="hero-stats">
+        <span><b>550–650&nbsp;MiB</b> at idle</span>
+        <span><b>116</b> packages</span>
+        <span><b>76</b> bindings</span>
+      </p>
+    </div>
+
+    <figure class="shot hero-shot">
+      <img src="assets/hero.webp" width="1920" height="1200"
+           alt="The Swaystone desktop: three tiled terminal panes on a dark neon-accented background — a text editor showing the keybinding configuration, a system information readout, and a file manager listing helper scripts — under a thin status bar."
+           fetchpriority="high" decoding="async">
+      <figcaption>Sway, three panes, the <code>neon</code> palette. The bar, the borders, the prompt and the terminal all take their colours from one file.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ─────────────────────────── the premise ─────────────────────────── -->
+  <section id="premise" class="band">
+    <h2 class="h2">The premise</h2>
+    <p class="section-lede">
+      Three ideas, and the third is the one that actually does the work.
+    </p>
+
+    <div class="cards">
+      <article class="card">
+        <div class="card-num">01</div>
+        <h3>Light enough to disappear</h3>
+        <p>
+          There is no compositor animation to drop a frame, no desktop shell under the
+          window manager, and no background service that arrived as somebody else's
+          dependency. Sway on Wayland, session components as systemd user units,
+          compressed swap in RAM, and an out-of-memory handler that acts before the
+          machine locks up.
+        </p>
+        <p class="card-foot">Idle: <b>550–650&nbsp;MiB</b>, effectively <b>0%</b> CPU.</p>
+      </article>
+
+      <article class="card">
+        <div class="card-num">02</div>
+        <h3>Considered enough to stay in</h3>
+        <p>
+          Small is easy. Small and <em>pleasant</em> is the hard part. Seventy-six bindings,
+          each argued for and each obeying one rule. A status bar where every module does
+          something when you click it. Notifications with four generated sounds. Eleven
+          palettes that recolour the entire desktop from a single file.
+        </p>
+        <p class="card-foot">Detail is not decoration. It is why you stay.</p>
+      </article>
+
+      <article class="card">
+        <div class="card-num">03</div>
+        <h3>Intentional, not merely empty</h3>
+        <p>
+          Minimalism is not the goal — <em>choosing</em> is. Every package sits on a line in
+          a manifest and has to justify that line. Nothing gets installed to see if it
+          helps and then quietly left behind. When a fix turns out not to have worked, it
+          comes back out, or the failure gets written down where the next reader will
+          look.
+        </p>
+        <p class="card-foot">The question is never "is this small?" but "is this worth it?"</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── the numbers ─────────────────────────── -->
+  <section id="numbers" class="band band-alt">
+    <h2 class="h2">The numbers</h2>
+    <p class="section-lede">
+      Measured on the machines this is built on, and all of it checkable from the
+      repository.
+    </p>
+
+    <ul class="stats">
+      <li><b>550–650</b><span>MiB idle memory</span></li>
+      <li><b>~0<i>%</i></b><span>idle CPU</span></li>
+      <li><b>4.5<i>s</i></b><span>userspace to a desktop</span></li>
+      <li><b>116</b><span>declared packages</span></li>
+      <li><b>76</b><span>keyboard bindings</span></li>
+      <li><b>39</b><span>helper scripts</span></li>
+      <li><b>11</b><span>colour themes</span></li>
+      <li><b>6</b><span>scripts that check it</span></li>
+    </ul>
+
+    <p class="fineprint">
+      Idle memory is the whole graphical session — compositor, bar, notifications, idle
+      handling, network and audio — with no application open, on the reference VM. The
+      4.5&nbsp;s is userspace to <code>graphical.target</code> on the development laptop;
+      firmware and bootloader are that machine's own and are not counted. Package count is
+      what the three manifests declare, not what <code>pacman</code> pulls in behind them,
+      and the binding count is the total <code>checks/sway-bindings.sh</code> reports.
+    </p>
+  </section>
+
+  <!-- ────────────────────────── the keyboard ────────────────────────── -->
+  <section id="keyboard" class="band">
+    <h2 class="h2">The keyboard is the interface</h2>
+    <p class="section-lede">
+      Getting to a flow state is mostly a matter of never having to stop and think about
+      where something is. That takes a rule, not a long list.
+    </p>
+
+    <blockquote class="quote">
+      <p>
+        <b>$mod</b> is for window management. Nothing else may take a <b>$mod</b> chord.
+        One binding per action — if there are two ways to do a thing, one goes.
+      </p>
+      <cite>— the comment at the top of <code>50-keybindings.conf</code></cite>
+    </blockquote>
+
+    <p class="prose">
+      Exactly three applications get a key of their own: the terminal, the browser and the
+      file explorer. Everything else is one press of <kbd>$mod</kbd><kbd>Space</kbd> away,
+      because the launcher costs a single extra keystroke and a crowded modifier costs you
+      every day.
+    </p>
+
+    <div class="keys-layout">
+      <div class="keytable">
+        <table>
+          <caption>A dozen of the seventy-six</caption>
+          <tbody>
+            <tr><td><kbd>$mod</kbd><kbd>Space</kbd></td><td>Launch anything</td></tr>
+            <tr><td><kbd>$mod</kbd><kbd>Return</kbd></td><td>Terminal</td></tr>
+            <tr><td><kbd>$mod</kbd><kbd>B</kbd></td><td>Browser</td></tr>
+            <tr><td><kbd>$mod</kbd><kbd>E</kbd></td><td>File explorer</td></tr>
+            <tr><td><kbd>$mod</kbd><kbd>G</kbd></td><td>Git interface</td></tr>
+            <tr><td><kbd>$mod</kbd><kbd>Q</kbd></td><td>Close window</td></tr>
+            <tr><td><kbd>$mod</kbd><kbd>H J K L</kbd></td><td>Move focus</td></tr>
+            <tr><td><kbd>$mod</kbd><kbd>F</kbd></td><td>Fullscreen</td></tr>
+            <tr><td><kbd>$mod</kbd><kbd>T</kbd></td><td>Split ⇄ tabbed</td></tr>
+            <tr><td><kbd>$mod</kbd><kbd>1</kbd>…<kbd>0</kbd></td><td>Workspaces</td></tr>
+            <tr><td><kbd>Ctrl</kbd><kbd>Tab</kbd></td><td>Tiled ⇄ floating</td></tr>
+            <tr><td><kbd>$mod</kbd><kbd>?</kbd></td><td>Every shortcut, on screen</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="shot">
+        <img src="assets/launcher.webp" width="1920" height="1200" loading="lazy" decoding="async"
+             alt="The launcher open over the tiled desktop, listing entries such as Focus Music, Theme, Bar Size, Media Controls, Wallpaper and Power.">
+        <figcaption>
+          <kbd>$mod</kbd><kbd>Space</kbd> searches applications, open windows and files at
+          once — and the desktop's own controls sit in the same list.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ──────────────────────────── themes ──────────────────────────── -->
+  <section id="themes" class="band band-alt">
+    <h2 class="h2">One palette, defined once</h2>
+    <p class="section-lede">
+      Sway's borders, the bar, the terminal, the launcher, notifications, the lock screen,
+      the prompt and the wallpaper all read the same file. Changing a colour changes every
+      one of them; changing the theme changes all of it at once.
+    </p>
+
+    <p class="prose center">
+      These are the real palettes, read out of
+      <code>.chezmoidata/themes.toml</code>. <b>Pick one and this page will wear it too.</b>
+    </p>
+
+    <div id="theme-grid" class="themes" role="radiogroup" aria-label="Colour themes"></div>
+
+    <p class="fineprint">
+      No wallpaper image is stored anywhere in the repository — each one is generated on
+      the machine from the theme's own colours, so adding a theme costs nothing but the
+      colours themselves.
+    </p>
+  </section>
+
+  <!-- ─────────────────────────── built how ─────────────────────────── -->
+  <section id="built" class="band">
+    <h2 class="h2">How it holds together</h2>
+
+    <div class="cards cards-4">
+      <article class="card card-sm">
+        <h3>Two entry points</h3>
+        <p><code>install.sh</code> builds a machine from the live ISO. <code>sync.sh</code> applies the
+        repository to a machine already running it, as many times as you like.</p>
+      </article>
+      <article class="card card-sm">
+        <h3>Manifests, not snapshots</h3>
+        <p>Three plain text files list what the machine should have. Anything installed and
+        not listed shows up as drift, in both directions.</p>
+      </article>
+      <article class="card card-sm">
+        <h3>Dotfiles as templates</h3>
+        <p>chezmoi renders user configuration from the selected palette and the machine's
+        own identity, so one repository fits more than one machine.</p>
+      </article>
+      <article class="card card-sm">
+        <h3>Checks that argue back</h3>
+        <p>Six scripts ask the running system whether it matches what the repository
+        intended — because the failure here is always config that looks right and does
+        nothing.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── install ─────────────────────────── -->
+  <section id="install" class="band band-alt">
+    <h2 class="h2">Install</h2>
+    <p class="section-lede">
+      Boot the Arch live ISO on a UEFI machine with Secure Boot off, then:
+    </p>
+
+    <div class="code">
+      <pre><code><span class="c"># the live ISO has no git</span>
+pacman -Sy git
+
+git clone https://github.com/vincemaina/arch.git Arch
+cd Arch
+
+<span class="c"># lsblk first — this erases the disk you name</span>
+./install.sh /dev/nvme0n1</code></pre>
+    </div>
+
+    <p class="prose">
+      The installer asks who the machine belongs to, then partitions, installs, configures
+      and applies the dotfiles in five ordered stages. On a machine already running it,
+      <code>./sync.sh</code> brings it back in line and <code>./sync.sh --dry-run</code>
+      shows what would change first.
+    </p>
+
+    <div class="warn">
+      <b>It repartitions the disk you name.</b> Try it in a virtual machine before you try
+      it on hardware you care about — that is how it is developed, and a fresh VM is the
+      only real test this repository has.
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── honest ─────────────────────────── -->
+  <section class="band closing">
+    <h2 class="h2">What this is, honestly</h2>
+    <p class="prose">
+      Swaystone is one person's machine being generalised in public. It is not a distro,
+      there is no installer ISO, and parts of it still assume things about the hardware it
+      grew up on. What it does have is a written reason for nearly every decision, a
+      manual for people who have never seen it, and checks that fail when the documentation
+      starts lying.
+    </p>
+    <p class="prose">
+      If that sounds like the sort of system you would want to live in, the whole thing is
+      in one repository.
+    </p>
+    <div class="cta center">
+      <a class="btn btn-primary" href="https://github.com/vincemaina/arch">Take a look</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-in">
+    <span class="brand small">
+      <svg class="gem" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M7 2h10l5 7-10 13L2 9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+      </svg>
+      <span class="wordmark">swaystone</span>
+    </span>
+    <nav class="footlinks">
+      <a href="https://github.com/vincemaina/arch">Repository</a>
+      <a href="https://github.com/vincemaina/arch/blob/main/DECISIONS.md">Decisions</a>
+      <a href="https://github.com/vincemaina/arch/tree/main/docs/manual">Manual</a>
+    </nav>
+  </div>
+  <p class="colophon">
+    No web fonts, no analytics, no trackers, one small stylesheet — it seemed rude to do
+    otherwise.
+  </p>
+</footer>
+
+<script src="themes.js"></script>
+<script src="theme.js"></script>
+</body>
+</html>

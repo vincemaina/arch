@@ -35,7 +35,8 @@ There are two entrypoints: `install.sh` builds a machine from the live ISO and i
 ### `setup/` is the only thing that becomes the Arch system
 
 **Nothing outside `setup/` ends up on the built machine.** `README.md`, `DECISIONS.md`, `CLAUDE.md`,
-`claude-best-practices.md` and `backlog/` exist to develop, document and manage *this repository*;
+`claude-best-practices.md`, `backlog/` and `site/` exist to develop, document, manage and
+present *this repository*;
 they are never copied onto the target system and their tooling is never installed on it.
 (`install.sh` is the exception in kind, not in placement — it orchestrates the build but runs from
 the live ISO and is not copied either.)
@@ -84,6 +85,9 @@ Two consequences worth holding onto:
 
 # Build docs/manual/ into one self-contained HTML page and open it.
 ./tools/manual.sh --open
+
+# Re-generate the landing page's copy of the palettes, after changing a theme.
+./tools/site-themes.py
 
 # Backlog task management (see the CRITICAL_INSTRUCTION block above)
 backlog task list
@@ -366,7 +370,9 @@ Five scripts, run from the repo on the target machine:
 `tools/` holds things that produce output rather than verdicts.
 `tools/shortcuts.sh` lists every shortcut by context and flags keys that mean
 different things in different tools; `--markdown` emits the same table for the
-manual to embed. `tools/manual.sh` builds `docs/manual/` into one HTML page. Keep the distinction: `checks/` exits
+manual to embed. `tools/manual.sh` builds `docs/manual/` into one HTML page, and
+`tools/site-themes.py` regenerates the landing page's copy of the palettes from
+`themes.toml`. Keep the distinction: `checks/` exits
 non-zero on a problem, `tools/` produces something to read. Neither reaches the
 built machine — which is why the wallpaper generator lives in `dot_local/bin/`
 and not here: it is the one piece of the theming machinery that has to run on
@@ -451,6 +457,39 @@ reasoning are in `docs/manual/README.md` and in `DECISIONS.md`. Like everything
 else here, the manual is repository tooling: nothing it needs may be added to
 `setup/packages/`, which is why there is no pandoc. `sync.sh` installs the
 built page so the `manual` command and the launcher entry can open it.
+
+## The landing page
+
+The build is called **Swaystone**, and `site/` is the one page that says what
+that means: hero, premise, the measured numbers, the keyboard argument, the
+palettes, install. `.github/workflows/pages.yml` publishes it to GitHub Pages on
+every push to `main` that touches `site/`. It is the sixth documentation surface
+and the only one aimed at someone who has not decided to look at the repository
+yet — so it argues rather than explains, and links to the other five instead of
+restating them.
+
+Plain static HTML, one stylesheet, one script, two images. **There is no build
+step**, which is deliberate (`DECISIONS.md` → "The build has a name, and a
+landing page"): open `index.html` and that is exactly what Pages serves.
+
+Three things to know before changing it:
+
+- **`site/themes.js` is generated. Do not edit it.** `tools/site-themes.py`
+  writes it from `setup/dotfiles/.chezmoidata/themes.toml`, so the page wears the
+  same eleven palettes the desktop does and a visitor can apply any of them to
+  the page itself. Re-run it after touching a theme. Transcribing the colours by
+  hand is the drift this repository keeps finding, one surface further out.
+- **The numbers on the page are asserted, and nothing checks them.** Idle memory,
+  package count, shortcut count, theme count, boot time. `site/README.md` records
+  how to re-derive each one. There is no `checks/site.sh`; if they start going
+  stale, that is what to write.
+- **The screenshots were staged on a headless output**, not captured off a real
+  screen — recipe in `site/README.md` and the `desktop-verification` skill. They
+  are WebP because the PNGs came to 1.4 MB, which is a silly thing to serve from
+  a page arguing for being light.
+
+Like everything outside `setup/`, none of it reaches the built machine and
+nothing it needs may be added to `setup/packages/`.
 
 ## The hook that keeps the record
 
