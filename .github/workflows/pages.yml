@@ -32,7 +32,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # enablement: true turns Pages on via the API if it is not on already,
+      # so the site does not need a visit to Settings before it can deploy.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
