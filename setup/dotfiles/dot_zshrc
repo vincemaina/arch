@@ -26,7 +26,15 @@ setopt HIST_VERIFY            # expanded !! is shown before it runs, not after
 ### Completion
 
 autoload -Uz compinit
-# Cache the dump so compinit does not rebuild it on every shell start.
+# The mkdir is load-bearing. compinit does not create the directory its dump
+# lives in: pointed by -d at a path under one that does not exist, it silently
+# fails to write, with nothing on stderr and no failed shell, and the next
+# shell rebuilds the dump from scratch. That was the state here until TASK-175
+# - 1306 completion functions scanned and 903 compdef calls made on every
+# prompt, all of it thrown away - and it was 246ms of the 248ms a shell took
+# to start. The cache-path below lives in the same directory and was dead for
+# the same reason. Remove this line and both go quietly back to doing nothing.
+mkdir -p "$HOME/.cache/zsh"
 compinit -d "$HOME/.cache/zsh/zcompdump"
 
 zstyle ':completion:*' menu select
