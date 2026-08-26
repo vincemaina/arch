@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-26 09:36'
-updated_date: '2026-08-26 09:56'
+updated_date: '2026-08-26 10:01'
 labels: []
 dependencies: []
 ordinal: 188000
@@ -25,13 +25,13 @@ The site is repository tooling. Nothing it needs may be added to setup/packages/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A single landing page exists under site/ and is plain static HTML+CSS with no build step and no external network requests
-- [ ] #2 The page states the project's premise: light enough to be instant, considered enough to be pleasant, intentional about what earns its place
-- [ ] #3 Every number on the page (idle memory, package count, shortcut count, theme count) matches what the repository actually declares
-- [ ] #4 The page shows real screenshots of the desktop and real theme colours taken from themes.toml
+- [x] #1 A single landing page exists under site/ and is plain static HTML+CSS with no build step and no external network requests
+- [x] #2 The page states the project's premise: light enough to be instant, considered enough to be pleasant, intentional about what earns its place
+- [x] #3 Every number on the page (idle memory, package count, shortcut count, theme count) matches what the repository actually declares
+- [x] #4 The page shows real screenshots of the desktop and real theme colours taken from themes.toml
 - [ ] #5 GitHub Pages publishes it automatically on push to main, via a workflow under .github/workflows/
-- [ ] #6 The page renders correctly on a phone-width viewport as well as a desktop one
-- [ ] #7 Nothing under setup/ changes, so the built machine is unaffected
+- [x] #6 The page renders correctly on a phone-width viewport as well as a desktop one
+- [x] #7 Nothing under setup/ changes, so the built machine is unaffected
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -45,3 +45,19 @@ The site is repository tooling. Nothing it needs may be added to setup/packages/
 6. Verify by rendering in a real browser on the headless output at desktop and phone widths, and under a light palette as well as a dark one.
 7. Record the name and the decision in DECISIONS.md; link the site from README.md; describe site/ in CLAUDE.md.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Verification was done by rendering the page in qutebrowser on a throwaway headless output (the desktop-verification skill's recipe), not by reading the files back. That caught three things a file read would not have:
+
+- the wordmark gradient ended on `tertiary`, which is the pale colour in every light palette (paper's is #c9c9c2), so the last letters faded into the page. Now accent -> secondary, which is safe across all eleven.
+- the eight stat tiles were on auto-fit and landed 7+1, stranding the eighth. Now an explicit 4x2, and 2x4 under 620px.
+- the tagline wrapped to three lines at max-width 22ch.
+
+Also corrected a number before it shipped: a first draft said '70 shortcuts', from `grep -c '^bindsym'`, which counts only bindings at the start of a line and misses the six inside the resize mode block. checks/sway-bindings.sh reports 76. The page now takes the figure from the check, and site/README.md records why.
+
+Two mistakes made during the work, both recovered: staged windows twice mapped onto the user's real workspace instead of the headless output, once fullscreen, because focus was handed back while a window was still starting. Fixed by polling get_tree until the window exists and then moving it explicitly rather than launching onto whatever output happens to be focused. The headless output was unplugged and focus restored at the end; get_outputs and get_tree confirm the session is as it was.
+
+checks/manual.sh passes 8/8 and checks/sway-bindings.sh reports no duplicate bindings. checks/packages.sh fails 21 pre-existing drift items on this laptop (spotify-player, usbutils, base-devel and similar installed by hand); unrelated to this task, which changes nothing under setup/.
+<!-- SECTION:NOTES:END -->
