@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-26 09:36'
-updated_date: '2026-08-26 10:01'
+updated_date: '2026-08-26 10:06'
 labels: []
 dependencies: []
 ordinal: 188000
@@ -60,4 +60,28 @@ Also corrected a number before it shipped: a first draft said '70 shortcuts', fr
 Two mistakes made during the work, both recovered: staged windows twice mapped onto the user's real workspace instead of the headless output, once fullscreen, because focus was handed back while a window was still starting. Fixed by polling get_tree until the window exists and then moving it explicitly rather than launching onto whatever output happens to be focused. The headless output was unplugged and focus restored at the end; get_outputs and get_tree confirm the session is as it was.
 
 checks/manual.sh passes 8/8 and checks/sway-bindings.sh reports no duplicate bindings. checks/packages.sh fails 21 pre-existing drift items on this laptop (spotify-player, usbutils, base-devel and similar installed by hand); unrelated to this task, which changes nothing under setup/.
+
+Deployment is built and pushed but NOT yet live, and the remaining step is not one this repository can take.
+
+GitHub Pages has to be enabled once by a repository admin: Settings -> Pages -> Build and deployment -> Source: GitHub Actions. Until then `configure-pages` fails and every later step is skipped - confirmed on two runs (c8cd86e, e05b628), and the API still reports has_pages: false.
+
+The action's `enablement: true` input exists to do exactly this through the API and does not work: the workflow's GITHUB_TOKEN cannot create a Pages site that has never existed. It was tried, it failed, and it was taken back out rather than left in looking load-bearing - the failure and the manual step are written into the workflow and site/README.md where the next reader will look.
+
+AC 5 is therefore left unchecked. The workflow itself is correct and its YAML validates; what is unproven is the end-to-end deploy, which needs that one setting. Once it is on, re-running the workflow from the Actions tab publishes to https://vincemaina.github.io/arch/.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Named the build **Swaystone** and gave it a one-page site at site/, published by .github/workflows/pages.yml.
+
+The page argues the project's actual premise - light enough to feel instant, considered enough to live in, and intentional rather than merely empty - and backs it with figures that are all checkable from the repository: 550-650 MiB idle, ~0% idle CPU, 4.5 s of userspace to a desktop, 116 declared packages, 76 keyboard bindings, 39 helper scripts, 11 themes, 6 check scripts. Plain static HTML, one stylesheet, one script, two WebP screenshots; no build step and no external requests (audited: every loaded resource is local, the only https URLs are GitHub anchors).
+
+The eleven palettes are generated rather than transcribed. tools/site-themes.py writes site/themes.js from setup/dotfiles/.chezmoidata/themes.toml, and a visitor can apply any of them to the page itself; re-running the generator on merged main reproduced the committed file byte-for-byte.
+
+Verified by rendering in qutebrowser on a throwaway headless output at 1500px and 430px widths and under a light palette as well as a dark one - which caught three defects reading the files would not have: the wordmark gradient ended on `tertiary` and faded into the page on every light theme, the eight stat tiles landed 7+1, and the tagline wrapped to three lines. Also caught a wrong number before it shipped: a first draft said '70 shortcuts' from a grep that misses the six bindings inside the resize mode; checks/sway-bindings.sh reports 76 and the page now says what the check says.
+
+checks/manual.sh passes 8/8 on merged main and checks/sway-bindings.sh reports no duplicates. checks/packages.sh fails only on 21 pre-existing hand-installed packages on this laptop, unrelated to this change. Nothing under setup/ was touched, so the built machine is unaffected.
+
+Merged to main and pushed (3cb8a91). Not yet live: Pages must be enabled once in Settings - see AC 5 note above.
+<!-- SECTION:FINAL_SUMMARY:END -->
