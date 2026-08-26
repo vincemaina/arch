@@ -231,12 +231,27 @@ code {
   padding: clamp(3.5rem, 8vw, 6rem) var(--pad);
 }
 
+/* A full-bleed band whose *contents* sit in a centred column.
+ *
+ * This used to be `.band-alt > * { max-width: var(--maxw); margin-inline: auto }`,
+ * which centred each child individually and therefore lost to any child that
+ * set its own inline margins. `.h2 { margin: 0 }` and `.stats { margin: 2.6rem 0 0 }`
+ * are the same specificity and come later in this file, so both re-zeroed
+ * margin-inline and sat against the left padding while their siblings - which
+ * happen to spell their margins `1rem auto 0` - stayed centred. Two centre
+ * lines in one section, and nothing to see in the markup.
+ *
+ * Centring the column instead of the children makes it structural: a child
+ * cannot opt out of it by accident.
+ */
 .band-alt {
   max-width: none;
+  display: grid;
+  grid-template-columns: min(var(--maxw), 100%);
+  justify-content: center;
   background: color-mix(in srgb, var(--surface) 55%, var(--bg));
   border-block: 1px solid var(--line);
 }
-.band-alt > * { max-width: var(--maxw); margin-inline: auto; }
 
 .h2 {
   font-size: clamp(1.6rem, 4vw, 2.3rem);
