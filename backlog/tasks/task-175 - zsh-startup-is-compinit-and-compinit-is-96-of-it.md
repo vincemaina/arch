@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-25 11:20'
-updated_date: '2026-08-26 10:54'
+updated_date: '2026-08-26 10:57'
 labels: []
 dependencies: []
 priority: medium
@@ -62,6 +62,35 @@ the absolute numbers.
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
+### The investigation (earlier session, never committed)
+
+CAUSE FOUND, AND IT IS NOT THAT compinit IS SLOW. The dump this ticket assumes exists has never existed on this machine. Measured on vlod, 2026-08-26, with the CPU verified at full clock (scaling_cur_freq 3400488) so the numbers are not the power-profile artefact the description warns about.
+
+  ls -ld ~/.cache/zsh   ->  No such file or directory
+
+dot_zshrc line 30 runs 'compinit -d $HOME/.cache/zsh/zcompdump', and compinit does NOT create a missing parent directory - it fails to write the dump and carries on silently, with no error on stderr and no failed shell. So every interactive shell was doing the full uncached build: scanning 1306 completion functions across 21 fpath directories and registering them one at a time, which is exactly the 903 compdef calls the zprof output in the description records. The dump was never written, so the next shell did it all again.
+
+The comment directly above that line reads 'Cache the dump so compinit does not rebuild it on every shell start.' It rebuilt it on every shell start. This is the repository's named failure mode - configuration that looks correct and does nothing - in the shell rc.
+
+A SECOND DEAD LINE, same cause. Line 37, "zstyle ':completion:*' cache-path $HOME/.cache/zsh/zcompcache", pointed into the same missing directory, so 'use-cache on' on line 36 was also caching nothing. Not measured separately; recorded because it is the same one-line fix and would otherwise look fixed while still doing nothing.
+
+MEASUREMENT. 'zsh -i -c exit', five runs each, same session, full clock throughout:
+
+  before (no ~/.cache/zsh)        246, 245, 248, 245, 248 ms
+  after mkdir -p ~/.cache/zsh
+    first run (builds the dump)   381 ms
+    subsequent runs                49, 50, 50, 51, 49 ms
+
+  bare 'zsh -f -c exit' (no rc)     2 ms
+
+So 246ms -> 50ms, a 4.9x reduction, from creating one directory. The dump lands at ~/.cache/zsh/zcompdump, 55K. That is comfortably inside checks/session.sh's 400ms pass threshold, and it clears it at balanced too rather than only at full clock, since 971ms/243ms was the same ~4x profile ratio applied to a figure that is now 50ms.
+
+WHAT THIS MEANS FOR THE REMEDIES THE DESCRIPTION LISTS. Neither is needed for this. 'compinit -C' skips compaudit, which zprof measured at 11.95ms of 267ms - under 5%, so it was never the cost. zcompile on the dump is an optimisation of loading a dump that was not being written at all. Both remain available if 50ms is still felt, but the description's guess that 'the dump itself is what costs, not the audit' is right in a way it did not intend: the cost was building the dump, every time, because it was never kept.
+
+STATE OF THE MACHINE. ~/.cache/zsh was created during this measurement, so THIS machine is already fast. That is machine state and not reproducible - a fresh install, and the desktop this build is about to go on, would still be slow. The repository fix is still to be made, and is one line in setup/dotfiles/dot_zshrc creating the directory before compinit runs. Not done here; this session was an investigation and the branch it ran on is mid-flight on unrelated calendar work.
+
+### The fix
+
 FIX APPLIED AND VERIFIED. One line in setup/dotfiles/dot_zshrc - 'mkdir -p "$HOME/.cache/zsh"' immediately before compinit - plus a rewrite of the comment above it, which previously claimed the dump was cached and had been false since it was written. The new comment names the trap (compinit does not create the directory, fails silently, next shell rebuilds) so the mkdir is not deleted as redundant. No run_once_ script, no tmpfiles rule, no XDG helper: the file already creates ${HISTFILE:h} the same way eleven lines above.
 
 MEASUREMENT, and it was NOT taken by trusting the machine's existing state. ~/.cache/zsh was present at the start of this session because the previous investigation created it, so a plain run would have proved nothing about a fresh install. Both sides were measured with the directory deliberately removed first, through matched ZDOTDIR harnesses: /tmp/t175-before/.zshrc is origin/main's dot_zshrc byte-for-byte (confirmed identical to the live ~/.zshrc), /tmp/t175-after/.zshrc is the edited one. Only the mkdir differs.
