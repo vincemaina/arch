@@ -4010,6 +4010,89 @@ above.
 
 ---
 
+## The build has a name, and a landing page
+
+**Decision:** Call the system **Swaystone**, and give it one static landing page
+under `site/`, published to GitHub Pages by `.github/workflows/pages.yml`.
+
+Until now the repository presented itself as one person's dotfiles. That
+undersells what it is. The system is an argument - that a desktop can be light
+enough to feel instant *and* considered enough to want to live in, and that the
+way to get there is to be deliberate about what earns a place rather than to
+own as little as possible. An argument needs somewhere to be made.
+
+### Why
+
+**A name makes it a thing rather than a directory.** "My Arch build" cannot be
+recommended, searched for, or referred to in its own repository without
+circumlocution. Swaystone carries the compositor it is built on and reads as a
+single object - cut, not assembled - which is the closer metaphor for a system
+whose whole premise is that its complexity is chosen.
+
+**Static HTML, and no build step.** The page is `index.html`, one stylesheet,
+one script and two images. There is no generator to keep working, no
+`node_modules`, nothing to install in CI, and no reason the page cannot be
+opened straight off disk. A repository arguing for restraint should not need a
+toolchain to describe itself.
+
+**Published from `site/`, by Actions, not from `docs/`.** `docs/` already holds
+four unrelated things - the manual's sources, the software record, theme
+references and wallpaper notes - none of which is a website. Serving that
+directory would publish all of it and constrain how it is organised.
+Uploading `site/` as a Pages artifact keeps the published surface exactly the
+files written to be published.
+
+**The palettes are generated, not transcribed.** `tools/site-themes.py` writes
+`site/themes.js` from `setup/dotfiles/.chezmoidata/themes.toml` - the same file
+the desktop templates its own colours out of - and the page lets a visitor
+apply any of the eleven to the page itself. Copying eleven palettes into a
+stylesheet by hand would have been the same failure this repository keeps
+finding, one surface further out: something that looks right, and quietly stops
+being true.
+
+### Trade-off
+
+**The page asserts numbers, and nothing fails when they drift.** Idle memory,
+package count, shortcut count, theme count and boot time are all on the page
+and all checkable from the repository, but there is no `checks/site.sh` holding
+them to it. `site/README.md` records where each figure comes from so the next
+reader can re-derive them. If they start going stale, that check is the fix -
+this is exactly the shape of problem the other five were written for.
+
+**Screenshots are a snapshot of an appearance that changes.** The two images
+were staged on a throwaway headless output rather than captured off a real
+screen, so they show an uncluttered session rather than whatever was open; the
+recipe is in `site/README.md` and in the `desktop-verification` skill. They
+still have to be re-taken when the desktop's look changes, and nothing will
+announce that they should be.
+
+### Alternatives considered
+
+**A README with better screenshots.** Cheaper, and it stays where people
+already look. Rejected because GitHub renders a README as documentation for
+people who have already decided to look at the repository; the thing missing
+was something to send to someone who has not.
+
+**Jekyll or GitHub Pages' default build.** Rejected: it means a Gemfile, a
+theme and a build to keep working, in exchange for markdown-to-HTML that is not
+needed for a single page. The manual already has its own renderer for the one
+place markdown genuinely helps.
+
+**Publishing the manual alongside the landing page.** Deferred rather than
+rejected. `tools/manual.sh` already builds `docs/manual/` into one HTML page,
+and putting it on the same site is a small change to the workflow. It was left
+out to keep the first version to one page with one purpose; the manual is
+linked to on GitHub in the meantime.
+
+**Other names.** *Swayze* was the most memorable and was rejected for being a
+real person's name, which makes it a joke rather than a project. *Swayve* and
+*Swayde* both read well and both say more about surface than about substance.
+*Swaystone* was chosen for the half the others lack: solidity, which is the
+half of the pitch - stable, no dropped frames, never falls over - that the
+lightness half tends to overshadow.
+
+---
+
 # Guiding principle
 
 When evaluating future changes, prefer the option that best preserves this balance:

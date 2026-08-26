@@ -2,11 +2,15 @@
   <img src="./assets/arch-logo.svg" width="180" alt="Arch Linux">
 </p>
 
-# VM's Arch Build
+# Swaystone
 
-My version-controlled, reproducible Arch Linux setup.
+A version-controlled, reproducible Arch Linux desktop.
+
+**[swaystone on the web →](https://vincemaina.github.io/arch/)** — what it is and why, on one page.
 
 The goal is a lightweight, minimal system that can be rebuilt from scratch with as little manual configuration as possible. The current setup uses Sway and idles at roughly 550–650 MiB of memory with effectively zero CPU usage.
+
+Small is only half of it. The other half is that a desktop you spend all day in should be worth spending the day in: seventy shortcuts that each had to argue for themselves, eleven palettes applied from a single file, a bar where everything is clickable, and notification sounds generated on the machine rather than shipped. Nothing here is installed to see whether it helps — every package sits on a line in a manifest and has to justify that line.
 
 The repository contains everything needed to reproduce the system: package manifests, installation scripts, system configuration, and user dotfiles.
 
