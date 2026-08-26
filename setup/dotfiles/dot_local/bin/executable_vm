@@ -194,6 +194,27 @@ default_cpus() {
     printf '%s' "$half"
 }
 
+# The host port that reaches this machine's sshd, chosen once at creation and
+# written into its vm.conf so it stays the same across restarts.
+#
+# qemu's user-mode networking is one-way by default: a guest can reach out, but
+# nothing on the host can reach in, because there is no route to a SLIRP guest
+# at all. That is why `vm` needed a hostfwd before ssh could work, and why
+# enabling sshd inside a guest on its own does nothing observable from here.
+#
+# First free port from 2222 upward, checked against what other machines have
+# already claimed rather than against what is listening right now - two guests
+# started minutes apart must not be handed the same port just because neither
+# was running when the other was made.
+pick_ssh_port() {
+    local port=2222 claimed
+    claimed="$(cat "$STORE"/*/vm.conf 2>/dev/null | sed -n 's/^SSH_PORT=//p')"
+    while grep -qx "$port" <<<"$claimed"; do
+        port=$(( port + 1 ))
+    done
+    printf '%s' "$port"
+}
+
 write_conf() {
     local dir="$1" iso="${2-}"
     cat > "$dir/vm.conf" <<CONF
@@ -204,6 +225,15 @@ write_conf() {
 # number is what keeps that arrangement safe. See setup/system/earlyoom.conf.
 MEMORY=$(default_memory_mb)
 CPUS=$(default_cpus)
+
+# ssh into this machine with:  ssh -p \$SSH_PORT user@127.0.0.1
+#
+# Bound to 127.0.0.1 deliberately, and this is the load-bearing half. A guest
+# built from this repository has the password "password" (see DECISIONS.md ->
+# "Passwords"), so a forward on 0.0.0.0 would put a known-credential shell on
+# every network this laptop ever joins. Loopback keeps it reachable from this
+# machine and from nowhere else.
+SSH_PORT=$(pick_ssh_port)
 
 # An installer image attached at boot. Only meaningful for a machine made with
 # --iso. Clear it once the guest is installed, or it boots the installer again
@@ -216,7 +246,7 @@ CONF
 # vm.conf which has lost a line still starts.
 read_conf() {
     local dir="$1"
-    MEMORY=""; CPUS=""; ISO=""
+    MEMORY=""; CPUS=""; ISO=""; SSH_PORT=""
     if [[ -f "$dir/vm.conf" ]]; then
         # shellcheck disable=SC1091
         source "$dir/vm.conf"
@@ -224,6 +254,12 @@ read_conf() {
     MEMORY="${MEMORY:-$(default_memory_mb)}"
     CPUS="${CPUS:-$(default_cpus)}"
     ISO="${ISO:-}"
+    # 2222 rather than pick_ssh_port() for a machine whose vm.conf predates this
+    # line: the point here is a stable default for one existing machine, not
+    # allocation, and calling the picker would hand out a port that nothing has
+    # written down and that would change again the next time another machine
+    # was made.
+    SSH_PORT="${SSH_PORT:-2222}"
 }
 
 # ----------------------------------------------------------------------
@@ -419,7 +455,7 @@ cmd_run() {
         # /sys/class/dmi/id/product_family in the guest; nothing else on this
         # machine sets it.
         -smbios type=1,family=arch-repo-vm-guest
-        -netdev user,id=net0
+        -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22"
         -device virtio-net,netdev=net0
         # A tablet rather than a mouse: it reports absolute coordinates, so the
         # host and guest pointers stay together without the window grabbing the

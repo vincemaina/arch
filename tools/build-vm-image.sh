@@ -559,6 +559,26 @@ command = "uwsm start -N Sway -D sway -- sway"
 user = "$USERNAME"
 EOF
 
+# ----------------------------------------------------------------------
+# Guest-only: sshd, so a guest can be driven from the host
+# ----------------------------------------------------------------------
+#
+# openssh is already in packages/base.txt and is therefore already installed
+# here; what it is not is enabled, on a guest or anywhere else. A real machine
+# keeps it that way - this enables it in the GUEST's own filesystem only, the
+# same way the auto-login above is written only here.
+#
+# On its own this achieves nothing observable, which is worth stating because it
+# was assumed otherwise once. qemu's user-mode networking gives a guest no
+# inbound route at all, so an sshd listening inside one is unreachable from the
+# host until `vm` forwards a host port to it. Both halves are needed and both
+# landed together; see the SSH_PORT block in dot_local/bin/executable_vm.
+#
+# The pairing with a known password is deliberate and is only defensible because
+# that forward is bound to 127.0.0.1. See DECISIONS.md -> "Passwords".
+msg "Enabling sshd in the guest (base image only - a real install leaves it disabled)"
+arch-chroot /mnt systemctl enable sshd.service
+
 msg "Unmounting"
 # "target is busy" on the first attempt is real, observed behaviour on this
 # machine - the very first full build hit it here, after every install stage
