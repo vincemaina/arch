@@ -1,11 +1,11 @@
 ---
 id: TASK-181
 title: 'Swaystone: a landing page for this build, on GitHub Pages'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-26 09:36'
-updated_date: '2026-08-26 10:06'
+updated_date: '2026-08-26 10:34'
 labels: []
 dependencies: []
 ordinal: 188000
@@ -29,7 +29,7 @@ The site is repository tooling. Nothing it needs may be added to setup/packages/
 - [x] #2 The page states the project's premise: light enough to be instant, considered enough to be pleasant, intentional about what earns its place
 - [x] #3 Every number on the page (idle memory, package count, shortcut count, theme count) matches what the repository actually declares
 - [x] #4 The page shows real screenshots of the desktop and real theme colours taken from themes.toml
-- [ ] #5 GitHub Pages publishes it automatically on push to main, via a workflow under .github/workflows/
+- [x] #5 GitHub Pages publishes it automatically on push to main, via a workflow under .github/workflows/
 - [x] #6 The page renders correctly on a phone-width viewport as well as a desktop one
 - [x] #7 Nothing under setup/ changes, so the built machine is unaffected
 <!-- AC:END -->
@@ -68,20 +68,32 @@ GitHub Pages has to be enabled once by a repository admin: Settings -> Pages -> 
 The action's `enablement: true` input exists to do exactly this through the API and does not work: the workflow's GITHUB_TOKEN cannot create a Pages site that has never existed. It was tried, it failed, and it was taken back out rather than left in looking load-bearing - the failure and the manual step are written into the workflow and site/README.md where the next reader will look.
 
 AC 5 is therefore left unchecked. The workflow itself is correct and its YAML validates; what is unproven is the end-to-end deploy, which needs that one setting. Once it is on, re-running the workflow from the Actions tab publishes to https://vincemaina.github.io/arch/.
+
+AC 5 verified end to end. Pages was enabled on the repository, and the workflow has since deployed successfully twice - runs on e6a4b35 and 7f846f8 both completed with conclusion success, after the two earlier failures on c8cd86e and 3cb8a91 when Pages did not yet exist.
+
+The live site was checked by fetching it rather than by trusting the green run:
+
+  https://vincemaina.github.io/arch/   200, 15,514 bytes of text/html
+
+Every referenced asset resolves: style.css (200), theme.js (200), themes.js (200), assets/hero.webp (200), assets/launcher.webp (200), assets/favicon.svg (200). The served style.css contains the band-centring fix, so what is public is the corrected build and not the first one. Whole page is roughly 500 KB, of which about 460 KB is the two screenshots.
+
+Note for whoever changes the workflow next: the one-time enablement step is real and is written into .github/workflows/pages.yml and site/README.md. configure-pages' enablement: true does not substitute for it.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Named the build **Swaystone** and gave it a one-page site at site/, published by .github/workflows/pages.yml.
+Named the build **Swaystone** and shipped a one-page site for it, live at https://vincemaina.github.io/arch/.
 
-The page argues the project's actual premise - light enough to feel instant, considered enough to live in, and intentional rather than merely empty - and backs it with figures that are all checkable from the repository: 550-650 MiB idle, ~0% idle CPU, 4.5 s of userspace to a desktop, 116 declared packages, 76 keyboard bindings, 39 helper scripts, 11 themes, 6 check scripts. Plain static HTML, one stylesheet, one script, two WebP screenshots; no build step and no external requests (audited: every loaded resource is local, the only https URLs are GitHub anchors).
+The page makes the project's actual argument - light enough to feel instant, considered enough to want to live in, and intentional rather than merely empty - and backs it with figures that are all checkable from the repository: 550-650 MiB idle, ~0% idle CPU, 4.5 s of userspace to a desktop, 116 declared packages, 76 keyboard bindings, 39 helper scripts, 11 themes, 6 check scripts. Plain static HTML, one stylesheet, one script, two WebP screenshots; no build step, and no external requests (audited - every loaded resource is local, the only https URLs are GitHub anchors).
 
-The eleven palettes are generated rather than transcribed. tools/site-themes.py writes site/themes.js from setup/dotfiles/.chezmoidata/themes.toml, and a visitor can apply any of them to the page itself; re-running the generator on merged main reproduced the committed file byte-for-byte.
+The eleven palettes are generated rather than transcribed: tools/site-themes.py writes site/themes.js from setup/dotfiles/.chezmoidata/themes.toml, and a visitor can apply any of them to the page itself. Re-running the generator on merged main reproduces the committed file byte-for-byte.
 
-Verified by rendering in qutebrowser on a throwaway headless output at 1500px and 430px widths and under a light palette as well as a dark one - which caught three defects reading the files would not have: the wordmark gradient ended on `tertiary` and faded into the page on every light theme, the eight stat tiles landed 7+1, and the tagline wrapped to three lines. Also caught a wrong number before it shipped: a first draft said '70 shortcuts' from a grep that misses the six bindings inside the resize mode; checks/sway-bindings.sh reports 76 and the page now says what the check says.
+Verified by rendering in a browser on a throwaway headless output at 1920px, 1500px and 430px and under a light palette as well as a dark one, then by fetching the deployed site. That caught five real defects that reading the files would not have: the wordmark gradient ended on `tertiary` and faded into the page on every light theme; the eight stat tiles landed 7+1; the tagline wrapped to three lines; a wrong figure ('70 shortcuts', from a grep that misses the six bindings inside the resize mode - checks/sway-bindings.sh reports 76); and, found by the user rather than by me, two centre lines in the three full-bleed sections, where per-child margin-inline: auto lost to any child setting its own margin shorthand. The last is fixed structurally, by centring the band's column instead of its children, so a future child cannot opt out of it by accident.
 
-checks/manual.sh passes 8/8 on merged main and checks/sway-bindings.sh reports no duplicates. checks/packages.sh fails only on 21 pre-existing hand-installed packages on this laptop, unrelated to this change. Nothing under setup/ was touched, so the built machine is unaffected.
+Also updated the surfaces that would otherwise have gone stale: DECISIONS.md records the name and the choice of a no-build static page published from site/ rather than docs/; CLAUDE.md describes site/ and the generated themes.js; README.md is retitled and links to the site; site/README.md records where every asserted number comes from and how to re-take the screenshots.
 
-Merged to main and pushed (3cb8a91). Not yet live: Pages must be enabled once in Settings - see AC 5 note above.
+checks/manual.sh passes 8/8 on merged main and checks/sway-bindings.sh reports no duplicate bindings. checks/packages.sh fails only on 21 pre-existing hand-installed packages on the development laptop, unrelated to this change. Nothing under setup/ was touched, so the built machine is unaffected.
+
+Merged to main and pushed; deployed and confirmed live with all assets returning 200.
 <!-- SECTION:FINAL_SUMMARY:END -->
