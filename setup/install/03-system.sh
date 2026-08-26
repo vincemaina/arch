@@ -71,13 +71,36 @@ set_password() {
     return 1
 }
 
-echo
-echo "Set root password:"
-set_password root
+# GUEST_PRESET_PASSWORD is exported by tools/build-vm-image.sh and by nothing
+# else. install.sh never sets it and has no flag that reaches it, so on every
+# real install it is unset, this branch is not taken, and the two set_password
+# calls below are exactly the interactive passwd they have always been. That is
+# still the only path a real machine takes, and DECISIONS.md's "Passwords"
+# section describes it unchanged; only a guest image takes the other one.
+#
+# Why a guest needs it at all: a guest ALREADY logs itself in - build-vm-image.sh
+# writes greetd's initial_session into the guest's own config - so this buys no
+# access that was not already there. What it buys is a credential, without which
+# there is no sudo and no way to enable sshd, and every command inside a guest
+# has to be typed into a qemu window by a human. See TASK-69.4.
+#
+# chpasswd rather than piping into passwd: passwd reading from a pipe fails
+# instantly and forever, which is the same property the bounded retry above
+# exists to survive. chpasswd is the interface built for exactly this.
+if [[ -n "${GUEST_PRESET_PASSWORD:-}" ]]; then
+    echo
+    echo "==> Setting preset guest passwords (VM base image only)"
+    echo "root:$GUEST_PRESET_PASSWORD" | chpasswd
+    echo "$USERNAME:$GUEST_PRESET_PASSWORD" | chpasswd
+else
+    echo
+    echo "Set root password:"
+    set_password root
 
-echo
-echo "Set password for $USERNAME:"
-set_password "$USERNAME"
+    echo
+    echo "Set password for $USERNAME:"
+    set_password "$USERNAME"
+fi
 
 echo
 echo "==> Installing systemd-boot"

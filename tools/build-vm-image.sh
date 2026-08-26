@@ -26,18 +26,38 @@ set -euo pipefail
 #      this script - not the qcow2's firmware, the host's.
 #
 # So this script drives the five numbered install/ stages directly, exactly as
-# install.sh itself does, rather than calling install.sh. Every stage script
-# is used completely unmodified - see "THE EFIVARS GUARD" below for how stage
+# install.sh itself does, rather than calling install.sh. No stage script is
+# edited or patched at build time - see "THE EFIVARS GUARD" below for how stage
 # 3's one genuine hazard is neutralised without touching it.
 #
-# WHY PASSWORDS ARE STILL INTERACTIVE
+# That used to read "every stage script is used completely unmodified", and
+# TASK-69.4 made it untrue in one specific way worth stating rather than
+# glossing: 03-system.sh now carries a branch that exists solely for this
+# builder, taken when GUEST_PRESET_PASSWORD is set in the environment. The file
+# on disk is the same file a real install runs; what differs is which path
+# through it a guest build takes.
 #
-# Stage 3 prompts for a root password and a user password via a real `passwd`,
-# same as any other install. That stays exactly as interactive as it has
-# always been - this script does not read a password from anywhere, and
-# nothing pipes one in. Run this yourself, in your own terminal, and type them
-# when asked. See TASK-69.2 and DECISIONS.md for why that stance is
-# deliberate.
+# WHY PASSWORDS ARE NO LONGER INTERACTIVE FOR GUESTS
+#
+# This block used to say the opposite, and said it emphatically: that stage 3
+# prompts for both passwords the same as any other install, and that this
+# script reads a password from nowhere. That is no longer true, and leaving it
+# would be the exact failure this repository keeps naming - a comment stating a
+# stance the code has stopped taking.
+#
+# A guest is built with a fixed username and a fixed password, both written
+# down in plain text further down this file. The reasoning, in full, is beside
+# them under "Guest identity"; the short version is that a guest already logs
+# ITSELF in, sits behind the host's own login, and is explicitly not for
+# confidential work - so the credential is not defending anything. What it buys
+# is a guest that can be driven without a human at the keyboard: sudo, and
+# sshd.
+#
+# FOR REAL MACHINES NOTHING HAS CHANGED. install.sh never sets
+# GUEST_PRESET_PASSWORD and has no flag that reaches it, so a real install
+# still prompts for both passwords via a real `passwd` and still stores neither.
+# setup/install.conf is not written to by this script at all, and the build
+# asserts that it was not. See TASK-69.2, TASK-69.4 and DECISIONS.md.
 #
 # requires: qemu-img qemu-nbd modprobe udevadm partprobe unshare arch-chroot mountpoint umount chmod mkdir cp readlink dirname basename sed seq cat getent mktemp
 #
@@ -69,10 +89,13 @@ own installer, run against a fresh qcow2 attached over nbd. No ISO, no wizard -
 machine identity comes from the repository's own setup/install.conf, exactly
 as it would for a fresh install with --no-wizard.
 
-You will be asked for a root password and a user password partway through, by
-the real installer's own prompts. That is not this script asking - it is
-exactly the same passwd call a fresh install makes, and it is deliberately not
-automatable. Run this somewhere you can sit and type them.
+The guest is built as user "user" with password "password", and root has the
+same password. Both are fixed and deliberately weak: a guest logs itself in
+already, sits behind this machine's own login, and is not for confidential
+work - the credential exists so a guest can be driven without a human at the
+keyboard. Nothing is asked during the build, and it can be left unattended.
+
+A real install is unaffected and still prompts for both passwords.
 USAGE
 }
 
@@ -346,6 +369,59 @@ mkdir -p /mnt/opt/arch-setup
 cp -a "$REPO_ROOT/setup/." /mnt/opt/arch-setup/
 
 # ----------------------------------------------------------------------
+# Guest identity: fixed, weak, and deliberately not the repository's
+# ----------------------------------------------------------------------
+#
+# A guest is not a machine anyone logs into as themselves. It already logs
+# ITSELF in - see the auto-login block near the foot of this script - so a
+# password here is not a line of defence in front of anything: the guest sits
+# behind the HOST's login, and these images are explicitly not for confidential
+# work. What a credential buys is the ability to drive a guest without a human
+# at the keyboard: sudo, and enabling sshd. Without one, every command inside a
+# guest has to be typed into a qemu window and read back off the screen.
+#
+# So this is a real weakening, scoped to guests, decided deliberately. See
+# TASK-69.4 and DECISIONS.md's "Passwords" section, which records both this and
+# the unchanged stance for real machines.
+#
+# THE OVERRIDE REACHES THE STAGES THROUGH THE COPY, NEVER THE REPOSITORY.
+# 03-system.sh and 05-dotfiles.sh both `source "$SETUP_ROOT/install.conf"`,
+# and SETUP_ROOT is /opt/arch-setup - the copy made immediately above, not
+# $REPO_ROOT/setup/install.conf. Rewriting the copy therefore reaches every
+# stage while the repository's own file stays byte-identical, which matters
+# more than it looks: that file names the user of every REAL machine this
+# repository installs, including the one being read on right now.
+#
+# The quoting style is load-bearing in two directions - `source` has to accept
+# it and dot_gitconfig.tmpl's regex has to match it - so the replacement keeps
+# the exact KEY="value" shape the wizard writes. See setup/install.conf.
+GUEST_USERNAME="user"
+GUEST_PASSWORD="password"
+
+# Recorded before the edit so the assertion afterwards compares against what
+# was actually there, rather than against a guess about what it should say.
+REPO_USERNAME_LINE="$(grep '^USERNAME=' "$REPO_ROOT/setup/install.conf")"
+
+msg "Overriding guest identity: user '$GUEST_USERNAME' (the repository's own install.conf is untouched)"
+sed -i "s/^USERNAME=\".*\"\$/USERNAME=\"$GUEST_USERNAME\"/" /mnt/opt/arch-setup/install.conf
+
+# Assert rather than trust, in both directions. A silent no-op on the copy
+# would build an image whose auto-login names an account the stages never
+# created - a guest that boots to a greeter it cannot get past, discovered
+# only after a full pacstrap. And a sed that somehow reached the repository's
+# own file would rename the user of every real machine built afterwards.
+#
+# `if ! ...` rather than `... || die`, and a comparison rather than a grep for
+# the guest name: a machine whose real configured username happened to be
+# "user" would make the naive check fire on a file nothing had touched.
+if ! grep -qx "USERNAME=\"$GUEST_USERNAME\"" /mnt/opt/arch-setup/install.conf; then
+    die "failed to override USERNAME in the copied install.conf"
+fi
+if [[ "$(grep '^USERNAME=' "$REPO_ROOT/setup/install.conf")" != "$REPO_USERNAME_LINE" ]]; then
+    die "the repository's own install.conf changed during the build - it must never be written to"
+fi
+
+# ----------------------------------------------------------------------
 # THE EFIVARS GUARD
 # ----------------------------------------------------------------------
 #
@@ -371,8 +447,22 @@ cp -a "$REPO_ROOT/setup/." /mnt/opt/arch-setup/
 # that flag and it exits before reaching any of it) and stage 5 never touches
 # bootctl at all.
 
-msg "[3/5] Configuring system (you will be asked for two passwords)"
-arch-chroot /mnt /bin/bash -c '
+# GUEST_PRESET_PASSWORD is read by 03-system.sh, which uses chpasswd instead of
+# its interactive passwd when it is set, and takes exactly the old interactive
+# path when it is not. Nothing but this line sets it: install.sh has no flag
+# that reaches it, so a real install is unaffected.
+#
+# Passed through the environment rather than on the command line, so it does not
+# appear in `ps` output for the duration of the build. That is tidiness, not
+# secrecy - the value is "password" and is written down in this file, in
+# DECISIONS.md and in the guest's own documentation.
+#
+# arch-chroot's default path is a plain `chroot` with no `env -i` (its
+# --reset-env is only on the -S systemd-run path, which this script does not
+# use), so the variable is inherited by the stage script. Checked in
+# /usr/bin/arch-chroot rather than assumed.
+msg "[3/5] Configuring system (guest passwords are preset - you will NOT be asked)"
+GUEST_PRESET_PASSWORD="$GUEST_PASSWORD" arch-chroot /mnt /bin/bash -c '
     mount -t tmpfs tmpfs /sys/firmware/efi/efivars 2>/dev/null || true
     /opt/arch-setup/install/03-system.sh
     rc=$?
@@ -386,8 +476,18 @@ arch-chroot /mnt /opt/arch-setup/install/04-desktop.sh
 msg "[5/5] Installing user configuration"
 arch-chroot /mnt /opt/arch-setup/install/05-dotfiles.sh
 
-# shellcheck disable=SC1091
-source "$REPO_ROOT/setup/install.conf"
+# The guest's identity is GUEST_USERNAME, set where the copied install.conf was
+# overridden above - NOT whatever $REPO_ROOT/setup/install.conf says. This line
+# used to source that file, which was correct only while the two agreed. Now
+# that a guest is built as a different user, sourcing it would point the two
+# steps below - the wallpaper check and the auto-login block - at an account
+# 03-system.sh never created, and the build would ship a guest that boots to a
+# greeter it cannot get past. The failure would appear at first boot of a clone,
+# a long way from the cause.
+#
+# install.conf is still the source of everything else about a guest; only the
+# username differs, and only because this builder deliberately overrode it.
+USERNAME="$GUEST_USERNAME"
 
 # ----------------------------------------------------------------------
 # Guest-only: guarantee the wallpaper actually exists

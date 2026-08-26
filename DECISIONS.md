@@ -2933,9 +2933,83 @@ Some choices remain deliberately manual or unfinished.
 
 ## Passwords
 
-Passwords are entered interactively during installation rather than stored in Git.
+**Decision:** On a real machine, passwords are entered interactively during
+installation and stored nowhere. On a **VM guest built by
+`tools/build-vm-image.sh`**, they are fixed and weak on purpose: user `user`,
+password `password`, the same for root.
 
 A secure unattended secret-management approach can be added later if needed.
+
+### Why the split
+
+The two cases are not the same question, and answering them the same way was
+costing something real.
+
+For a real machine the reasoning has not changed: a password is a secret, this
+repository is public, and `setup/install.conf` is committed. `03-system.sh`
+prompts, and nothing here ever writes one down.
+
+For a guest the credential was not defending anything. A guest **already logs
+itself in** — `build-vm-image.sh` writes a greetd `initial_session` block into
+the guest's own config, gated on a `/run` runfile so it fires on every boot, so
+there is no prompt to get past in the first place. It sits behind the host's own
+login, and these images are explicitly not for confidential work. What the
+absent password actually cost was the ability to *use* a guest: no `sudo`, and
+no way to enable `sshd`, so every command inside one had to be typed into a qemu
+window by a human and read back off the screen. That made a guest unusable for
+exactly the thing it is best at — measuring a clean install without disturbing a
+working machine.
+
+So the weakening is deliberate, scoped, and buys something specific. TASK-69.4.
+
+### How the boundary is enforced
+
+`USERNAME` is read by real installs *and* by the VM builder from the same file,
+so the override must never touch it. It does not: `build-vm-image.sh` copies the
+whole `setup/` tree to `/mnt/opt/arch-setup`, and both `03-system.sh` and
+`05-dotfiles.sh` source `$SETUP_ROOT/install.conf` — that **copy**. The builder
+rewrites the copy and then asserts two things before continuing: that the copy
+really changed, and that `setup/install.conf` did **not**. A build that somehow
+wrote to the repository's own file stops rather than shipping.
+
+The password travels as `GUEST_PRESET_PASSWORD` in the environment, read by
+`03-system.sh`, which uses `chpasswd` when it is set and its ordinary
+interactive `passwd` when it is not. `install.sh` never sets it and has no flag
+that reaches it, so the real-install path is not merely unchanged but
+unreachable from the other direction.
+
+### Trade-off
+
+`03-system.sh` now has a branch that exists only for the VM builder, which
+slightly weakens the property that a guest is built by exactly the same code as
+a real machine. The file is the same file; only the path through it differs, and
+the difference is two lines setting passwords. That was judged cheaper than the
+alternatives below, but it is a real cost and the builder's header says so
+rather than continuing to claim the stages are used completely unmodified.
+
+Anyone who clones a guest inherits these credentials. That is the point, and it
+is why the guest is not somewhere to put anything worth protecting.
+
+### Alternatives considered
+
+**Leave it interactive and type into the qemu window.** This was the status quo
+and it is what made the decision. It rules out any unattended use of a guest,
+and there is no keystroke-injection tool installed (`wtype`/`ydotool` are not in
+any manifest), so an agent or a script cannot drive a guest at all.
+
+**Prompt once and store the password outside Git.** Solves the secret problem
+and not the usability one: the build still cannot run unattended, and a
+machine-local secret store is a lot of machinery for a value whose whole purpose
+is to be guessable.
+
+**Give the guest a strong random password and print it at the end of the build.**
+Better on paper. In practice it has to be recorded somewhere to be usable, which
+is the same problem one step removed, and it makes every guest's credential
+different for no benefit given the threat model is "none".
+
+**Change `USERNAME` in `setup/install.conf`.** Rejected outright: that file names
+the user of every real machine this repository installs, including the one it is
+being read on.
 
 ---
 

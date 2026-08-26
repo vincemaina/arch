@@ -336,10 +336,20 @@ is no longer allowed to reclaim. Raise that number thoughtfully.
 repository — nothing image-shaped is tracked here, the same rule wallpapers
 follow. `tools/build-vm-image.sh` builds it, on the machine, using this
 repository's own installer against a scratch disk attached over `nbd`, rather
-than an ISO. It asks for a root password and a user password partway through —
-the same prompts a fresh install makes — so it needs a real terminal to run in,
-not a script driving it. See
+than an ISO. It asks nothing and can be left to run. See
 [Recipes](08-recipes.md) → "Build (or rebuild) the base VM image" for how.
+
+**A guest logs itself in, as `user`, password `password`.** Root has the same
+password. That is deliberate and it is only true of guests: a real install of
+this system still asks for both passwords and stores neither. A guest is
+already behind this machine's login, and it already logs itself straight into
+its desktop without prompting — so the password is not standing in front of
+anything. It exists so a guest can be *used*: `sudo` inside one, and turning on
+`sshd` so a guest can be driven from a terminal on the host instead of by
+typing into its window. The obvious corollary is the point rather than a
+caveat — a guest is not somewhere to put anything worth protecting, and anyone
+you hand a clone to has the same credentials. See `DECISIONS.md` →
+"Passwords".
 
 **The left Alt / left Control swap (see [The keyboard](03-the-keyboard.md))
 still works inside a guest, and only because the guest's own copy of it is

@@ -421,15 +421,19 @@ repository.
 sudo ./tools/build-vm-image.sh
 ```
 
-Run this yourself, at a real terminal — not through a script that pipes
-answers into it. Partway through it asks for a root password and a user
-password, the exact same `passwd` prompts a fresh install makes. That is
-deliberate — see `DECISIONS.md` → "Passwords" — and this builder does not
-weaken it; it drives the real, unmodified installer stages, so the same
-interactive prompt is what you get.
+It asks nothing and can be left to run — it takes tens of minutes, most of it
+`pacstrap`. The guest it builds has user `user` with password `password`, and
+root the same. That is a deliberate weakening scoped to guests only, and a real
+install still prompts for both passwords and stores neither; the reasoning is in
+`DECISIONS.md` → "Passwords".
+
+**Two things to check before rebuilding, both of which bite quietly.** Every
+machine in `vm list` reads *through* the base image, so replacing it invalidates
+all of them — delete or accept losing any clone you still care about first.
+And the builder will not overwrite an existing base without `--force`.
 
 What it actually does is run every stage under `setup/install/` in order — the
-same numbered scripts `install.sh` runs, completely unmodified — against a scratch
+same numbered scripts `install.sh` runs, none of them edited or patched — against a scratch
 qcow2 attached over `nbd`, so the base image genuinely is a fresh install
 built by this repository's own installer, not an approximation of one. It
 cannot simply call `install.sh` itself: that script ends by powering off the
