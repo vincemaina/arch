@@ -32,11 +32,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # enablement: true turns Pages on via the API if it is not on already,
-      # so the site does not need a visit to Settings before it can deploy.
+      # Pages has to be turned on once, by hand, before this can deploy:
+      #   Settings -> Pages -> Build and deployment -> Source: GitHub Actions
+      #
+      # `configure-pages` takes an `enablement: true` input that is supposed to
+      # do that through the API. It was tried here and it does not work: the
+      # workflow's own GITHUB_TOKEN cannot create a Pages site that has never
+      # existed, so the step failed outright (runs on c8cd86e and e05b628) and
+      # every step after it was skipped. It is left out rather than left in
+      # looking load-bearing.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

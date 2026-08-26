@@ -4,6 +4,17 @@ The Swaystone landing page, published to GitHub Pages by
 [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) on every push to
 `main` that touches this directory.
 
+> **One-time setup.** Pages must be turned on by hand before the workflow can
+> deploy anything: **Settings → Pages → Build and deployment → Source:
+> *GitHub Actions***. Until that is done, `configure-pages` fails and every step
+> after it is skipped. The action's `enablement: true` input is meant to avoid
+> this and does not: the workflow's `GITHUB_TOKEN` cannot create a Pages site
+> that has never existed. Tried, failed, removed.
+>
+> Once it is on, re-run the workflow from the Actions tab (or push anything
+> under `site/`) and the page goes live at
+> `https://vincemaina.github.io/arch/`.
+
 **Like `docs/`, `checks/` and `backlog/`, this is repository tooling.** Nothing in
 here reaches the built machine, and nothing it needs may be added to
 `setup/packages/`.
