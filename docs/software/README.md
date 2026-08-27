@@ -1,6 +1,6 @@
 # Software this setup installs
 
-One hundred and thirteen packages are declared across [`setup/packages/`](../../setup/packages/).
+One hundred and fourteen packages are declared across [`setup/packages/`](../../setup/packages/).
 This document accounts for every one of them: what it is for, where its
 rationale lives, and what it costs on the machine.
 
@@ -277,6 +277,7 @@ the line, **↓** means an entry below in this document.
 | `xdg-user-dirs` | Creates `~/Pictures` and friends | ↓ |
 | `gvfs` | Removable and network volumes for GIO, so a USB stick appears in a Save As dialog | M, D: GVFS |
 | `yazi` | The file manager, on `$mod+e`. It replaced Thunar rather than sitting beside it | M, D: No graphical file manager, reversing an earlier decision |
+| `udisks2` | `udisksctl`, behind yazi's mount manager on `M` — mounts and unmounts a drive without root | ↓ |
 | `imv` | Image viewer | M |
 | `btop` | System monitor | D: btop |
 | `vimb` | Minimal WebKitGTK browser, **on trial** against qutebrowser: 354ms cold vs 1673ms. `browser --use vimb` | D: Launching an application gives you a new instance of it |
@@ -888,6 +889,65 @@ transitive dependency is `libgudev`. `python-gobject`: **1541.82 KiB**
 installed (`pacman -Si`, 2026-08-24); `glib2`, `glibc` and `libffi` are
 already present, so the real new weight is `gobject-introspection-runtime`.
 Resident cost is **not measured** - see the gap below.
+
+### udisks2
+
+**Problem.** TASK-188: an external drive was not reachable from the file
+manager at all. yazi's layout is three fixed columns with no fourth pane, so
+the sidebar a GUI file manager keeps its device list in has nowhere to live -
+and without a device list, an unmounted disk is something you mount from a
+shell and then type the path to. This machine has four disks and, at rest,
+partitions on three of them mounted nowhere.
+
+**Choice.** `udisks2`, driven by the `mount.yazi` plugin bound to `M`. The
+plugin is upstream's own (`yazi-rs/plugins`) and shells out to `udisksctl`,
+so the package is not really a choice made here so much as the interface that
+plugin speaks. What *was* chosen is doing it through udisks at all rather
+than `sudo mount`: udisks lets the logged-in user mount a removable volume
+with no password, through a polkit policy written for exactly this, instead
+of inventing a sudoers rule. Same reasoning as `power-profiles-daemon` above.
+
+**Alternatives.** `udevil` and `pmount` are the setuid-helper approach and
+both are effectively unmaintained. A `sudoers` entry for `mount` is the thing
+udisks exists so you do not write. Going the other way - a graphical file
+manager purely for its device sidebar - is the decision TASK-44 already made
+and reversed; see *No graphical file manager, reversing an earlier decision*
+in `DECISIONS.md`.
+
+**How it works.** `udisksd` runs as root on the system bus and is **D-Bus
+activated, not enabled** - `udisks2.service` ships `disabled` and nothing in
+`apply-config.sh` turns it on. The first `udisksctl` call starts it, and it
+then stays up. Mounts land under `/run/media/<user>/<label>`.
+
+Authorisation is where the two kinds of drive part company, and it is worth
+knowing which you have before reading a password prompt as a bug:
+
+| | polkit action | As the active console user |
+| --- | --- | --- |
+| Removable disk (USB stick, external drive) | `filesystem-mount` | `yes` — no prompt |
+| Fixed internal disk (the Windows partitions here) | `filesystem-mount-system` | `auth_admin_keep` — prompts once |
+
+Measured on this machine: `udisksctl mount -b /dev/loop0` on a loopback
+volume mounted at `/run/media/vincemaina/TESTSTICK` with no prompt, and
+`udisksctl mount -b /dev/sdb1` - a partition on a fixed internal disk -
+returned `NotAuthorizedCanObtain`. `mount.yazi` handles that second case: it
+retries over D-Bus and then interactively, so the session's polkit agent asks
+for a password rather than the operation simply failing.
+
+No filesystem package is needed for the drives this is aimed at. `vfat`,
+`exfat` and `ntfs3` are all kernel modules in `linux`, so `ntfs-3g`,
+`exfatprogs` and `dosfstools` are **not** declared - they supply `mkfs` and
+`fsck`, not the ability to mount. `lsblk`, which the plugin uses to fill in
+the filesystem column for unmounted partitions, and `eject` are in
+`util-linux` under `base`.
+
+**Cost.** 7.88 MiB on disk (`pacman -Qi`, 2.11.2-1), and it was already
+installed as a dependency of `gvfs` before being declared, so declaring it
+added nothing. `udisksd` resident: 16.2 MiB RSS, 8.35 MiB by the cgroup
+(`systemd-cgtop -1 --raw`), measured 2026-08-27 - but only *after* something
+first calls it. On a machine that never touches a removable drive it is not
+running at all, which is why it does not appear in the session's idle-memory
+figure.
 
 ## Gaps this document does not close
 

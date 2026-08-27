@@ -32,4 +32,29 @@ prepend_keymap = [
     # yazi wants today is `%s1` - the first selected file, already quoted - and
     # `yazi-terminal` needs its `[[ -d "$1" ]] || dirname` fallback returned.
     { on = "<C-o>", run = "shell '{{ .chezmoi.homeDir }}/.local/bin/yazi-terminal' --orphan", desc = "Terminal here" },
+
+    # The mount manager, because yazi has no sidebar and cannot be given one.
+    #
+    # Its layout is three fixed columns - parent, current, preview - with no
+    # fourth pane concept, so the affordance a GUI file manager spends its
+    # left-hand edge on, a list of devices, has nowhere to live. Without this
+    # key an unmounted drive is not reachable from the file manager at all: you
+    # would mount it from a shell and then type the path.
+    #
+    # `M` is safe. yazi 26.8.15 compiles its defaults into the binary rather
+    # than shipping a file, and extracting them shows no bare `on = "M"` - the
+    # only M is `,` `M`, sort by modified time reversed, which is behind the
+    # `,` prefix and does not collide.
+    #
+    # Inside the popup: j/k move, l enters the mount point, m mounts, u
+    # unmounts, e ejects, q quits.
+    #
+    # No absolute path here, unlike every other line in this file. `plugin` is
+    # resolved by yazi against ~/.config/yazi/plugins, not by the shell against
+    # PATH, so the trap that makes the openers and Ctrl+o carry full paths does
+    # not apply. The plugin is vendored - see plugins/README.md for why, and
+    # for how to update it. checks/session.sh asserts it is actually there,
+    # because a `plugin` naming one that is not produces no error and no
+    # message: the key just does nothing.
+    { on = "M", run = "plugin mount", desc = "Mount manager" },
 ]
