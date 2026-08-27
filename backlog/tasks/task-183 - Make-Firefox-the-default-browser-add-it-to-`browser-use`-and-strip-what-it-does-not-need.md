@@ -3,11 +3,11 @@ id: TASK-183
 title: >-
   Make Firefox the default browser, add it to `browser --use`, and strip what it
   does not need
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-26 12:51'
-updated_date: '2026-08-27 12:12'
+updated_date: '2026-08-27 12:13'
 labels: []
 dependencies: []
 priority: medium
@@ -164,3 +164,25 @@ in the main checkout - and nothing to do with browsers. Resolving it means
 either declaring steam in a manifest or removing it, which is the user's call
 and a different task. Left for them rather than checked off or quietly fixed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+firefox is now the browser: $mod+b opens it and every link from every other application resolves to it. qutebrowser and vimb stay installed behind 'browser --use'.
+
+Three surfaces that argued for qutebrowser were rewritten to record why the answer changed rather than being quietly contradicted: executable_browser (firefox in SUPPORTED, as DEFAULT, and in the '# requires:' header), run_onchange_after_set-default-applications.sh (firefox.desktop for http/https/text-html), and packages/desktop.txt. The helper also adds --new-window for firefox, because it is the one browser here that would otherwise add a tab and break the desktop's documented 'a launch is a window' invariant.
+
+Firefox is turned down by enterprise policy, not by clicking about:preferences: setup/system/firefox/policies.json installed to /etc/firefox/policies/ by apply-config.sh, so it reaches a fresh install and a running machine by one route. It force-installs Vimium, which is what gives firefox the keyboard-driven browsing qutebrowser was originally chosen for. user.js was rejected because the profile directory is randomly named and chezmoi cannot address a path it cannot know; DECISIONS.md records that, and setup/system/firefox/README.md carries a reason per policy.
+
+VERIFIED against a running firefox, not by reading files back. The policy was exercised without root through toolkit.policies.perUserDir, which uses the same JSONPoliciesProvider: Vimium 2.4.2 installed itself into a fresh profile with no manual step. about:policies was screenshotted headlessly and read - every policy in the file shows Active, no errors. xdg-mime query default returns firefox.desktop for all three types. browser --current/--list/--use were exercised against a throwaway state dir including the no-state-file case a fresh machine is in.
+
+THREE DEAD SETTINGS were written and removed on the way, each of which passed a naive check and did nothing: browser.tabs.firefox-view and browser.contentblocking.report.vpn.enabled do not exist in 154 (the greps that found them were prefix matches on longer prefs), and DisablePocket is schema-valid but listed under deprecated_policies with no implementation. Only comparing about:policies against the file caught the third.
+
+ONE ITEM NOT DELIVERED: Firefox View. Firefox 154 has no policy and no pref for it - it is a CustomizableUI widget - so removing the button is a per-profile manual step, written down in setup/system/firefox/README.md rather than left looking handled.
+
+MEASURED, and the numbers contradict the task's premise. Balanced profile, best of 3, fresh profile, exec to window mapped on sway IPC: firefox 862ms vs qutebrowser 363ms warm, 875 vs 803 cold from disk; idle PSS 674 MiB across 19 processes vs 108 MiB in one. Firefox costs more on both measurable axes - less than folklore suggests on speed, MORE than assumed on memory - and is chosen on reliability, which neither number measures. The memory gap is real but not like-for-like: qutebrowser on a blank page spawns no renderer, firefox pre-spawns its whole content-process pool. Prose in four files was corrected to match, including two claims written earlier in this same task.
+
+Also swept: the sway $browser comment, a window rule so firefox floats at 1500x900 like the other two, the shortcuts panel entry for $mod+b (which had been naming a command the binding stopped running in TASK-178), and earlyoom's --prefer list, which named qutebrowser and now names firefox's content processes as 'Isolated.Web.Co' - dots for spaces, because that value is split on whitespace.
+
+checks/session.sh 132 passed 0 failed; checks/manual.sh 8/0 (it was failing on main before this task); sway-commands.sh and sway-bindings.sh pass. AC #13 is left unchecked because checks/packages.sh still reports steam and vulkan-tools as installed-but-undeclared - byte-identical on main, unrelated to browsers, and the user's call to resolve.
+<!-- SECTION:FINAL_SUMMARY:END -->
