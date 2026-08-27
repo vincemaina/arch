@@ -1,7 +1,7 @@
 ---
 id: TASK-186
 title: not possible to override sway display/output settings
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-26 13:20'
 updated_date: '2026-08-27 11:26'
@@ -55,3 +55,15 @@ The two output lines were moved out of the tracked 20-output.conf and into 99-lo
 
 Worth noting for whoever reads this next: the tracked file only ever set a resolution for Virtual-1, which exists only inside a QEMU guest. So on real hardware there was never anything to conflict with - the local lines simply add what sway preferred-mode detection did not get right, and nothing above them competes.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The mechanism already existed and nothing pointed at it. TASK-144.3 created ~/.config/sway/config.d/99-local.conf - written once by chezmoi, never rewritten, globbed by sway and sorted last so it wins - and its seeded comment names an output line for a monitor you own as the example. It was sitting on this machine untouched.
+
+The failure was discoverability, at the exact place the wall was hit: sync.sh reported the drifted file, suggested `chezmoi re-add` (which would have committed one desk monitors to a repository meant to build anybody machine), and advised ~/.config/zsh/local.zsh - a line written before six other tools got local files, naming the one tool that could not help.
+
+sync.sh advice is now per-file, with the mapping derived from create_* files in the source rather than hardcoded. 20-output.conf carries a plain warning and a worked example. The manual gained a monitors subsection. DECISIONS.md records the lesson: an escape hatch nobody is told about fails like one that does not exist, and worse, because it looks solved - so document it where the wall is, not only in the chapter that already described it.
+
+Verified by manufacturing drift in a sway file and a foot file simultaneously and reading the advice back: it named 99-local.conf and foot/local.ini, correctly and without duplicates. On this machine the two output lines were moved into 99-local.conf and the tracked file restored, with displays confirmed byte-identical either side of the move (DP-1 1920x1080@60 at 0,0; HDMI-A-1 1920x1080@75 at 1920,0). sync.sh --dry-run now reports no dotfile drift.
+<!-- SECTION:FINAL_SUMMARY:END -->
