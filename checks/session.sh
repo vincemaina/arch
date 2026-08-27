@@ -1071,6 +1071,48 @@ else
     else
         pass "every helper yazi names exists and is executable"
     fi
+
+    # Every plugin the keymap invokes, and whether it is actually there.
+    #
+    # This is the same silent shape as the helpers above, one layer in. `plugin
+    # mount` is resolved by yazi against ~/.config/yazi/plugins rather than by
+    # the shell against PATH, and when the directory is absent yazi prints
+    # nothing at all - no error, no notification, no entry in the task list.
+    # The key simply does nothing, and the config still reads as configured.
+    #
+    # The plugins are vendored into this repository rather than fetched by
+    # `ya pkg` at install time, precisely so that "absent" cannot happen on a
+    # fresh build - see setup/dotfiles/dot_config/yazi/plugins/README.md. This
+    # check is what would notice if it did anyway.
+    missing_yazi_plugins=""
+    while IFS= read -r plug; do
+        [[ -n "$plug" ]] || continue
+        [[ -f "$HOME/.config/yazi/plugins/$plug.yazi/main.lua" ]] \
+            || missing_yazi_plugins+="  $plug (expected $HOME/.config/yazi/plugins/$plug.yazi/main.lua)"$'\n'
+    done < <(grep -hoE '^[^#]*run = "plugin ([a-z0-9_-]+)' "$yazi_conf" "$yazi_keymap" 2>/dev/null \
+        | grep -oE 'plugin [a-z0-9_-]+' | cut -d' ' -f2 | sort -u)
+
+    if [[ -n "$missing_yazi_plugins" ]]; then
+        fail "yazi binds keys to plugins that are not installed, so those keys do nothing and say nothing:"$'\n'"${missing_yazi_plugins%$'\n'}"
+    else
+        pass "every plugin yazi's keymap invokes is present"
+    fi
+
+    # What the mount manager shells out to. udisksctl comes from udisks2,
+    # declared in packages/desktop.txt for this reason; lsblk and eject come
+    # from util-linux under `base`. A missing one fails inside the popup, on a
+    # line of stderr yazi has already taken over the terminal from.
+    if grep -qhE '^[^#]*run = "plugin mount' "$yazi_keymap" 2>/dev/null; then
+        missing_mount_cmds=""
+        for cmd in udisksctl lsblk eject; do
+            command -v "$cmd" &>/dev/null || missing_mount_cmds+=" $cmd"
+        done
+        if [[ -n "$missing_mount_cmds" ]]; then
+            fail "yazi's mount manager is bound but these commands are missing:${missing_mount_cmds}"
+        else
+            pass "yazi's mount manager has udisksctl, lsblk and eject"
+        fi
+    fi
 fi
 
 # ----------------------------------------------------------------------

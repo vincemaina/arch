@@ -244,6 +244,35 @@ Two things are specific to this setup rather than yazi defaults:
   yazi behind it — the terminal is a place to go and do something, and yazi has
   done its job by finding the location. `o` used to open one at the entry under
   the cursor; it was given back to yazi, and nothing is bound to that now.
+- `M` opens the mount manager: every disk on the machine and every partition
+  on it, mounted or not. `j` and `k` move, `m` mounts, `u` unmounts, `e` ejects,
+  `l` steps into the mount point of the highlighted partition, and `q` closes
+  it. A drive it mounts lands under `/run/media/`, and `l` takes you there.
+
+### Why there is no sidebar
+
+Every graphical file manager keeps a list of places down its left-hand edge,
+and external drives appear in it. yazi has no such list and cannot be given
+one: its layout is three fixed columns — the parent directory, the current
+one, and the preview — with no fourth pane to put one in.
+
+`M` is the answer to what that list was for. It is a popup rather than a
+permanent strip, which suits a thing you want a few times a week rather than
+constantly, and it does the part a sidebar cannot anyway: a drive that is not
+mounted yet has no path to click on.
+
+Plugging in a USB stick and mounting it asks for no password. Mounting a
+partition on one of the machine's own internal disks — a Windows partition on
+a dual-boot machine, say — asks once, because those are two different polkit
+rules and only the removable one is granted to whoever is sitting at the
+machine. Both are the stock udisks policy, not something set here.
+
+The plugin behind `M` is [mount.yazi](https://github.com/yazi-rs/plugins),
+written by yazi's own authors. It is the one piece of third-party code this
+setup vendors — copied into the repository rather than downloaded when the
+machine is built, because a fresh install has no guarantee of a network and a
+plugin that is not there does nothing at all and says nothing about it. See
+`setup/dotfiles/dot_config/yazi/plugins/README.md` for how to update it.
 
 ## The git tool: lazygit
 

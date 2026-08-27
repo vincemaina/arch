@@ -316,6 +316,22 @@ rofi-calc
 # See TASK-44 and DECISIONS.md for what was given up.
 yazi
 
+# udisksctl, which is how yazi's mount manager on `M` mounts and unmounts a
+# drive. Declared rather than inherited: it already arrives through gvfs, but
+# as a dependency - so a change in what gvfs pulls in could take it, and the
+# only symptom would be that key doing nothing. Same reasoning as polkit and
+# mesa above. See TASK-188.
+#
+# It needs no daemon enabled: udisksd is D-Bus activated, and polkit is what
+# lets the logged-in user mount a removable volume without a password. A fixed
+# internal disk is a different policy and does prompt.
+#
+# `lsblk`, which the plugin uses to enumerate partitions, and `eject` are both
+# in util-linux, a hard dependency of the `base` meta-package in
+# packages/base.txt - so they are on every machine this builds and are not
+# declared here.
+udisks2
+
 # Mesa, declared rather than inherited. Everything graphical depends on it
 # through sway, so it arrives either way - but the desktop relies on this
 # capability directly, and a dependency-graph change should not be able to

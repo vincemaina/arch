@@ -1656,6 +1656,104 @@ Thunar until it is removed by hand. `checks/packages.sh` reports the drift.
 
 ---
 
+## The device sidebar, answered by a popup rather than a second file manager
+
+**Decision:** External and internal drives are mounted from inside yazi, with
+`M`, using the upstream `mount.yazi` plugin over `udisks2`. The plugin's code is
+**vendored into this repository** rather than fetched by `ya pkg` when the
+machine is built.
+
+### Why
+
+Dropping Thunar above left one thing genuinely unanswered, and it is not on that
+section's "what is given up" list because nobody had noticed it yet: **a GUI
+file manager's left-hand sidebar is where external drives appear.** Take the GUI
+file manager away and there is no device list anywhere on the desktop. An
+unmounted disk is then not reachable from the file manager at all — you mount it
+from a shell and type the path.
+
+yazi cannot grow that sidebar. Its layout is three fixed columns — parent,
+current, preview — with no fourth pane concept, so the affordance has nowhere to
+live. This is a real limit, not a missing setting.
+
+A popup is the better answer anyway, and not only because it is the possible
+one. A sidebar is a permanent strip paid for on every glance at every directory,
+in service of something wanted a few times a week. And it cannot do the part
+that actually matters here: a drive that is not mounted yet has no path for a
+sidebar entry to point at. `M` lists the disks whether they are mounted or not,
+mounts one, and `l` steps into where it landed.
+
+**udisks rather than sudo.** `udisksd` runs as root on the system bus and
+authorises each request through polkit, and the stock policy already grants
+`filesystem-mount` to whoever is sitting at the machine — so a USB stick mounts
+with no password, and a partition on a fixed internal disk (`filesystem-mount-system`,
+`auth_admin_keep`) asks once. Both verified against
+`/usr/share/polkit-1/actions/org.freedesktop.UDisks2.policy` rather than
+assumed. The alternative was a sudoers rule for `mount`, which is precisely the
+thing udisks exists so that nobody writes. Same shape of reasoning as *Power
+profiles switch through a daemon, for privilege rather than scheduling*.
+
+### Why the plugin is vendored
+
+`ya pkg add yazi-rs/plugins:mount` clones from GitHub at the moment it runs. A
+fresh install of this system runs from a live ISO through `arch-chroot` and
+applies dotfiles from `/opt/arch-setup` — a copy of `setup/` and nothing else.
+There is no clone step there and no guarantee of a network.
+
+A plugin fetched at install time is a plugin that is sometimes absent, and an
+absent plugin fails in this repository's signature way: yazi prints no error, no
+notification and nothing in the task list. `M` simply does nothing, while the
+keymap still reads as configured. That is the same failure shape as the media
+keys calling an uninstalled binary and the theme `include` pointing at a file
+that was never there.
+
+So the code is committed and chezmoi deploys it like any other dotfile. `ya
+pkg`'s own `package.toml` manifest is tracked alongside it, so the pinned
+revision is machine-readable as well as written down, and `checks/session.sh`
+asserts that every `plugin` the keymap names has a `main.lua` behind it.
+
+### Trade-off
+
+**485 lines of somebody else's Lua now live in this repository**, and updating
+it is a manual copy rather than a command. That is the cost of the guarantee,
+and it is paid in the direction this repository already leans: the repo is the
+source of truth, and a change made on the machine is drift.
+
+It also inverts the usual update flow. `chezmoi apply` will *revert* an upgrade
+performed in place with `ya pkg upgrade`, so upgrades have to happen in the
+repository and reach the machine through `sync.sh`. The procedure is written
+down in `setup/dotfiles/dot_config/yazi/plugins/README.md`, next to the code,
+because that is where someone about to run `ya pkg upgrade` will be standing.
+
+Vendoring also means nobody upstream can fix a bug for you silently — which
+cuts both ways, and is the reason that README says to read the upstream diff
+before committing it. `mount.yazi` shells out to `udisksctl` and has a `sudo`
+fallback path.
+
+### Alternatives considered
+
+**A graphical file manager, purely for the sidebar.** This is the decision above,
+already made and reversed on evidence. Reinstalling Thunar to get a device list
+would bring back all four things it was dropped for and cost 20.53 MiB across
+seven packages, to solve a problem 28 KiB of Lua solves.
+
+**`udiskie`**, a tray-and-notification auto-mounter. It is the conventional
+answer and it works, but it is a resident daemon that mounts things on insertion
+whether or not anyone asked, and the desktop it reports into is a tray this
+setup does not have. `M` is explicit and costs nothing when not pressed.
+
+**Auto-mounting via a udev rule.** Mounts a drive the moment it is plugged in,
+with no session, no policy and no user in the loop. Faster and considerably
+harder to reason about when it goes wrong.
+
+**`ntfs-3g`, `exfatprogs`, `dosfstools`.** Considered and *not* declared. `vfat`,
+`exfat` and `ntfs3` are all kernel modules shipped in `linux`; those packages
+supply `mkfs` and `fsck`, not the ability to mount. Declaring them would have
+been three packages bought on an assumption — see *the fix that did not work,
+kept anyway* in CLAUDE.md for why that matters.
+
+---
+
 ## GVFS
 
 **Decision:** Keep GVFS, which arrived with Thunar and outlived it.
