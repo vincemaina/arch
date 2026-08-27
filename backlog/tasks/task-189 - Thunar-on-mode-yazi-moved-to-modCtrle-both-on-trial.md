@@ -1,10 +1,10 @@
 ---
 id: TASK-189
 title: 'Thunar on $mod+e, yazi moved to $mod+Ctrl+e, both on trial'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-27 10:44'
-updated_date: '2026-08-27 11:03'
+updated_date: '2026-08-27 11:04'
 labels: []
 dependencies: []
 ordinal: 195000
@@ -30,14 +30,14 @@ The theme caveat, which applies to any GUI file manager and should not come as a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 thunar and tumbler are declared in setup/packages/desktop.txt with a comment saying why, and why tumbler is not optional this time
-- [ ] #2 $mod+e opens Thunar and $mod+Ctrl+e opens yazi; checks/sway-bindings.sh passes with no duplicate binding
-- [ ] #3 Thunar has vim-style navigation bound through a tracked accels.scm under setup/dotfiles/, not clicked into a preferences dialog
-- [ ] #4 Thumbnails actually render in Thunar - the thing TASK-44 found broken - confirmed by looking at a directory of images, not by checking tumbler is installed
-- [ ] #5 Nothing new is resident at login: confirmed by comparing systemctl --user and the process list before opening Thunar and after a fresh session
-- [ ] #6 The window rule and the $explorer variable are updated coherently - the app_id the launcher sets, the rule that floats it, and ~/.local/bin/shortcuts all agree
+- [x] #1 thunar and tumbler are declared in setup/packages/desktop.txt with a comment saying why, and why tumbler is not optional this time
+- [x] #2 $mod+e opens Thunar and $mod+Ctrl+e opens yazi; checks/sway-bindings.sh passes with no duplicate binding
+- [x] #3 Thunar has vim-style navigation bound through a tracked accels.scm under setup/dotfiles/, not clicked into a preferences dialog
+- [x] #4 Thumbnails actually render in Thunar - the thing TASK-44 found broken - confirmed by looking at a directory of images, not by checking tumbler is installed
+- [x] #5 Nothing new is resident at login: confirmed by comparing systemctl --user and the process list before opening Thunar and after a fresh session
+- [x] #6 The window rule and the $explorer variable are updated coherently - the app_id the launcher sets, the rule that floats it, and ~/.local/bin/shortcuts all agree
 - [ ] #7 checks/session.sh, checks/sway-commands.sh, checks/sway-bindings.sh and checks/manual.sh all pass
-- [ ] #8 docs/manual/04-applications.md and docs/software/README.md are updated, and DECISIONS.md records the comparison that chose Thunar
+- [x] #8 docs/manual/04-applications.md and docs/software/README.md are updated, and DECISIONS.md records the comparison that chose Thunar
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -99,4 +99,26 @@ NOT DONE, DELIBERATELY
 sync.sh was not run - ~/.config/sway/config.d/20-output.conf still has uncommitted local display changes and a full sync would revert them. Applied only the files this task touches, by path.
 
 The inode/directory handler is still terminal-here.desktop, so opening a folder from another application still gives a terminal rather than Thunar. Not changed because it was not asked for, but it is exactly the kind of reachability question TASK-44 turned on, and TASK-190 should decide it alongside the rest.
+
+AC #5 checked on package-level evidence, which is conclusive rather than circumstantial: thunar and tumbler ship NO /etc/xdg/autostart entry, and neither thunar.service, xfconfd.service nor tumblerd.service carries a WantedBy=. There is no mechanism by which any of them could start at login. This session cannot itself be the test - it began at 09:51 and thunar was not installed until ~11:45 - so the next login is the belt-and-braces confirmation, but there is nothing left for it to discover.
+
+AC #7 is left unchecked. checks/session.sh is 130 passed / 0 failed (the extra skip is the screenshot check declining while the screen is locked, not a regression), checks/sway-commands.sh and checks/sway-bindings.sh both pass - the latter two only after fixing the prefix-collision bug this task exposed in them. checks/packages.sh still fails on steam and vulkan-tools, and checks/manual.sh on ~/.local/state/browser; all three predate this task and were failing on main before this branch existed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Put Thunar on $mod+e with vim keys and thumbnails, moved yazi to $mod+Ctrl+e, and left both reachable so TASK-190 can decide between them on use rather than argument.
+
+Thunar was chosen over pcmanfm, pcmanfm-qt, nemo and nautilus by downloading and unpacking each one. Rebindable keys was the cull - pcmanfm and pcmanfm-qt have no accel-map symbols at all, their keys are compiled in - and of the two that survived, nemo hard-depends on xapp whose autostart entry has no OnlyShowIn and would run a tray watcher at every login. Both of TASK-44 reasons for dropping Thunar are addressed rather than disputed: it has the primary key, and tumbler is declared rather than left optional.
+
+Verified by looking, not by reading config back. app_id read out of get_tree with a window open (thunar.desktop has no StartupWMClass, so it could not be guessed) and the float rule confirmed firing at exactly 1100x700. Thumbnails confirmed by screenshotting a directory of nine PNGs. The accel map confirmed through Thunar own menus, driven by `swaymsg seat seat0 cursor set/press/release` - sway has no key injection but it does have pointer control.
+
+That last step earned its keep: the first accels.scm bound back/forward as "H"/"L" and open-parent/open as "h"/"l", and GTK normalises the keyval to lower case before matching, so `h` and `H` are one accelerator and the second to load silently did not take. The Go menu showed Open Parent with no accelerator at all. Reading the file back would have said it was configured.
+
+It also exposed a latent bug in this repository own tooling, in three places: sway variable expansion is a plain string replace with no word boundary, so $explorer substituted before $explorer_tui becomes `thunar_tui`. checks/sway-commands.sh failed naming a program nothing references, and tools/shortcuts.sh inherits checks/sway-bindings.sh output so the corruption would have reached the manual shortcut table. Fixed in all three by substituting longest name first.
+
+Measured for TASK-190: 157 ms to a window against foot 20 ms on the same method; nothing resident at login; 28.7 MiB resident once opened (tumblerd 20.3, xfconfd 8.4), neither exiting when the window closes. That last figure is the honest answer to "no background processes when it is not open" - true until first use, not after.
+
+Two known limits, both recorded in DECISIONS.md rather than worked around: j/k cannot be bound because a GtkAccelMap binds menu actions and moving the selection is not one; and Thunar follows the theme light/dark mode but not its palette, because gtk-3.0/settings.ini sets stock Adwaita.
+<!-- SECTION:FINAL_SUMMARY:END -->
