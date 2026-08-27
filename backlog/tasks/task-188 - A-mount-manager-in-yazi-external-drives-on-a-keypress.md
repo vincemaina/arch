@@ -1,10 +1,10 @@
 ---
 id: TASK-188
 title: 'A mount manager in yazi: external drives on a keypress'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-27 09:53'
-updated_date: '2026-08-27 10:04'
+updated_date: '2026-08-27 10:48'
 labels: []
 dependencies: []
 ordinal: 194000
@@ -30,7 +30,7 @@ See TASK-44 for why thunar was removed rather than kept for this kind of job, an
 - [x] #1 The mount plugin is vendored under setup/dotfiles/dot_config/yazi/plugins/ and tracked in git, so a fresh install gets it with no network fetch at install time
 - [x] #2 A key in yazi opens the mount manager, bound in keymap.toml.tmpl, and it does not shadow a yazi default that was in use
 - [ ] #3 Mounting and unmounting a real external device is confirmed to work on the running machine, as the normal user, with no sudo prompt
-- [ ] #4 udisks2 is declared explicitly in setup/packages/desktop.txt with a comment saying why, and checks/packages.sh passes
+- [x] #4 udisks2 is declared explicitly in setup/packages/desktop.txt with a comment saying why, and checks/packages.sh passes
 - [x] #5 The vendored plugin carries a note recording its upstream, its version or commit, and how to update it, so it does not become unattributed code of unknown age
 - [ ] #6 checks/session.sh, checks/packages.sh and checks/manual.sh all pass
 - [x] #7 docs/manual/04-applications.md describes the mount manager under the file-manager section, and docs/software/README.md or DECISIONS.md records the package change
@@ -94,4 +94,26 @@ AC #3, #4 and #6 are not checked, for two reasons that both need a hand at the k
 1. `sudo pacman -D --asexplicit udisks2` has not been run - sudo requires a password here. Until it does, checks/packages.sh reports udisks2 as declared-but-a-dependency, which is exactly the drift the declaration exists to prevent. (checks/packages.sh also reports steam and vulkan-tools as undeclared; that is pre-existing drift, unrelated to this task. checks/session.sh is 131 passed / 0 failed, and checks/manual.sh has one pre-existing failure on ~/.local/state/browser, also unrelated - both confirmed against main.)
 
 2. No external drive is plugged into this machine, and there is no way to press `M` from a script here. The mount/unmount path is proven on a udisks-managed loop device and the popup is proven to open, so what is left is one keystroke and one USB stick.
+
+udisks2 is now Explicitly installed (confirmed with `pacman -Qi udisks2`), and checks/packages.sh no longer reports it. AC #4 checked.
+
+AC #6 is left unchecked deliberately. checks/session.sh is 131/0 and the udisks2 assertion in checks/packages.sh passes, but packages.sh still fails on steam and vulkan-tools - undeclared drift that predates this task and is not its to fix - and checks/manual.sh still fails on ~/.local/state/browser, likewise pre-existing (both confirmed against main before this branch existed). Nothing here made either worse.
+
+AC #3 is left unchecked: no external drive has been plugged into this machine. The mount/unmount path is proven on a udisks-managed loop device and the popup is proven to open; what remains is one USB stick and one keypress.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Bound `M` in yazi to the upstream mount.yazi plugin, vendored into the repository rather than fetched at install time, and declared udisks2 explicitly.
+
+WHY IT EXISTS: dropping Thunar (TASK-44) left external drives unreachable from the file manager, because a device sidebar is what a GUI file manager spends its left-hand edge on and yazi has three fixed columns with no fourth pane. A popup answers it better anyway - a drive that is not mounted yet has no path for a sidebar entry to point at.
+
+WHY IT IS VENDORED: `ya pkg add` clones from GitHub when it runs, and a fresh install applies dotfiles inside arch-chroot from a copy of setup/ with no clone step and no guaranteed network. An absent plugin makes `M` do nothing AND say nothing - no error, no notification, no task-list entry - which is this repository signature failure. So the code is committed, package.toml pins rev c591a36, plugins/README.md carries provenance and the update procedure, and checks/session.sh asserts every plugin the keymap names has a main.lua behind it.
+
+VERIFIED, not read back: the plugin was invoked over yazi own DDS socket (`ya sub` for the instance id, then `ya emit-to <id> plugin mount`) on a throwaway HEADLESS-1 output, and rendered correctly listing all four disks with labels and filesystem types. Mount and unmount were exercised through the exact command cross.lua runs - a udisks loop device mounted at /run/media/vincemaina/TESTSTICK with no password prompt, then unmounted and detached. The polkit split (filesystem-mount=yes for removable, filesystem-mount-system=auth_admin_keep for fixed internal) was read out of the policy file and confirmed against behaviour. The new check was proved to bite by moving the plugin directory aside and watching it fail.
+
+ALSO ESTABLISHED: ntfs-3g, exfatprogs and dosfstools are not needed - vfat, exfat and ntfs3 are kernel modules, and those packages supply mkfs/fsck. udisks2.service is D-Bus activated, not enabled, so it costs nothing on a machine that never touches a removable drive.
+
+OUTSTANDING: AC #3 unchecked - no external drive was available to plug in, so the final USB-stick-and-keypress confirmation is untaken. AC #6 unchecked - checks/packages.sh and checks/manual.sh each still fail on drift predating this task (steam, vulkan-tools, ~/.local/state/browser); checks/session.sh is 131 passed / 0 failed.
+<!-- SECTION:FINAL_SUMMARY:END -->
