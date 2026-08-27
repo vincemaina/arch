@@ -441,10 +441,11 @@ Everything below is produced by `tools/shortcuts.sh` from the live
 configuration: every Sway window-management and system binding, the resize
 mode, the hardware keys, and the terminal's own line-editing shortcuts
 (zsh), followed by a check for any key that means two different things in
-different contexts. It also lists what is not covered yet - qutebrowser,
-neovim, rofi and foot are not parsed by the tool, either because they have
-no configuration in this repository to read or because that parsing has not
-been written - so a gap in the table below is a gap in the tool, not a claim
-that those programs have no shortcuts of their own.
+different contexts. It also lists what is not covered yet - firefox and its
+Vimium extension, qutebrowser, neovim, rofi and foot are not parsed by the
+tool, either because they have no configuration in this repository to read or
+because that parsing has not been written - so a gap in the table below is a
+gap in the tool, not a claim that those programs have no shortcuts of their
+own. Vimium's own list is `?` inside firefox.
 
 {{shortcuts}}

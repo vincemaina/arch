@@ -167,7 +167,12 @@ def sway_shortcuts():
                 "shortcuts": "This panel",
                 "sway-toggle-floating": "Float or tile the focused window",
                 "swaynag": "Exit sway (asks first)",
-                "qutebrowser": "Open the browser",
+                # $mod+b runs ~/.local/bin/browser, which picks between
+                # firefox, qutebrowser and vimb - so the name to describe is
+                # the helper's, not any one browser's. This said
+                # "qutebrowser" until TASK-183 and had been describing a
+                # command the binding stopped running back in TASK-178.
+                "browser": "Open the browser",
             }
             if first in HELPERS:
                 return HELPERS[first]

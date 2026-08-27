@@ -282,9 +282,9 @@ the line, **↓** means an entry below in this document.
 | `udisks2` | `udisksctl`, behind yazi's mount manager on `M` — mounts and unmounts a drive without root | ↓ |
 | `imv` | Image viewer | M |
 | `btop` | System monitor | D: btop |
-| `vimb` | Minimal WebKitGTK browser, **on trial** against qutebrowser: 354ms cold vs 1673ms. `browser --use vimb` | D: Launching an application gives you a new instance of it |
-| `qutebrowser` | Web browser, the everyday one | D: Two browsers: qutebrowser for everything, firefox for DRM and extensions |
-| `firefox` | The other browser, for WebExtensions and DRM that `qutebrowser`'s webengine cannot do at all | M, D: Two browsers: qutebrowser for everything, firefox for DRM and extensions |
+| `firefox` | **The browser.** What `$mod+b` opens and where every link goes, since TASK-183. Turned down and given Vimium by `/etc/firefox/policies/policies.json` | M, D: The everyday browser is firefox; D: Firefox is configured by enterprise policy, not by a profile file |
+| `qutebrowser` | Web browser, the everyday one until TASK-183. Still on `browser --use qutebrowser` | D: The everyday browser is firefox |
+| `vimb` | Minimal WebKitGTK browser, trialled against qutebrowser and not chosen either. Still on `browser --use vimb` | D: The everyday browser is firefox; D: Launching an application gives you a new instance of it |
 | `rofi` | The launcher — one prompt, several sources via `combi` | M, D: rofi, reversing an earlier decision |
 | `rofi-calc` | Calculator source for that prompt, via libqalculate | M |
 | `fastfetch` | System summary, run manually | M |

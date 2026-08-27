@@ -41,19 +41,30 @@ set $explorer thunar
 # The terminal one is a terminal with a distinct app_id - otherwise the window
 # rule that floats it would float every terminal.
 set $explorer_tui foot --app-id=explorer -e yazi
-# The helper chooses WHICH browser, not how to open it. TASK-177 measured vimb
-# at 354ms cold against qutebrowser's 1673ms, and vimb is 193 KiB on top of
-# WebKitGTK so that figure is the engine itself - there is no lighter GUI
-# browser to find. Whether WebKitGTK renders real sites well enough to live
-# with is not a benchmark question, so TASK-178 put both behind a one-line
-# state file and this key follows it. `browser --use vimb` switches.
+# The helper chooses WHICH browser, not how to open it. It is firefox, since
+# TASK-183 - with Vimium force-installed by policy, so the keyboard-driven
+# browsing qutebrowser was picked for in the first place comes with it. TASK-178
+# put the choice behind a one-line state file and this key follows it, so
+# `browser --use vimb` and `browser --use qutebrowser` still switch and
+# `browser --current` says which is in force.
+#
+# Firefox is the slower of the two, measured rather than assumed: TASK-183 got
+# 862ms against qutebrowser's 363ms warm, and 875ms against 803ms cold from
+# disk. That is the known price of this decision, paid once per window, and
+# TASK-183 judged it smaller than reaching for a second browser when a site does
+# not render. Do not quote TASK-177's 1673ms here - it is a different cache
+# state and these two numbers are not comparable to it.
 #
 # Each launch still opens a new WINDOW rather than a tab in the window you
-# used last. For qutebrowser that is `new_instance_open_target` in
-# dot_config/qutebrowser/config.py - set there rather than as `--target
-# window` here, so the launcher, the default link handler and the terminal
-# behave the same way as this key. vimb needs nothing: it is one process per
-# invocation already.
+# used last. Each browser gets there differently: qutebrowser through
+# `new_instance_open_target` in dot_config/qutebrowser/config.py, firefox
+# through a `--new-window` the helper adds, and vimb through being one process
+# per invocation already. Set in each browser rather than as a flag here, so
+# the launcher and the terminal behave the same way as this key.
+#
+# Links from OTHER applications deliberately do not go through this - they go
+# to firefox.desktop and land in a tab. See
+# dotfiles/run_onchange_after_set-default-applications.sh.
 set $browser ~/.local/bin/browser
 # One prompt, several sources. `combi` merges the modes listed in
 # config.rasi - applications, open windows, files, calculator - so there is a
