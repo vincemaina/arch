@@ -161,70 +161,81 @@ and vimdoc. TypeScript, SQL, HTML, CSS, JSON, YAML and TOML have no parser
 package yet and fall back to plain regex highlighting, which is a known gap,
 not a bug.
 
-## The browsers: qutebrowser and firefox
+## The browser: firefox
 
-Two browsers, for two different jobs, and the system default-application
-mapping already sends links to the right one: qutebrowser handles
-`http://`, `https://` and `.html` by default; firefox does not open anything
-automatically and is reached deliberately.
+**firefox is the browser.** `$mod+b` opens it, and every link clicked
+anywhere else — in a notification, from the launcher, from another
+application — opens in it too. There is nothing to configure to get that;
+it is what the system default-application mapping already says.
 
-**qutebrowser** is the everyday, keyboard-driven browser and the one you
-should reach for first. `$mod+b` launches it, and every launch gives you a
-new window — the same as `$mod+e` for the file manager and `$mod+Return`
-for the terminal. Reaching a window you already have open is what window
-switching is for, not what the launch key does. Its window floats and opens
-at 1500×900.
+Every launch gives you a new window, the same as `$mod+e` for the file
+manager and `$mod+Return` for the terminal. Reaching a window you already
+have open is what window switching is for, not what the launch key does. The
+window floats and opens at 1500×900.
 
-That is not qutebrowser's own default, which opens a *tab* in whichever
-window you used last and raises that window — easy to mistake for the key
-doing nothing at all. `new_instance_open_target` in the qutebrowser config
-changes it, which is why the launcher, a link opened by another application
-and `$mod+b` all behave the same way.
+That is not firefox's own default, which adds a *tab* to whichever window you
+used last and raises it — easy to mistake for the key doing nothing at all.
+`$mod+b` goes through `~/.local/bin/browser`, which adds `--new-window`.
 
-Starting the browser is not fast: roughly 1.7 seconds cold. If it feels far
-worse than that, check the power profile before anything else — on
-`power-saver` this machine clocks down to 800MHz and multiplies every figure
-by about three. That is the battery icon in the bar.
+A link arriving from somewhere else deliberately does **not** get that, and
+lands in a tab of the window you already have. Opening a link is a different
+intention from asking for a browser, and the two behave differently on purpose.
 
-**A second browser is on trial.** `vimb` starts in 354ms against
-qutebrowser's 1673ms, and `$mod+b` opens whichever of the two you have
-selected:
+Starting it is not fast: a little under a second, and closer to 1.2 seconds if
+nothing of it is in memory yet. If it feels far worse than that, check the
+power profile before anything else — on `power-saver` this machine clocks down
+to 800MHz and multiplies every figure by about three. That is the battery icon
+in the bar.
+
+**Keyboard navigation is Vimium**, a browser extension that is installed for
+you rather than something you add. It gives firefox the vim-style browsing the
+desktop is otherwise built around: `j` and `k` to scroll, `f` to click a link
+by hint, `/` to search the page, `o` to open a URL, `x` to close a tab, `X` to
+reopen one, `?` for the full list at any time. Press `?` rather than trusting
+this paragraph — it is the authoritative list and it is one key away.
+
+Vimium arrives over the network on first launch, so a machine set up without a
+connection will not have it until the first time firefox starts with one.
+
+**firefox is turned down.** No Pocket, no telemetry, no Normandy studies, no
+VPN promotion, no sponsored shortcuts on the new tab page, no first-run tour,
+and no update nagging — firefox is a pacman package here, so `sync.sh` updates
+it and its own updater could not. None of that was clicked off in
+`about:preferences`; it is a policy file the repository installs, which is why
+it is the same on every machine built from it and survives resetting your
+profile. Some settings are therefore greyed out, and `about:policies` lists
+exactly what is in force.
+
+One thing on that list is *not* handled: the **Firefox View** button at the
+left of the tab strip. Recent firefox has no policy or preference for it.
+Right-click it and choose *Remove from Toolbar*; that is stored in your
+profile, so it is a step to repeat on a rebuilt machine.
+
+**Two other browsers are installed**, and `$mod+b` will open either if you ask
+it to:
 
 ```
-browser --current       which one $mod+b opens
-browser --list          both, marking the selected one
-browser --use vimb      switch
-browser --use qutebrowser
+browser --current          which one $mod+b opens
+browser --list             all three, marking the selected one
+browser --use qutebrowser  switch
+browser --use vimb
+browser --use firefox
 ```
 
 The choice is one line in `~/.local/state/browser` and survives logging out.
-Nothing else moves: links from other applications still open qutebrowser, and
-the launcher still reaches either by name. vimb is a very small browser on
-the same engine GNOME Web uses — it renders ordinary sites correctly, has no
-tab bar or address bar at all, and is weaker than qutebrowser's Chromium
-engine on recent JavaScript. That last point is the thing the trial is for.
+Links from other applications do not follow it — those stay with firefox.
 
-Closing qutebrowser's *last* window quits the whole process, so the next
-`$mod+b` press pays the full cold start again. The open tabs survive it:
-the config turns on session auto-save, and restored tabs load only when you
-focus them.
+`qutebrowser` was the everyday browser until firefox replaced it, and is
+keyboard-driven in its own right rather than through an extension; press
+`:bind` inside it for its keys. `vimb` is a very small browser on the same
+engine GNOME Web uses, with no tab bar or address bar at all. Both start
+faster than firefox — qutebrowser in about 360ms with a warm cache — and both
+are on weaker engines that struggle where firefox does not, which is the
+trade that made firefox the default.
 
-The repository ships a small qutebrowser configuration — window-per-launch
-and session restore, and nothing about appearance or keys. So navigation is
-still qutebrowser's own: vim-style (`hjkl` to scroll, `o` to
-open a URL, `O` to open one in a new tab, `d` to close a tab, `u` to reopen
-it, `/` to search the page, `f` to click a link by hint). Those were not
-re-verified against a running session for this chapter — press `:bind` inside
-qutebrowser for the authoritative, current list. `Ctrl+Tab` is the one
-exception worth knowing: sway claims it globally for switching between tiled
-and floating windows, so qutebrowser's own tab-cycling on that chord never
-reaches it.
-
-**firefox** exists for exactly what qutebrowser structurally cannot do:
-Widevine DRM (Netflix and similar) and WebExtensions. qutebrowser's
-QtWebEngine ships zero Widevine files — this is not a missing setting, there
-is no codec to enable. firefox has no keybinding of its own and is not the
-default handler for anything; open it by name from `$mod+space`.
+`Ctrl+Tab` is worth knowing in any of them: sway claims it globally for
+switching between tiled and floating windows, so a browser's own tab-cycling
+on that chord never reaches it.
 
 ## The file managers: Thunar and yazi
 

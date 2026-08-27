@@ -1076,6 +1076,12 @@ Current configuration includes workspace information and useful system status wh
 
 ## The everyday browser is on trial, behind a one-line switch
 
+**Superseded by *The everyday browser is firefox* (TASK-183).** The trial ran
+and answered, and the answer was neither of the two on trial. The switch itself
+survives — it is how `browser --use` still reaches all three — but "not a
+decision yet" is no longer true. Kept because the measurements below are still
+the only ones taken, and the new entry rests on them.
+
 **Decision:** Not a decision yet, deliberately. `$mod+b` opens whichever of
 qutebrowser and vimb a one-line state file names, so the question can be
 answered by use rather than by argument.
@@ -1200,6 +1206,11 @@ which is where the wait actually is.
 
 ## Two browsers: qutebrowser for everything, firefox for DRM and extensions
 
+**Superseded by *The everyday browser is firefox* (TASK-183), which reversed
+which of the two is which.** Everything below about what qt6-webengine cannot
+do, and about why firefox rather than a Chromium, is still current and still
+the reason firefox is the one installed. Only the ranking changed.
+
 **Decision:** qutebrowser as the everyday browser, firefox declared alongside it
 for the things qutebrowser cannot do.
 
@@ -1241,6 +1252,208 @@ find out.
 solves the problem: falkon is qt6-webengine again, so it inherits the same
 missing Widevine, and Epiphany's WebKit has its own DRM story rather than a
 better one. The second browser exists precisely to be the heavy one.
+
+---
+
+## The everyday browser is firefox
+
+**Decision:** firefox is what `$mod+b` opens and where every link from every
+other application goes. qutebrowser and vimb stay installed and stay reachable
+through `browser --use`, but neither is the default any more.
+
+This reverses *Two browsers: qutebrowser for everything, firefox for DRM and
+extensions* and closes *The everyday browser is on trial, behind a one-line
+switch*. Both are kept above, marked superseded, because the reasoning in them
+is still load-bearing — it is the ranking that moved, not the facts.
+
+### Why
+
+The trial ran. What it found is not in TASK-177's table, because the table
+measures the thing that turned out not to be deciding.
+
+Cold start is a cost paid once per window. A site that does not render is a cost
+paid at an unpredictable moment, in the middle of doing something else, and the
+only remedy is to open a second browser and start over. Weeks of use put the
+second cost well above the first, and put firefox as the browser where it does
+not arise. WebKitGTK and QtWebEngine are both behind Blink on recent JavaScript
+in ways that show up on ordinary sites rather than exotic ones.
+
+**What the measurements say, taken on 2026-08-27 under TASK-177's method** —
+exec to window mapped on sway's IPC stream, best of 3, balanced profile, fresh
+profile per run, `about:blank`:
+
+| | firefox | qutebrowser |
+| --- | --- | --- |
+| warm, libraries in page cache | 862 ms | 363 ms |
+| first launch, cold from disk | 875 ms | 803 ms |
+| idle PSS, blank page | 674 MiB / 19 procs | 108 MiB / 1 proc |
+
+Three things about that table, none of them comfortable:
+
+**Firefox is slower, and by less than expected.** Cold, the two are within
+70 ms of each other. Warm, firefox is 2.4× qutebrowser — because qutebrowser's
+figure more than halves with a warm cache and firefox's barely moves, its
+libraries being resident already on a machine that runs it. Neither pass
+reproduces TASK-177's 1673 ms, so that number should not be quoted against
+these; it was a different cache state.
+
+**Firefox uses far more memory than this entry originally claimed.** The first
+draft said the RAM argument "did not survive". Measured, it is 6× at idle, and
+that sentence was wrong. It is left described rather than deleted because the
+correction is the useful part.
+
+**The memory comparison is not like-for-like, which is why it did not decide
+anything.** qutebrowser on `about:blank` spawned no QtWebEngine renderer at all
+— one process, total. firefox pre-spawns its entire content-process pool on
+startup. A real page moves qutebrowser up sharply and firefox very little. The
+674 MiB is a true number about a state nobody browses in.
+
+So the honest summary is that firefox costs more on both axes than qutebrowser
+does, by less than folklore suggests on speed and by more than this entry first
+claimed on memory, and it is chosen anyway — on reliability, which is the axis
+none of these numbers measure.
+
+That leaves the reason qutebrowser was chosen in the first place: keyboard-
+driven browsing on a desktop where everything else is. **Vimium gives firefox
+that**, and TASK-183 made it a tracked, force-installed extension rather than
+something clicked in on one machine — which is the only version of that answer
+this repository can accept. See *Firefox is configured by enterprise policy,
+not by a profile file*.
+
+### Trade-off
+
+**The slower launch is now on the most-used binding**, at 862 ms warm against
+qutebrowser's 363 ms, and the heavier browser is the resident one. Accepted
+because both costs are bounded and predictable, and paid at a moment when you
+are already choosing to switch context — unlike the failure they buy off.
+
+**Three browser engines are installed** where the original decision wanted two:
+qt6-webengine's 282 MiB, webkit2gtk-4.1's 133 MiB and firefox's own. Two of
+them are now kept for a switch nobody is expected to use. That is refundable
+whenever someone decides to spend the line — TASK-183 deliberately did not,
+because removing a browser on the same day you change which one is default
+makes reverting expensive for no gain.
+
+**A machine built offline gets no Vimium** until its first connected launch,
+because firefox fetches the extension itself.
+
+### Alternatives considered
+
+**Keep qutebrowser as the default and firefox on `--use`.** This is the status
+quo, and it is what the cold-start numbers argue for. Rejected because the
+numbers are not what daily use tripped over.
+
+**Remove qutebrowser and vimb in the same change.** Rejected as two decisions
+in one commit. The default is what is being changed; what stays installed is a
+separate question, and keeping them makes reverting a one-word edit to
+`~/.local/state/browser`.
+
+**Leave the xdg-mime handlers on qutebrowser** — the split the trial
+deliberately kept, so that `$mod+b` could change without links following.
+Rejected now for exactly the reason it was right then: the split exists to make
+a trial cheap, and there is no trial any more. Two browsers answering "open
+this link" differently depending on where the link came from is a surprise, not
+a feature.
+
+---
+
+## Firefox is configured by enterprise policy, not by a profile file
+
+**Decision:** Everything this repository wants to say about how firefox behaves
+is said in `/etc/firefox/policies/policies.json`, installed machine-wide by
+`setup/system/apply-config.sh`. No `user.js`, no `prefs.js`, nothing under
+`~/.mozilla`.
+
+### Why
+
+Making firefox the default browser meant turning it down. Mozilla ships a
+browser carrying a VPN promotion, Pocket, telemetry, Normandy studies, sponsored
+new-tab shortcuts and Firefox View, and clicking those off in `about:preferences`
+is precisely the untracked, one-machine change this repository exists to avoid.
+
+**The obvious chezmoi route does not work.** A firefox profile lives in
+`~/.mozilla/firefox/<random>.default-release/`, where `<random>` is eight
+characters generated when the profile is created. chezmoi's source state is a
+mapping from a path in the repository to a path in the home directory, and it
+cannot address a directory whose name it cannot know. There is no glob, and
+`profiles.ini` is written by firefox rather than read from us.
+
+A policy file has none of that shape. It is machine-wide, it applies before any
+profile exists, it survives a profile reset or a new profile, and it is exactly
+the kind of `/etc` file `apply-config.sh` was built to own — so it reaches a
+fresh install and a running machine by one route, which is the property that
+matters most here.
+
+It also settles the Vimium question in the same file. `ExtensionSettings`
+force-installs an add-on by GUID, so the extension that makes firefox
+keyboard-driven arrives on a rebuilt machine without a manual step. An extension
+installed by hand would have been the same untracked state as a clicked
+preference.
+
+**`/etc/firefox/policies/` rather than `/usr/lib/firefox/distribution/`**, which
+is the path most documentation names. Firefox reads the `/etc` one first when
+its build sets `MOZ_SYSTEM_POLICIES`, and Arch's build does — read out of
+`omni.ja` rather than assumed, with the command recorded in
+`setup/system/firefox/README.md`. The reason to prefer it has nothing to do with
+precedence: pacman owns `/usr/lib/firefox/distribution/`, and a file this
+repository drops into a package-owned directory is a file waiting to be
+surprised by an upgrade.
+
+### Trade-off
+
+**JSON takes no comments**, and this repository explains its configuration in
+comments. So the reasons live in `setup/system/firefox/README.md`, one line per
+policy, next to the file rather than in it — a separation that will drift the
+moment someone adds a policy without adding its line. Nothing checks it.
+
+**Policies are heavier than preferences.** Several are set with
+`"Status": "locked"`, which greys the setting out in `about:preferences`
+entirely. That is the point for a promotion; it is a nuisance if you later
+disagree with one, and the remedy is editing the repository rather than the
+browser.
+
+**Firefox is visibly "managed"** — `about:policies` exists, and an enterprise
+badge appears in some surfaces. Cosmetic, and the honest description of what is
+happening.
+
+**It does not cover everything.** Firefox View has no policy and no preference
+in Firefox 154 — it is a CustomizableUI widget, and the pref every search result
+still names for it was removed. Removing the button is a per-profile manual
+step, recorded as one in `setup/system/firefox/README.md` rather than left
+looking handled.
+
+**Three dead settings were written and removed during TASK-183**, which is worth
+recording because each one looked correct at a different depth. Two were
+preferences that no longer exist (`browser.tabs.firefox-view`,
+`browser.contentblocking.report.vpn.enabled`) — setting a nonexistent pref
+through the `Preferences` policy is completely silent. The third was
+`DisablePocket`, which is the policy every guide names, is still in
+`policies-schema.json`, validates against it, and is listed by Firefox 154 under
+`deprecated_policies` with nothing behind it.
+
+So schema validation is necessary and not sufficient here. `about:policies`
+lists what Firefox *applied*, and comparing that page against the file is the
+check that caught the third one. It can be captured headlessly; the command is
+in `setup/system/firefox/README.md`.
+
+### Alternatives considered
+
+**A `user.js` placed by a `run_onchange_` script** that globs for the profile
+directory. This would work, and it was the first idea. Rejected: it runs after
+the profile exists, so a fresh machine's very first launch is unconfigured and
+the first-run tour appears before anything can suppress it; it silently does
+nothing if the glob misses, which is this repository's signature failure; and it
+cannot install Vimium at all. Two mechanisms would then be needed where one does.
+
+**`policies.json` in `/usr/lib/firefox/distribution/`.** Rejected on package
+ownership, above.
+
+**librewolf instead**, which removes much of this at the source. Rejected on
+TASK-91 already, on size, and it remains the wrong shape: it is a fork tracking
+firefox with a delay, where this is a 70-line file tracking nothing.
+
+**Leave firefox as it ships and click the promotions off.** Rejected — that is
+the untracked one-machine state the whole repository is a refusal of.
 
 ---
 

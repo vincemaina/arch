@@ -41,6 +41,18 @@ CONFIG_FILES=(
     # only there, not on every VM, which is what TASK-166 fixed. See
     # setup/system/keyd/keyd.service.d/override.conf and TASK-160/TASK-166.
     "keyd/keyd.service.d/override.conf:/etc/systemd/system/keyd.service.d/override.conf"
+    # Firefox, turned down: no Pocket, no telemetry, no Normandy studies, no
+    # VPN promotion, no sponsored tiles - and Vimium installed, which is what
+    # makes firefox a keyboard-driven browser rather than a mouse-driven one.
+    # Machine-wide rather than a dotfile because the profile directory is
+    # randomly named and chezmoi cannot address a path it does not know.
+    #
+    # Firefox View is the one thing on that list this does NOT deliver: there
+    # is no policy and no pref for it in Firefox 154, and the pref every search
+    # result names was removed. setup/system/firefox/README.md has a reason per
+    # policy and records that gap as a manual step; DECISIONS.md records why
+    # this is not a user.js.
+    "firefox/policies.json:/etc/firefox/policies/policies.json"
     "greetd/config.toml:/etc/greetd/config.toml"
     "greetd/regreet.toml:/etc/greetd/regreet.toml"
     # Resets brightness to a fixed floor before greetd starts, so a session

@@ -176,10 +176,15 @@ if ignore_file.exists():
 # a machine with a broken manual. base.qcow2 specifically only exists once
 # tools/build-vm-image.sh has been run by hand - it is never shipped, and
 # checks/session.sh's image ban means it never could be.
+# ~/.local/state/browser is written only by `browser --use`. Its ABSENCE is the
+# normal state and is what selects the compiled-in default, so a machine that
+# has never switched browsers is the machine this repository expects, not a
+# broken one. It was failing this check on main before TASK-183 for that reason.
 created_on_demand = {"~/Pictures/wallpapers",
                      "~/.config/focus-music/stations.local",
                      "~/.local/share/vm",
-                     "~/.local/share/vm/base.qcow2"}
+                     "~/.local/share/vm/base.qcow2",
+                     "~/.local/state/browser"}
 ignored |= created_on_demand
 
 missing = []

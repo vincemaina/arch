@@ -216,17 +216,25 @@ gvfs
 # System monitor
 btop
 
-# TWO BROWSERS, DELIBERATELY - see TASK-91.
+# THREE BROWSERS, AND ONLY ONE OF THEM IS THE BROWSER.
 #
-# qutebrowser is the everyday one: keyboard-driven, vim-style, which is the
-# whole reason it suits this desktop. 11 MiB itself, though the honest figure is
-# the 282 MiB of qt6-webengine underneath - it is a Chromium engine wearing a
-# very small coat, not a small browser.
+# firefox is it - see its block below and TASK-183. The other two are declared
+# because `browser --use` can still reach them, and checks/sway-commands.sh
+# requires every command the session can invoke to come from a declared package.
+# Neither is load-bearing: delete one and the line here comes out with it.
+#
+# qutebrowser was the everyday one until TASK-183: keyboard-driven, vim-style,
+# which is the whole reason it suited this desktop. 11 MiB itself, though the
+# honest figure is the 282 MiB of qt6-webengine underneath - it is a Chromium
+# engine wearing a very small coat, not a small browser.
 qutebrowser
 
-# vimb is ON TRIAL, not a decision - see TASK-177 and TASK-178. It is declared
-# because it is reachable from $mod+b, and checks/sway-commands.sh requires every
-# command the session can invoke to come from a declared package.
+# vimb was on trial against qutebrowser - TASK-177 and TASK-178. The trial did
+# not end by picking either of them: TASK-183 went to firefox instead, and the
+# reason applies to vimb harder than it did to qutebrowser, since WebKitGTK is
+# the weaker engine of the two. It stays reachable from `browser --use vimb`
+# because it costs 193 KiB and the webkit2gtk-4.1 it needs is pulled in by other
+# things regardless.
 #
 # 193 KiB of browser on top of webkit2gtk-4.1's 133 MiB. Measured cold start,
 # keypress to mapped window: vimb 354ms against qutebrowser's 1673ms. Because
@@ -234,16 +242,33 @@ qutebrowser
 # no lighter graphical browser exists to look for, and epiphany's 843ms is its
 # own GTK4 interface rather than the engine.
 #
-# The open question is not speed. WebKitGTK is weaker than Blink on recent
+# The open question was never speed. WebKitGTK is weaker than Blink on recent
 # JavaScript, and whether that matters is answered by using it, not measuring
-# it. `browser --use qutebrowser` reverts; if the trial ends that way, this
-# line and the switch in ~/.local/bin/browser both come out.
+# it. Using it answered yes, which is what settled TASK-183.
 vimb
 
-# firefox is the one for what qutebrowser cannot do, and the list is short but
-# unavoidable: WebExtensions, and DRM. qt6-webengine ships zero Widevine files,
-# so qutebrowser cannot play Netflix or anything else behind DRM at all - not a
-# configuration gap, an absent codec.
+# firefox is THE browser: what $mod+b opens and where every link goes.
+#
+# THIS BLOCK USED TO SAY THE OPPOSITE, WHICH IS THE POINT OF SAYING SO
+#
+# Until TASK-183 it described firefox as the fallback kept only for the two
+# things qutebrowser structurally cannot do - WebExtensions, and DRM, because
+# qt6-webengine ships zero Widevine files, an absent codec rather than a
+# configuration gap. Both of those are still true and still one-directional.
+#
+# What changed is the everyday case. qutebrowser was chosen for keyboard-driven
+# browsing; Vimium gives firefox that, and setup/system/firefox/policies.json
+# installs it rather than leaving it to be clicked in on one machine. Daily use
+# then found firefox the more reliable of the two on the sites actually used,
+# and reliability is the axis no benchmark here measures.
+#
+# It does cost more on both axes that ARE measured, and TASK-183 measured them
+# rather than guessing: 862ms to a mapped window against qutebrowser's 363ms
+# warm (875 vs 803 cold from disk), and 674 MiB idle across 19 processes against
+# 108 MiB in one. The memory gap is real but not like-for-like - qutebrowser on
+# a blank page spawns no renderer at all, while firefox pre-spawns its whole
+# content-process pool. See DECISIONS.md, which sets out what the table does and
+# does not settle.
 #
 # Firefox rather than a Chromium, and the choice is mostly made for us:
 #   - brave, google-chrome and ungoogled-chromium are AUR-only, ruled out on
@@ -251,9 +276,16 @@ vimb
 #   - Arch's chromium has no Widevine either, and is larger at 416 MiB.
 #   - vivaldi (434 MiB) and librewolf (424 MiB) are both bigger than firefox,
 #     and librewolf is a firefox derivative that removes things in this
-#     direction rather than adding them.
+#     direction rather than adding them - which is what policies.json does here
+#     without a second package.
 # That leaves firefox at 295 MiB, which enables DRM by default and fetches the
 # Widevine CDM itself on first use.
+#
+# It is turned down machine-wide, not per profile: no Pocket, no telemetry, no
+# Normandy studies, no VPN promotion, no sponsored tiles. Firefox View is the
+# exception and has no policy in 154 - see setup/system/firefox/README.md, which
+# carries a reason per policy and writes that gap down rather than implying it
+# was handled.
 firefox
 
 # Key remapping, at the evdev layer so the console, the greeter, sway and
