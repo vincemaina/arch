@@ -20,9 +20,27 @@ set $right l
 # is not on the PATH sway hands to what it spawns.
 set $term ~/.local/bin/terminal
 
-# The file explorer is a terminal one, so it is a terminal with a distinct
-# app_id - otherwise the window rule that floats it would float every terminal.
-set $explorer foot --app-id=explorer -e yazi
+# TWO FILE MANAGERS, DELIBERATELY AND ON A CLOCK - see TASK-189, and TASK-190
+# which ends this. The same bargain as the two browsers above and the two
+# Escape keys in the keyd config: two things doing one job is what this
+# repository argues against, and it is tolerable only while the ticket that
+# removes one of them exists.
+#
+# $explorer is on $mod+e, $explorer_tui on $mod+Ctrl+e. Both are on a key
+# rather than one being demoted to the launcher, because TASK-44 settled the
+# last file-manager question on REACHABILITY - nothing routed to Thunar, so
+# a fortnight of use could only have recorded someone typing its name. A
+# comparison needs both to be genuinely reachable or it measures nothing.
+#
+# Thunar takes no app_id flag and thunar.desktop ships no StartupWMClass, so
+# the app_id is whatever GTK derives at runtime. It is `thunar`, lowercase,
+# read out of `swaymsg -t get_tree` with a window open rather than assumed -
+# 40-window-rules.conf depends on that string and nothing notices if it is
+# wrong except the window failing to float.
+set $explorer thunar
+# The terminal one is a terminal with a distinct app_id - otherwise the window
+# rule that floats it would float every terminal.
+set $explorer_tui foot --app-id=explorer -e yazi
 # The helper chooses WHICH browser, not how to open it. TASK-177 measured vimb
 # at 354ms cold against qutebrowser's 1673ms, and vimb is 193 KiB on top of
 # WebKitGTK so that figure is the engine itself - there is no lighter GUI

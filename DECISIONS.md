@@ -1656,6 +1656,114 @@ Thunar until it is removed by hand. `checks/packages.sh` reports the drift.
 
 ---
 
+## Thunar returns, and the four file managers it was measured against
+
+**Decision:** Thunar is the file manager on `$mod+e`, with `tumbler` declared
+and its keys remapped to vim ones. yazi keeps a binding on `$mod+Ctrl+e` while
+TASK-190 decides which of the two stays.
+
+This is the second reversal of the same decision. *No graphical file manager,
+reversing an earlier decision* above dropped Thunar; this brings it back. That
+section is not deleted and should not be, because it was right about what it
+measured — it is simply that what it measured was reachability, and both of the
+things it found are fixed here.
+
+### Why it changed again
+
+**The complaint was about shape, not speed.** yazi is quick and keyboard-native
+and none of that is in dispute. It suits a small job done and closed. Bulk work
+— moving, renaming and organising many files at once — and looking at a
+directory of images are what it is weakest at, and both are what a graphical
+file manager exists for.
+
+**Both of TASK-44's findings are addressed rather than argued with.** It was
+dropped because nothing on the desktop routed to it and because its thumbnails
+had never worked. It now has the *primary* key, and `tumbler` is declared in
+the manifest instead of being left as an Optional Dep nobody noticed. The
+thumbnails were then confirmed by opening a directory of screenshots and
+looking at them.
+
+### The comparison
+
+Each candidate was downloaded and unpacked rather than judged on reputation.
+Every autostart entry, systemd unit and D-Bus service was extracted and checked
+for desktop gating, which matters here because this session has
+`xdg-desktop-autostart.target` active — an ungated entry really would start.
+
+| | New pkgs | Added | Rebindable keys | Starts at login |
+| --- | --- | --- | --- | --- |
+| pcmanfm | 7 | 9.3 MiB | **no** | `menu-cached` |
+| pcmanfm-qt | 7 | 9.7 MiB | **no** | — |
+| **thunar** | **7** | **20.5 MiB** | **yes** | **—** |
+| nemo | 10 | 14.9 MiB | yes | `xapp-sn-watcher` |
+| nautilus | 27 | 64.4 MiB | no | — |
+| dolphin | 72 | 15.7 MiB+ | yes | — |
+
+**Rebindable keys was the cull.** `Thunar` exports `gtk_accel_map_load`/`save`,
+names `Thunar/accels.scm` and carries a Shortcuts Editor. `nemo` has the same
+accel-map calls and a `~/.gnome2/accels/nemo`. `pcmanfm` has **no accel-map
+symbols at all** — its keys are compiled in — and neither does `pcmanfm-qt`.
+So the two cheapest options cannot be given vim keys at any price, and the
+requirement is not negotiable.
+
+**Of the two that survived, Thunar starts nothing.** `nemo` hard-depends on
+`xapp`, which ships `xapp-sn-watcher.desktop` with **no `OnlyShowIn`** — it
+would start at every login whether or not nemo is ever opened, running a
+StatusNotifier tray watcher for a tray this desktop does not have. Thunar ships
+no autostart entry, and neither `thunar.service` nor `xfconfd.service` has a
+`WantedBy=`; both are D-Bus activated.
+
+`nautilus` was ruled out before the package count: it depends on `localsearch`
+and `tinysparql`, a background file indexer with three systemd user units.
+`dolphin` at 72 packages was never a candidate.
+
+### Trade-off
+
+**Thunar is not the cheapest; it is the only one that answers the
+requirement.** 20.5 MiB against pcmanfm's 9.3.
+
+**"Nothing in the background" is true only until it is first opened.** Measured
+after closing the window: `tumblerd` at 20.3 MiB and `xfconfd` at 8.4 MiB stay
+for the rest of the session — 28.7 MiB that yazi does not cost. Nothing at
+login, something after first use. That is the figure TASK-190 should weigh.
+
+**The vim keys are partial, and the missing part is not fixable.** A GtkAccelMap
+binds menu *actions*, and moving the selection is not one — the complete action
+list was extracted from the binary and there is no move-cursor in it. Cursor
+movement belongs to GtkTreeView and GtkIconView, whose keys come from GTK
+binding sets reachable only through `-gtk-key-bindings` in `gtk.css`, which is
+global to every GTK application and not scopable to one. So `j` and `k` are the
+arrow keys, and `gg`/`G` are impossible for a second reason as well: an
+accelerator is one chord, never a sequence.
+
+**It will not wear the theme.** `gtk-3.0/settings.ini.tmpl` sets stock
+Adwaita/Adwaita-dark and its own comment says the palette does not reach GTK.
+Thunar follows the selected theme's light/dark mode and nothing more. Pushing
+the palette into GTK would mean templating `gtk.css` from `themes.toml`, which
+affects every GTK application and was left out of scope.
+
+### One thing this cost that was not predicted
+
+`accels.scm` is **tracked read-only**, which is not how any other dotfile here
+works. Thunar rewrites the file with its own 125-entry dump on every quit, in
+hash-table order, so tracking it writable would mean a chezmoi diff after every
+session — drift that is pure noise, and noise is how a repository trains you to
+stop reading drift reports. `readonly_` makes it 0444, Thunar's save fails
+harmlessly, and the repository stays the source of truth. The cost is that
+Thunar's own Configure Shortcuts dialog cannot save.
+
+### Alternatives considered
+
+**Keeping yazi alone and adding `g`-prefixed bookmarks.** Cheaper and was
+offered first. It answers "shortcuts to places" and does not answer bulk work
+or thumbnails, which is what the complaint was actually about.
+
+**Running both permanently.** Two things doing one job is what this repository
+argues against. TASK-190 exists so that this is a trial with an end rather than
+a decision to have both.
+
+---
+
 ## The device sidebar, answered by a popup rather than a second file manager
 
 **Decision:** External and internal drives are mounted from inside yazi, with

@@ -313,8 +313,46 @@ rofi-calc
 # beside it: thunar was reachable from nothing on this desktop, was opened once
 # in its life, and could not even do thumbnails because tumbler was never
 # declared. Removing it took 20.53 MiB and six XFCE dependencies with it.
+# TWO FILE MANAGERS, DELIBERATELY - see TASK-189, and TASK-190 which ends it.
+#
+# yazi is the terminal one, on $mod+Ctrl+e. It replaced thunar rather than
+# sitting beside it: thunar was reachable from nothing on this desktop, was
+# opened once in its life, and could not even do thumbnails because tumbler was
+# never declared. Removing it took 20.53 MiB and six XFCE dependencies with it.
 # See TASK-44 and DECISIONS.md for what was given up.
 yazi
+
+# thunar is back, on $mod+e, and BOTH of the reasons it went are fixed here.
+# It is reachable - the primary key, not a name typed into the launcher - and
+# tumbler is declared below rather than left as an undeclared optional.
+#
+# Chosen over pcmanfm, pcmanfm-qt, nemo and nautilus by unpacking each of them
+# rather than on reputation. Keybindings were the cull: thunar exports
+# gtk_accel_map_load/save and ships a Shortcuts Editor, so its keys can be
+# rebound to vim ones from a tracked file. pcmanfm has no accel-map symbols at
+# all - its keys are compiled in - and neither does pcmanfm-qt. Of the two that
+# could be rebound, nemo hard-depends on xapp, whose autostart entry carries no
+# OnlyShowIn and so would start a tray watcher at every login for a tray this
+# desktop does not have. thunar ships no autostart at all. nautilus drags in
+# localsearch, a background file indexer, across 27 packages. See DECISIONS.md.
+#
+# 20.5 MiB across seven packages, against pcmanfm's 9.3 and nemo's 14.9. It is
+# not the cheapest; it is the only one that answers the requirement.
+thunar
+
+# Thumbnails, and NOT an optional dependency this time.
+#
+# This is the exact package whose absence made the last thunar useless: pacman
+# lists it as Optional For thunar, it was never declared, and "see a folder of
+# images at a glance" - the strongest argument for a graphical file manager -
+# was the one thing that installation could not do. Its single run logged
+# `ThunarThumbnailer: Failed to retrieve supported types ... ServiceUnknown`
+# and nobody read it. Declared here so a dependency-graph change cannot repeat
+# that quietly, same reasoning as polkit, mesa and udisks2.
+#
+# It is D-Bus activated, not enabled: tumblerd starts when a thumbnail is
+# actually asked for.
+tumbler
 
 # udisksctl, which is how yazi's mount manager on `M` mounts and unmounts a
 # drive. Declared rather than inherited: it already arrives through gvfs, but

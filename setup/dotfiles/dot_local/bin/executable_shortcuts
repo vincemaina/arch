@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# requires: rofi swaymsg nvim yazi foot
+# requires: rofi swaymsg nvim yazi foot thunar
 
 """A live shortcut panel that follows whatever you are using.
 
@@ -45,6 +45,7 @@ CACHE = HOME / ".cache" / "shortcuts"
 APP_CONTEXT = {
     "foot": "desktop",
     "explorer": "yazi",
+    "thunar": "thunar",
     "xdg-terminal": "desktop",
     "org.qutebrowser.qutebrowser": "qutebrowser",
     "monitor": "desktop",
@@ -91,11 +92,20 @@ def sway_shortcuts():
 
     variables = dict(re.findall(r"^\s*set\s+(\$\w+)\s+(.*)$", text, re.M))
 
+    # Longest name first, and it is load-bearing. This is a plain string
+    # replacement with no word boundary, so a variable whose name is a PREFIX
+    # of another corrupts it: $explorer_tui, added beside $explorer in
+    # TASK-189, becomes "thunar_tui" if $explorer is substituted first. A
+    # prefix can only be shorter than the name containing it, so sorting by
+    # descending length is the whole fix. checks/sway-commands.sh had the same
+    # bug and the same repair.
+    by_length = sorted(variables.items(), key=lambda kv: -len(kv[0]))
+
     def expand(value):
-        # Repeatedly, because variables refer to variables - $explorer is built
-        # from foot, and $term from the terminal helper.
+        # Repeatedly, because variables refer to variables - $explorer_tui is
+        # built from foot, and $term from the terminal helper.
         for _ in range(5):
-            for name, replacement in variables.items():
+            for name, replacement in by_length:
                 value = value.replace(name, replacement)
         return value
 
@@ -296,6 +306,43 @@ def yazi_shortcuts():
 
 
 # ---------------------------------------------------------------------------
+# Thunar
+# ---------------------------------------------------------------------------
+
+def thunar_shortcuts():
+    """Read out of the accel map, which is the same file that defines them.
+
+    Thunar's keys live in ~/.config/Thunar/accels.scm as GtkAccelMap entries.
+    An uncommented line is a binding this repository set; a commented one with
+    a non-empty key is Thunar's own default, which is exactly the distinction
+    worth showing. Anything with an empty key is unbound and skipped.
+
+    Nothing is extracted from the binary here, unlike yazi: Thunar dumps its
+    full default map into this file itself the first time it runs, so the file
+    already holds both halves.
+    """
+    entries = []
+    accels = HOME / ".config" / "Thunar" / "accels.scm"
+    try:
+        lines = accels.read_text().splitlines()
+    except OSError:
+        return entries
+
+    for line in lines:
+        m = re.match(r'\s*(;\s*)?\(gtk_accel_path\s+"<Actions>/([^"]+)"\s+"([^"]*)"\)',
+                     line)
+        if not m:
+            continue
+        default, action, key = m.group(1), m.group(2), m.group(3)
+        if not key:
+            continue
+        action = action.split("/")[-1].replace("-", " ")
+        entries.append((key, action if default else action + "  [ours]"))
+    entries.sort()
+    return entries
+
+
+# ---------------------------------------------------------------------------
 # The desktop's own surfaces
 # ---------------------------------------------------------------------------
 
@@ -332,6 +379,7 @@ CONTEXTS = {
     "sway": ("Desktop keys", sway_shortcuts),
     "nvim": ("Neovim", nvim_shortcuts),
     "yazi": ("Files (yazi)", yazi_shortcuts),
+    "thunar": ("Files (Thunar)", thunar_shortcuts),
     "desktop": ("The bar", desktop_shortcuts),
 }
 
