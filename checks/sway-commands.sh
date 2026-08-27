@@ -105,12 +105,27 @@ collect_sway_commands() {
     local config
     config="$(cat "$SWAY_DIR/config" "$SWAY_DIR"/config.d/*.conf | grep -vE '^[[:space:]]*#')"
 
+    # LONGEST VARIABLE NAME FIRST, and it is load-bearing.
+    #
+    # This is a plain string replacement with no word boundary, so a variable
+    # whose name is a PREFIX of another one corrupts it. TASK-189 added
+    # $explorer_tui beside $explorer, and substituting $explorer first turned
+    # `$explorer_tui` into `thunar_tui` - a command no package owns, so this
+    # check failed naming a program that was never referenced. The report was
+    # not wrong about the string it found; the string was this loop's own
+    # doing.
+    #
+    # Sorting by descending name length fixes it, because a prefix can only be
+    # shorter than the name that contains it. The alternative - a word-boundary
+    # match - does not work here: sway variable names begin with `$`, which is
+    # not a word character, so \b would anchor in the wrong place.
     local expanded="$config"
     while IFS= read -r line; do
         [[ "$line" =~ ^set[[:space:]]+(\$[A-Za-z0-9_]+)[[:space:]]+(.*)$ ]] || continue
         local name="${BASH_REMATCH[1]}" value="${BASH_REMATCH[2]}"
         expanded="${expanded//"$name"/$value}"
-    done < <(grep -E '^[[:space:]]*set[[:space:]]+\$' <<<"$config")
+    done < <(grep -E '^[[:space:]]*set[[:space:]]+\$' <<<"$config" |
+             awk '{ print length($2), $0 }' | sort -rn | cut -d' ' -f2-)
 
     grep -oE '\bexec(_always)?[[:space:]]+[^[:space:]]+' <<<"$expanded" |
         awk '{print $2}'

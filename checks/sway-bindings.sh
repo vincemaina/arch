@@ -77,12 +77,23 @@ done < <(
     # Expand `set` variables so $mod+b and Mod4+b compare equal, using the same
     # substitution approach as checks/sway-commands.sh, and read the fragments in
     # the order sway loads them.
+    #
+    # LONGEST NAME FIRST. This is a plain string replacement with no word
+    # boundary, so a variable name that is a PREFIX of another corrupts it -
+    # $explorer substituted before $explorer_tui turns the latter into
+    # `thunar_tui`, a command nothing owns. tools/shortcuts.sh reads this
+    # script's output, so the corruption travels: the same wrong string turned
+    # up in the manual's shortcut table. Sorting descending by name length is
+    # the whole fix, since a prefix is always shorter than what contains it.
+    # A \b word boundary does not work: the names start with `$`, which is not
+    # a word character.
     config="$(cat "$SWAY_DIR/config" "$SWAY_DIR"/config.d/*.conf)"
     expanded="$config"
     while IFS= read -r def; do
         [[ "$def" =~ ^[[:space:]]*set[[:space:]]+(\$[A-Za-z0-9_]+)[[:space:]]+(.*)$ ]] || continue
         expanded="${expanded//"${BASH_REMATCH[1]}"/${BASH_REMATCH[2]}}"
-    done < <(grep -E '^[[:space:]]*set[[:space:]]+\$' <<<"$config")
+    done < <(grep -E '^[[:space:]]*set[[:space:]]+\$' <<<"$config" |
+             awk '{ print length($2), $0 }' | sort -rn | cut -d' ' -f2-)
     printf '%s\n' "$expanded"
 )
 

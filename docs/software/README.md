@@ -1,6 +1,6 @@
 # Software this setup installs
 
-One hundred and fourteen packages are declared across [`setup/packages/`](../../setup/packages/).
+One hundred and sixteen packages are declared across [`setup/packages/`](../../setup/packages/).
 This document accounts for every one of them: what it is for, where its
 rationale lives, and what it costs on the machine.
 
@@ -276,7 +276,9 @@ the line, **↓** means an entry below in this document.
 | `cava` | Terminal spectrum display, reading whatever is audible from the default output's monitor | ↓ |
 | `xdg-user-dirs` | Creates `~/Pictures` and friends | ↓ |
 | `gvfs` | Removable and network volumes for GIO, so a USB stick appears in a Save As dialog | M, D: GVFS |
-| `yazi` | The file manager, on `$mod+e`. It replaced Thunar rather than sitting beside it | M, D: No graphical file manager, reversing an earlier decision |
+| `yazi` | The terminal file manager, now on `$mod+Ctrl+e`. **On trial against Thunar** — TASK-190 keeps one | M, D: No graphical file manager, reversing an earlier decision |
+| `thunar` | The graphical file manager, on `$mod+e`, back after TASK-44 removed it. **On trial against yazi** | ↓ |
+| `tumbler` | Thumbnails for Thunar. Declared, not left optional — its absence is what made the last Thunar useless | ↓ |
 | `udisks2` | `udisksctl`, behind yazi's mount manager on `M` — mounts and unmounts a drive without root | ↓ |
 | `imv` | Image viewer | M |
 | `btop` | System monitor | D: btop |
@@ -948,6 +950,62 @@ added nothing. `udisksd` resident: 16.2 MiB RSS, 8.35 MiB by the cgroup
 first calls it. On a machine that never touches a removable drive it is not
 running at all, which is why it does not appear in the session's idle-memory
 figure.
+
+### thunar, tumbler
+
+**Problem.** TASK-189: yazi is fast and keyboard-native but suits a small job
+done and closed. Bulk work — moving, renaming and organising many files at
+once — and looking at a directory of images are the two things it is weakest
+at, and both are what a graphical file manager is for.
+
+**Choice.** Thunar, chosen over pcmanfm, pcmanfm-qt, nemo and nautilus by
+unpacking each candidate and reading what is inside, not on reputation. See
+*Thunar returns, and the four file managers it was measured against* in
+`DECISIONS.md` for the full comparison. The short version is that rebindable
+keys were the cull: Thunar and nemo can be given vim keys, pcmanfm and
+pcmanfm-qt cannot at any price, and of the two that can, nemo starts a daemon
+at every login and Thunar starts nothing.
+
+**Alternatives.** pcmanfm (9.3 MiB, 7 packages, keys compiled in),
+pcmanfm-qt (9.7 MiB, 7 packages, keys compiled in, and Qt so it would not
+follow the GTK theme), nemo (14.9 MiB, 10 packages, hard-depends on `xapp`
+whose autostart entry has no `OnlyShowIn`), nautilus (64.4 MiB, 27 packages,
+drags in the `localsearch` indexer), dolphin (72 packages).
+
+**How it works.** `$mod+e` runs `thunar`. Its app_id is `thunar` — GTK's
+derived one, since Thunar takes no app_id flag and its desktop entry has no
+`StartupWMClass` — and `40-window-rules.conf` floats it at 1100×700 on that
+string. Keys come from `~/.config/Thunar/accels.scm`, tracked and read-only;
+see the manual for what is bound and for the two things GTK accelerators
+cannot express.
+
+`tumbler` is the thumbnailer, and it is declared rather than left as an
+Optional Dep on purpose. That exact omission is what made the previous Thunar
+useless: thumbnails are the strongest argument for a graphical file manager
+and it was the one thing that installation could not do, logging
+`ThunarThumbnailer: Failed to retrieve supported types ... ServiceUnknown`
+on its single run. Confirmed working this time by looking at a directory of
+screenshots and seeing them render, not by checking the package is present.
+
+**Cost.** Measured on this machine, 2026-08-27.
+
+| | |
+| --- | --- |
+| Disk, thunar + 6 dependencies | 20.5 MiB (`thunar` 9.58, `libexif` 3.12, `exo` 2.21, `libxfce4ui` 2.21, `libgtop` 1.29, `xfconf` 1.12, `libxfce4util` 1.09) |
+| Disk, tumbler | 880 KiB |
+| **Resident at login** | **nothing** — no autostart entry, and neither systemd user unit has a `WantedBy=` |
+| **Resident after the window is closed** | **28.7 MiB** — `tumblerd` 20.3 MiB and `xfconfd` 8.4 MiB, both D-Bus activated on first use and neither exiting afterwards |
+| Window on screen | 157 ms from launch to sway's `window::new`, warm cache, mean of three runs. A `foot` window on the same measurement is 20 ms, so Thunar costs about 137 ms more to appear |
+
+That 28.7 MiB is the figure TASK-190 should weigh. Thunar genuinely starts
+nothing at login — but "no background processes when it is not open" is only
+true until the first time it is opened, and after that two daemons stay for
+the rest of the session.
+
+The 157 ms is not comparable to the browser figures elsewhere in
+`DECISIONS.md`, which were keypress-to-mapped-window and cold. This one starts
+at process launch and stops at the compositor creating the container, warm.
+The useful part is the ratio against `foot` measured the same way.
 
 ## Gaps this document does not close
 

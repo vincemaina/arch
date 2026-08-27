@@ -226,9 +226,65 @@ QtWebEngine ships zero Widevine files — this is not a missing setting, there
 is no codec to enable. firefox has no keybinding of its own and is not the
 default handler for anything; open it by name from `$mod+space`.
 
-## The file manager: yazi
+## The file managers: Thunar and yazi
 
-`$mod+e` opens yazi in its own floating terminal (1100×700). Navigation is
+**There are two, deliberately, and one of them is going to go.** `$mod+e` opens
+Thunar, `$mod+Ctrl+e` opens yazi, and TASK-190 decides which stays. Both are on
+a key rather than one being demoted to the launcher, because the last time this
+question was asked the answer turned out to be about reachability rather than
+taste — nothing on the desktop opened Thunar, so nobody could have preferred
+it. A comparison needs both to be genuinely to hand.
+
+They are different kinds of tool rather than two versions of one. yazi is
+keyboard-native and quick for a small job done and closed. Thunar has a sidebar
+of places and devices, thumbnails, and a mouse. What is being measured is which
+one you actually reach for.
+
+### Thunar, on `$mod+e`
+
+Opens floating at 1100×700, the same geometry as yazi so the comparison is not
+partly about window size.
+
+Its keys have been remapped to vim ones, in
+`~/.config/Thunar/accels.scm`:
+
+| | |
+| --- | --- |
+| `h` / `l` | up a level / open |
+| `Shift+H` / `Shift+L` | back / forward through history |
+| `y` `d` `p` | copy, cut, paste |
+| `x` | to the wastebasket |
+| `r` | rename |
+| `u` / `Ctrl+R` | undo / redo |
+| `/` | search |
+| `.` | show hidden files |
+| `t` / `q` | new tab / close window |
+
+**`j` and `k` are missing, and cannot be added.** Thunar's keys are GTK
+accelerators, which fire menu actions — and moving the selection is not a menu
+action. Cursor movement belongs to the list widget, whose keys can only be
+changed globally for every GTK application on the machine. So the cursor moves
+with the arrow keys. `gg` and `G` are gone for a second reason as well: an
+accelerator is one chord, never a sequence, so no two-key motion is
+expressible.
+
+That limit is the honest difference between a keyboard-native file manager and
+a graphical one wearing vim keys, and it is the thing to weigh when deciding
+which of the two to keep.
+
+The file is **read-only on purpose**, because Thunar rewrites it on every quit
+and that would mean drift after every session. To change a binding, edit it in
+the repository and run `sync.sh`. Thunar's own Configure Shortcuts dialog will
+not save.
+
+One collision worth knowing: Thunar's stock key for showing hidden files is
+`Ctrl+H`, and on this machine that never arrives — keyd rewrites `Ctrl+H` to
+Backspace, which Thunar reads as *go back*. That is why hidden files are on `.`
+instead.
+
+### yazi, on `$mod+Ctrl+e`
+
+Opens yazi in its own floating terminal (1100×700). Navigation is
 yazi's own vim-style scheme — confirmed live with `shortcuts --mode yazi`,
 which is also the fastest way to see the full current list without leaving
 the keyboard.
