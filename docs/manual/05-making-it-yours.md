@@ -281,6 +281,26 @@ config reads it *last* — so whatever you put there wins.
 Each is created for you and then left alone forever, so anything you write in
 one stays, and each is read *last* so your setting wins.
 
+### Your monitors are the case this exists for
+
+Nothing in this repository is more specific to one desk than a display layout,
+and it is the setting people reach for first. It goes in the sway file:
+
+```
+output DP-1     res 1920x1080 pos 0 0
+output HDMI-A-1 res 1920x1080 pos 1920 0
+```
+
+Then `$mod+Shift+c`, and `swaymsg -t get_outputs` to see what actually took —
+which is worth doing, because a wrong output *name* is silently ignored rather
+than reported. The tracked `20-output.conf` sets a resolution for `Virtual-1`
+and nothing else; that name only exists inside a virtual machine, so on real
+hardware it does nothing and there is nothing for your lines to fight with.
+
+Editing `20-output.conf` itself works right up until the next `./sync.sh`,
+which reverts it. If that happens, sync now tells you which local file to move
+the change into.
+
 Two have no local file, and both for measured reasons rather than oversight.
 **mako** refuses to start at all if the file is missing, and a notification
 daemon that dies silently is worse than not having the hatch. **Waybar** fails

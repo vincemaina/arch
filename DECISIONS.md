@@ -2757,6 +2757,34 @@ The third had no mechanism at all, so anything in it had to be typed into a mana
 
 The rule that decides the column: **put things in the local file that you are content to lose when the machine is rebuilt.** Anything you would be annoyed to lose is universal or declared per-machine, and belongs in git.
 
+### An escape hatch nobody is told about is not an escape hatch
+
+TASK-186 was raised as "not possible to override sway display/output settings",
+and it was possible the whole time — `config.d/99-local.conf` existed, was
+created, and its seeded comment named *"an output line for a monitor you own"*
+as the example. The mechanism was not the problem. Being findable was.
+
+What the person actually met was `sync.sh`, reporting the drifted file, offering
+`chezmoi re-add`, and then saying *"For changes that should stay on this machine
+only, use `~/.config/zsh/local.zsh`"* — one line, naming one tool, written
+before this section's own generalisation gave six other tools a local file. So
+someone editing their monitor layout was pointed at a shell file that could not
+help them, next to a `re-add` command that would have committed one desk's
+displays to a repository meant to build anybody's.
+
+That advice is now per-file, and the mapping is **derived from the source rather
+than typed out**: every local file is a chezmoi `create_` file, so `sync.sh`
+finds them by looking, and a seventh tool getting one needs no edit. `zsh` is
+named explicitly because it predates the pattern and is a `.chezmoiignore` entry
+instead.
+
+The general lesson is worth more than the fix. A hatch that only its author can
+find has the same failure mode as a hatch that does not exist, and it is worse
+in one respect: it looks solved. **The place to document an escape hatch is
+wherever someone hits the wall it exists for** — which here meant `sync.sh`'s
+own output and a warning at the bottom of `20-output.conf`, not only the manual
+chapter that already described it correctly and that nobody had reason to open.
+
 ### The same shape, everywhere the tool allows it
 
 The shell had a mechanism and nothing else did, which made the repository a cage for every other tool: a machine that wanted to differ either hardcoded itself into shared config or watched `sync.sh` revert it. That is fatal to publishing the build, because a stranger's laptop is not this one. It already bit here - a terminal font raised to 15 on a small laptop panel, reverted to the repository's 10 on the next sync.

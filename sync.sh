@@ -225,8 +225,48 @@ else
     for file in "${CHANGED[@]}"; do
         echo "      chezmoi --source $SETUP_SOURCE re-add ~/$file"
     done
-    echo "    For changes that should stay on this machine only, use"
-    echo "    ~/.config/zsh/local.zsh, which chezmoi deliberately ignores."
+    # NAME THE RIGHT LOCAL FILE, not just zsh's.
+    #
+    # This said "use ~/.config/zsh/local.zsh" for every drifted file, whatever
+    # it was. That line was written before TASK-144.3 gave sway, foot, git, mpv,
+    # nvim and rofi local files of their own, and it never grew - so someone who
+    # had edited their sway output layout was told about a shell file that could
+    # not help, and offered `re-add` above, which would have committed one
+    # machine's monitors to the repository. That is exactly what happened, and
+    # it is what TASK-186 was raised as.
+    #
+    # The mapping is DERIVED, not typed out here. Every local file is a chezmoi
+    # `create_` file in the source, so asking the source is both shorter than a
+    # list and cannot go stale when a seventh tool gets one. zsh is the one
+    # exception - it predates the pattern and is a .chezmoiignore entry rather
+    # than a create_ file - so it is named explicitly.
+    declare -A LOCAL_FILE=( [".config/zsh"]=".config/zsh/local.zsh" )
+    while IFS= read -r created; do
+        rel="${created#"$SETUP_SOURCE/dotfiles/"}"
+        rel="${rel//dot_/.}"
+        LOCAL_FILE["${rel%/*}"]="${rel/\/create_/\/}"
+    done < <(find "$SETUP_SOURCE/dotfiles" -name 'create_*' 2>/dev/null)
+
+    local_hints=()
+    for file in "${CHANGED[@]}"; do
+        dir="${file%/*}"
+        # sway's local file lives in config.d/ while its tracked files are
+        # spread across config.d/ and the top-level config, so try the parent
+        # directory too rather than only an exact match.
+        target="${LOCAL_FILE[$dir]:-${LOCAL_FILE[$dir/config.d]:-}}"
+        [[ -n "$target" ]] || continue
+        [[ " ${local_hints[*]-} " == *" $target "* ]] || local_hints+=("$target")
+    done
+
+    echo "    For changes that should stay on THIS MACHINE and survive every"
+    echo "    sync, put them in the matching local file instead - created once,"
+    echo "    never rewritten, and read last so it wins:"
+    if [[ ${#local_hints[@]} -gt 0 ]]; then
+        printf '      ~/%s\n' "${local_hints[@]}"
+    else
+        echo "      ~/.config/<tool>/local.*  - see DECISIONS.md, Machine-local"
+        echo "      dotfile changes, for which tools have one and which cannot."
+    fi
 
     for file in "${CHANGED[@]}"; do
         case "$file" in
