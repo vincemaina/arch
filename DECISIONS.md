@@ -502,6 +502,74 @@ Using something lower-level would save very little while making laptop and Wi-Fi
 
 ---
 
+## systemd-timesyncd keeps the clock, and the timezone is a fixed answer
+
+**Decision:** Enable `systemd-timesyncd` from `setup/system/apply-config.sh`,
+against the Arch NTP pool, with the timezone pinned to whatever `install.conf`
+says rather than detected.
+
+### Why
+
+Until TASK-191 this system had no clock discipline at all. `03-system.sh` set
+the timezone and ran `hwclock --systohc` once, at install, which writes the
+system time *to* the RTC and never reads it back. So the hardware clock drifted
+unattended for as long as the machine was off, and the machine then booted with
+whatever it had drifted to. The bug was reported the way this class of bug
+always is — "the time is wrong after it has been off for a while" — and
+`timedatectl` confirmed it exactly: `System clock synchronized: no`, `NTP
+service: inactive`.
+
+timesyncd is the option that costs nothing. It ships as part of systemd, so
+there is no package to add to `setup/packages/` and no manifest entry that has
+to be justified later. It needs no configuration either: Arch compiles
+`0..3.arch.pool.ntp.org` in as `FallbackNTP`, which is what the stock empty
+`[Time]` section resolves to — so the fix is one unit name in `ENABLE_UNITS`,
+in the one file both install paths already call. Once synchronised it also
+keeps the RTC honest through the kernel's 11-minute mode, which is what stops
+the drift from accumulating again between boots.
+
+The timezone is deliberately *not* detected. Geolocation for a fixed desk is a
+network dependency, a privacy question and a failure mode, all bought to answer
+a question whose answer never changes. `install.conf` already carries
+`TIMEZONE`, the wizard already asks for it, and the zoneinfo database already
+knows when Europe/London switches to BST — so a fixed timezone and a synced UTC
+clock give a correct wall clock all year with nothing seasonal to maintain.
+
+The RTC stays in UTC, which is the other half of that. A hardware clock in
+local time turns every seasonal change into an hour of boot-time error — the
+same symptom TASK-191 was filed about, surviving the fix — so `checks/session.sh`
+asserts it alongside the rest.
+
+### Trade-off
+
+The clock is only correct once the network is up. A machine that boots with no
+connection keeps its drifted time until one arrives, and timesyncd steps rather
+than slews on a large offset, so a long-off machine sees a visible jump a few
+seconds into the session rather than a gradual correction. Both are acceptable
+for a desktop; neither would be for a machine writing ordered timestamps.
+
+### Alternatives considered
+
+**chrony.** Better at exactly what this system does not do: it disciplines a
+drifting clock more carefully, copes with intermittent connectivity, and can
+serve time to other machines. Rejected because all of that is a package, a
+config file and a service to understand, in exchange for accuracy no one here
+can perceive. If this machine ever needs to be a time source, that is when to
+revisit it.
+
+**`ntpd`.** The reference implementation, and heavier still. Same reasoning,
+with a longer history of configuration to get wrong.
+
+**An `hwclock --hctosys` at boot and nothing else.** Rejected outright: it
+reads the drifted clock rather than correcting it, which is not a fix, it is
+the bug written down.
+
+**Detecting the timezone from the network.** Rejected as described above. The
+wizard question stays; it is answered once per machine and is the right place
+for it.
+
+---
+
 # Graphical Environment
 
 ## Wayland

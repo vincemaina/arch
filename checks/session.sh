@@ -2090,6 +2090,83 @@ else
 fi
 
 # ----------------------------------------------------------------------
+section "Clock (TASK-191)"
+
+# Nothing kept this machine's clock right until TASK-191. The install set the
+# timezone and wrote the system time to the RTC once, and that was all: the
+# hardware clock then drifted unattended whenever the machine was off, and the
+# system booted with whatever it had drifted to. A wrong clock is one of this
+# repository's invisible failures - everything looks configured, and the
+# symptom surfaces somewhere else entirely, as a TLS handshake that fails or a
+# commit timestamped in the past.
+#
+# systemd-timesyncd is enabled by system/apply-config.sh, so it reaches a fresh
+# install and a running machine from the same place.
+
+if systemctl is-enabled --quiet systemd-timesyncd 2>/dev/null; then
+    pass "systemd-timesyncd is enabled at boot"
+else
+    fail "systemd-timesyncd is not enabled, so nothing corrects the clock after the machine has been off; run sync.sh"
+fi
+
+# Enabled and running are different questions, and only the second one keeps
+# time. Asked of timedatectl rather than of the unit, because timedatectl
+# reports what the manager considers the active NTP implementation.
+NTP_ACTIVE="$(timedatectl show -p NTP --value 2>/dev/null || true)"
+if [[ "$NTP_ACTIVE" == "yes" ]]; then
+    pass "the NTP service is active"
+else
+    fail "the NTP service is not active (timedatectl NTP=${NTP_ACTIVE:-unknown}); the clock is free-running"
+fi
+
+# The one that actually answers the bug. Enabled and active still leaves the
+# case where timesyncd has never reached a server - no network at boot, a
+# blocked port - and the clock is exactly as wrong as it was.
+#
+# A machine that has only just come up legitimately reports "no" for a few
+# seconds while the first exchange happens, so this reports rather than fails
+# when the system has been running for less than two minutes.
+CLOCK_SYNCED="$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)"
+UPTIME_SECS="$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)"
+
+if [[ "$CLOCK_SYNCED" == "yes" ]]; then
+    pass "the system clock is synchronised ($(date '+%Y-%m-%d %H:%M:%S %Z'))"
+elif [[ "$UPTIME_SECS" -lt 120 ]]; then
+    skip "the clock has not synchronised yet, but this machine has only been up ${UPTIME_SECS}s"
+else
+    fail "the system clock is not synchronised; check the network, then journalctl -u systemd-timesyncd"
+fi
+
+# The timezone is machine identity, from install.conf, the same way the console
+# keymap above is - and it is what turns a correct UTC clock into a correct
+# wall clock. Re-derived here rather than borrowing the variable that section
+# happens to leave behind, so moving either one does not break the other.
+INSTALL_CONF="$CHECKS_REPO/setup/install.conf"
+
+if [[ ! -f "$INSTALL_CONF" ]]; then
+    skip "setup/install.conf not found"
+else
+    WANT_TZ="$(source "$INSTALL_CONF"; echo "${TIMEZONE:-}")"
+    GOT_TZ="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
+    if [[ -z "$WANT_TZ" ]]; then
+        skip "install.conf has no TIMEZONE"
+    elif [[ "$GOT_TZ" == "$WANT_TZ" ]]; then
+        pass "the timezone is $GOT_TZ, as install.conf says"
+    else
+        fail "the timezone is ${GOT_TZ:-unset}, install.conf says $WANT_TZ"
+    fi
+fi
+
+# The RTC must hold UTC, not local time. With it in local time every seasonal
+# clock change becomes a boot-time error of an hour, which is the same symptom
+# TASK-191 was filed about and would survive the fix above.
+if [[ "$(timedatectl show -p LocalRTC --value 2>/dev/null)" == "no" ]]; then
+    pass "the hardware clock holds UTC, so the seasonal change is a timezone matter only"
+else
+    fail "the hardware clock is set to local time; every BST/GMT change becomes an hour of boot-time error"
+fi
+
+# ----------------------------------------------------------------------
 section "Login screen (TASK-15)"
 
 # Replicates how ReGreet discovers sessions, so a greeter that would offer the
