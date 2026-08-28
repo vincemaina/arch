@@ -237,7 +237,17 @@ if command -v keyd &>/dev/null; then
     fi
 fi
 
-ENABLE_UNITS=(earlyoom greetd keyd brightness-floor power-profiles-daemon)
+# systemd-timesyncd keeps the clock right, and nothing did before TASK-191.
+# 03-system.sh sets the timezone and runs `hwclock --systohc` once, at install,
+# and that was the whole story: the RTC then drifted unattended while the
+# machine was off and the system booted with whatever it had drifted to. A
+# clock is the kind of thing nobody verifies until a TLS handshake or a git
+# commit is wrong by minutes.
+#
+# It costs no package - timesyncd is part of systemd - and no configuration
+# file: Arch compiles 0..3.arch.pool.ntp.org in as FallbackNTP, which is what
+# an empty [Time] section resolves to. See DECISIONS.md for why not chrony.
+ENABLE_UNITS=(earlyoom greetd keyd brightness-floor power-profiles-daemon systemd-timesyncd)
 
 for unit in "${ENABLE_UNITS[@]}"; do
     # Checked by file rather than with systemctl, because this also runs inside
@@ -408,6 +418,16 @@ fi
 # rather than leaving a corrected KEYMAP stranded until the next boot.
 if [[ -n "${KEYMAP:-}" ]] && ! systemctl restart systemd-vconsole-setup.service; then
     echo "    WARNING: could not reapply the console keymap; it applies at next boot" >&2
+fi
+
+# Also safe: timesyncd owns no session, and starting it here is the difference
+# between a clock corrected now and one corrected at the next boot. On a
+# machine that has been off for a while, "now" is the point.
+#
+# It does not block: the first sync happens once the network is up, so this
+# returns immediately whether or not there is a connection yet.
+if ! systemctl start systemd-timesyncd; then
+    echo "    WARNING: could not start systemd-timesyncd; the clock syncs at next boot" >&2
 fi
 
 # Deliberately not restarted: greetd owns the active session, and restarting it

@@ -98,7 +98,12 @@ It owns:
   up by name on `PATH` rather than referenced by absolute path.
 - Validating and enabling `keyd`, refusing to enable it on a config that does
   not parse.
-- Enabling `earlyoom`, `greetd` and `keyd`.
+- Enabling `earlyoom`, `greetd`, `keyd` and `systemd-timesyncd` — the last of
+  which is what keeps this machine's clock right. It costs no package, since
+  timesyncd is part of systemd, and no configuration, since Arch compiles the
+  Arch NTP pool in as the fallback. Before it was enabled the clock was set
+  once at install and then left to drift for as long as the machine was
+  switched off.
 - The initramfs story: adding the `microcode` hook, re-enabling the
   `fallback` preset, and regenerating only when something changed.
 - Disabling `NetworkManager-wait-online`.
@@ -107,8 +112,10 @@ It owns:
 `sync.sh`'s. Without it, the script only writes files and enables units —
 which is all a chroot can do, since there is no running system inside it to
 restart anything on. With it, the change also takes effect now:
-`sysctl --system`, a `daemon-reload`, and restarts of `earlyoom`, `keyd` and
-`systemd-vconsole-setup`.
+`sysctl --system`, a `daemon-reload`, restarts of `earlyoom`, `keyd` and
+`systemd-vconsole-setup`, and a start of `systemd-timesyncd` — so a machine
+that has been off for a while has its clock corrected during the sync rather
+than at the next boot.
 Failures after `--activate` warn rather than abort the sync, because the
 configuration is already written and one service refusing to restart should
 not fail everything else that follows it.
