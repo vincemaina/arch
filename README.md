@@ -6,7 +6,7 @@
 
 A version-controlled, reproducible Arch Linux desktop.
 
-**[swaystone on the web →](https://vincemaina.github.io/arch/)** — what it is and why, on one page.
+**[swaystone on the web →](https://vincemaina.github.io/swaystone/)** — what it is and why, on one page.
 
 The goal is a lightweight, minimal system that can be rebuilt from scratch with as little manual configuration as possible. The current setup uses Sway and idles at roughly 550–650 MiB of memory with effectively zero CPU usage.
 
@@ -56,8 +56,8 @@ pacman -Sy git
 ### 4. Clone this repository
 
 ```bash
-git clone https://github.com/vincemaina/arch.git Arch
-cd Arch
+git clone https://github.com/vincemaina/swaystone.git
+cd swaystone
 ```
 
 ### 5. Identify the target disk
