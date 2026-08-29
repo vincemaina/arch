@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: yazi foot thunar
+
+# Launch the file explorer this machine is currently set to.
+#
+#   explorer                open the selected explorer
+#   explorer <path> [...]   the same, with arguments passed through
+#   explorer --other        open the one that is NOT selected
+#   explorer --current      which one is selected
+#   explorer --list         all of them, marking the selected one
+#   explorer --use yazi     select yazi from now on
+#   explorer --use thunar
+#
+# WHY THERE ARE STILL TWO OF THESE
+#
+# TASK-190 asked which of yazi and Thunar goes, on this repository's standing
+# argument that two things doing one job is a smell. TASK-196 answered it the
+# other way: neither goes, because they are not two implementations of one job.
+#
+# yazi is what the hand reaches for - keyboard-native, in a terminal, quick for
+# a small job done and closed, and shaped like the rest of this desktop. Thunar
+# is for the jobs it is genuinely better at and yazi cannot do at all: a
+# directory of thumbnails, a bulk rename with a preview column, dragging a file
+# into another window, a sidebar of mounted drives. That is a different task,
+# not a different taste, which is why the usual argument does not apply and why
+# the 20.5 MiB Thunar costs is knowingly not reclaimed. See DECISIONS.md.
+#
+# WHY THIS DIFFERS FROM `browser`, WHICH IT OTHERWISE COPIES
+#
+# `browser` puts one choice on one key, because its three browsers ARE
+# interchangeable: you want a browser, and the question is only which. Here the
+# two are reached for differently, so both are on a key at once - $mod+e for the
+# selected one and $mod+Ctrl+e for the other. Making Thunar cost a `--use` and a
+# `--use` back would price it out of exactly the jobs it is kept for.
+#
+# --other is the next entry in SUPPORTED after the selected one, wrapping. With
+# two that is simply "the other one"; adding a third would make $mod+Ctrl+e a
+# cycle rather than a toggle, which is the moment to reconsider that key.
+#
+# WHY THE STATE IS A PLAIN FILE AND NOT chezmoi.toml
+#
+# The same reason `browser` gives, for the same measurement: theme, wallpaper
+# style and glow are machine-local settings read through
+# ~/.local/lib/desktop_config.py, which shells out to `chezmoi data` and costs
+# upwards of 100 ms. This file is on the path between pressing $mod+e and
+# seeing a window, and yazi's whole advantage here is that it appears at once.
+# So it is one line in ~/.local/state, read with `cat`. See "Sound packs" in
+# DECISIONS.md, which records this trade-off first.
+
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/explorer"
+
+# Compiled in rather than read from anywhere, so a machine with no state file -
+# which is every freshly installed one - opens yazi on $mod+e.
+#
+# Changing this line is not enough on its own. A machine that ever ran
+# `explorer --use` has a state file naming the old choice, and that file wins.
+# `explorer --current` is how you find out which is happening.
+DEFAULT="yazi"
+
+# The whitelist is here rather than inferred from what is installed, so that a
+# typo in the state file is a fallback rather than an attempt to exec whatever
+# the word happens to name. Keep in step with the `# requires:` line above:
+# checks/sway-commands.sh reads that line to prove every command this can run
+# comes from a declared package.
+#
+# ORDER IS LOAD-BEARING for --other, which walks this list. yazi first is not
+# decoration: it is the default, and the list reads in the order the keys do.
+SUPPORTED=(yazi thunar)
+
+die() { echo "explorer: $*" >&2; exit 1; }
+
+is_supported() {
+    local candidate="$1" name
+    for name in "${SUPPORTED[@]}"; do
+        [[ "$name" == "$candidate" ]] && return 0
+    done
+    return 1
+}
+
+# A missing, empty or unrecognised state file selects the default rather than
+# failing. This runs on a keypress, and a keybinding that silently does nothing
+# is the exact failure this repository keeps finding - better to get the wrong
+# explorer, visibly, than no window and no message.
+selected() {
+    local value=""
+    [[ -r "$STATE" ]] && value="$(tr -d '[:space:]' < "$STATE" 2>/dev/null || true)"
+    if is_supported "$value"; then
+        printf '%s\n' "$value"
+    else
+        printf '%s\n' "$DEFAULT"
+    fi
+}
+
+# The entry after the selected one, wrapping. Derived rather than hardcoded as
+# "the one that is not yazi", so adding a third explorer does not leave this
+# quietly returning something wrong.
+other() {
+    local current i n="${#SUPPORTED[@]}"
+    current="$(selected)"
+    for ((i = 0; i < n; i++)); do
+        if [[ "${SUPPORTED[i]}" == "$current" ]]; then
+            printf '%s\n' "${SUPPORTED[(i + 1) % n]}"
+            return
+        fi
+    done
+    # selected() only ever returns a supported name, so this is unreachable -
+    # but an unreachable branch that fell through to nothing would be a
+    # keypress that opens no window, which is the failure mode above.
+    printf '%s\n' "$DEFAULT"
+}
+
+# yazi is a terminal program, so it needs a terminal - with a DISTINCT app_id,
+# or the window rule that floats it at 1100x700 would float every terminal.
+# That app_id ties three files together: this line, the `for_window` rule in
+# sway/config.d/40-window-rules.conf, and the app_id -> key-table map in
+# ~/.local/bin/shortcuts. Nothing notices when they disagree except the window
+# tiling and `shortcuts` showing the wrong table.
+#
+# Thunar takes no app_id flag and thunar.desktop ships no StartupWMClass, so
+# its app_id is whatever GTK derives at runtime. It is `thunar`, lowercase,
+# read out of `swaymsg -t get_tree` with a window open rather than assumed.
+launch() {
+    local target="$1"; shift
+    case "$target" in
+        yazi)   exec foot --app-id=explorer -e yazi "$@" ;;
+        thunar) exec thunar "$@" ;;
+        *)      die "no launcher for '$target'" ;;
+    esac
+}
+
+case "${1:-}" in
+    --current)
+        selected
+        ;;
+    --other)
+        shift
+        launch "$(other)" "$@"
+        ;;
+    --list)
+        current="$(selected)"
+        for name in "${SUPPORTED[@]}"; do
+            if [[ "$name" == "$current" ]]; then
+                printf '* %s\n' "$name"
+            else
+                printf '  %s\n' "$name"
+            fi
+        done
+        ;;
+    --use)
+        [[ $# -eq 2 ]] || die "usage: explorer --use <${SUPPORTED[*]}>"
+        is_supported "$2" || die "'$2' is not one of: ${SUPPORTED[*]}"
+        mkdir -p "$(dirname "$STATE")"
+        printf '%s\n' "$2" > "$STATE"
+        echo "\$mod+e now opens $2, \$mod+Ctrl+e opens $(other)"
+        ;;
+    -h|--help)
+        sed -n '6,14p' "$0" | sed 's/^# \{0,1\}//'
+        ;;
+    --*)
+        die "unknown option '$1'. Try --help"
+        ;;
+    *)
+        launch "$(selected)" "$@"
+        ;;
+esac

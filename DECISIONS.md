@@ -2107,6 +2107,101 @@ or thumbnails, which is what the complaint was actually about.
 argues against. TASK-190 exists so that this is a trial with an end rather than
 a decision to have both.
 
+> **This is the alternative that won.** TASK-196 ended the trial by taking it,
+> on the grounds that the premise above is wrong here: they are not two things
+> doing one job. See *Both file managers stay, behind `explorer --use`* below.
+
+---
+
+## Both file managers stay, behind `explorer --use`
+
+**Decision:** Neither yazi nor Thunar is removed. `~/.local/bin/explorer` picks
+which one `$mod+e` opens, from a one-line state file; `$mod+Ctrl+e` opens the
+other. The default is yazi.
+
+This answers TASK-190, which was written to delete one of them, and it answers
+it in the negative. TASK-189's trial ran as intended and the finding was about
+the question rather than the answer.
+
+### Why
+
+TASK-190's premise is this repository's standing argument that two things doing
+one job is a smell — the bargain struck for the two browsers (TASK-178) and the
+two Escape keys (TASK-110), both of which ended with one thing. The premise is
+sound where the two are **interchangeable**, and that is what makes those two
+cases work: you want a browser, and the only question is which one.
+
+It does not hold here, and use is what showed it. yazi is what the hand reaches
+for — keyboard-native, in a terminal, quick for a small job done and closed,
+and shaped like the rest of a desktop that is navigated without a mouse. Thunar
+was reached for rarely and specifically, for four things yazi cannot do at all:
+
+- a directory of images as thumbnails
+- a bulk rename with a preview column
+- dragging a file out into another window, which yazi cannot originate
+- a sidebar of mounted drives to click through
+
+Deleting Thunar would not remove a duplicate. It would remove those four
+capabilities and leave nothing in their place. That is a different finding from
+"Thunar lost", and deleting it on a rule written for a different situation
+would have been the rule outranking the evidence it exists to serve.
+
+**So the honest summary is that TASK-190 asked the wrong question.** It asked
+which one wins a comparison; the fortnight answered that they were not being
+compared, they were being used for different work.
+
+### Trade-off
+
+**20.5 MiB across seven packages, plus `tumbler`, knowingly not reclaimed** —
+the exact cost *Thunar returns* measured and TASK-190 was written to recover.
+It is paid for a program used a few times a month.
+
+**28.7 MiB resident for the rest of any session Thunar is opened in**
+(`tumblerd` and `xfconfd`, both D-Bus activated on first use, neither exiting).
+Demoting Thunar to `$mod+Ctrl+e` does not reduce that figure, but it does mean
+most sessions never pay it — which is a real improvement on it being the thing
+`$mod+e` opens.
+
+**Two keys for one concept**, where the browser needed one. That is the visible
+oddity and it is deliberate: making Thunar cost an `explorer --use` and an
+`explorer --use` back would price it out of exactly the jobs it is kept for, and
+a thing reached for a few times a month is precisely what a second modifier is
+for.
+
+**`$mod+e` gains a shell process between the keypress and the window**, the same
+few milliseconds `browser` costs. yazi in a `foot` window appears in about
+20 ms, so this is the one place in the setup where that overhead is a
+measurable fraction — and still far below anything a person perceives.
+
+### Alternatives considered
+
+**Delete Thunar, as TASK-190 specified.** Rejected on the reasoning above. The
+ticket is answered rather than quietly abandoned, because an open ticket
+contradicting the code is how this repository accumulates configuration that
+looks decided and is not.
+
+**Delete yazi and keep Thunar.** Never seriously in play — yazi is where the
+work happens, costs nothing extra (it is a terminal program the machine already
+has), and starts in a fifth of the time.
+
+**One key, like `browser`.** Rejected: see the trade-off above.
+
+**Pin `$mod+Ctrl+e` to Thunar rather than to "the other one".** Simpler to
+describe, and it means both keys open Thunar whenever Thunar is selected — two
+bindings doing the same thing, which is worse than the asymmetry it avoids.
+`--other` walks the supported list rather than hardcoding "not yazi", so a third
+explorer would turn that key into a cycle. That is the moment to revisit it.
+
+**Store the choice in `chezmoi.toml`** with the theme, wallpaper style and glow.
+Rejected for the same measured reason as the browser and the sound pack:
+`desktop_config.py` shells out to `chezmoi data` at upwards of 100 ms, and this
+is on the path between a keypress and a window. See *Sound packs*.
+
+**Switch the `inode/directory` handler too**, so opening a folder from another
+application follows the setting. Rejected: that handler is
+`terminal-here.desktop` and gives you a terminal in the directory, which is
+deliberate and unrelated to which explorer a key opens.
+
 ---
 
 ## The device sidebar, answered by a popup rather than a second file manager

@@ -80,13 +80,16 @@ done < <(
     #
     # LONGEST NAME FIRST. This is a plain string replacement with no word
     # boundary, so a variable name that is a PREFIX of another corrupts it -
-    # $explorer substituted before $explorer_tui turns the latter into
+    # $explorer substituted before $explorer_tui turned the latter into
     # `thunar_tui`, a command nothing owns. tools/shortcuts.sh reads this
-    # script's output, so the corruption travels: the same wrong string turned
+    # script's output, so the corruption travelled: the same wrong string turned
     # up in the manual's shortcut table. Sorting descending by name length is
     # the whole fix, since a prefix is always shorter than what contains it.
     # A \b word boundary does not work: the names start with `$`, which is not
     # a word character.
+    #
+    # TASK-196 removed $explorer_tui, so nothing collides today. The sort stays
+    # - it is one `sort -rn`, and this is cheaper than rediscovering it.
     config="$(cat "$SWAY_DIR/config" "$SWAY_DIR"/config.d/*.conf)"
     expanded="$config"
     while IFS= read -r def; do

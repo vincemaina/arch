@@ -180,11 +180,15 @@ if ignore_file.exists():
 # normal state and is what selects the compiled-in default, so a machine that
 # has never switched browsers is the machine this repository expects, not a
 # broken one. It was failing this check on main before TASK-183 for that reason.
+# ~/.local/state/explorer is the same file for the same reason, written only by
+# `explorer --use` (TASK-196). A machine that has never switched file managers
+# opens yazi on $mod+e, which is the default and not a fault.
 created_on_demand = {"~/Pictures/wallpapers",
                      "~/.config/focus-music/stations.local",
                      "~/.local/share/vm",
                      "~/.local/share/vm/base.qcow2",
-                     "~/.local/state/browser"}
+                     "~/.local/state/browser",
+                     "~/.local/state/explorer"}
 ignored |= created_on_demand
 
 missing = []

@@ -115,6 +115,10 @@ collect_sway_commands() {
     # not wrong about the string it found; the string was this loop's own
     # doing.
     #
+    # TASK-196 removed $explorer_tui, so no pair in the config collides today.
+    # The sort stays: it costs one `sort -rn` and the next prefix pair will be
+    # added by someone who has never read this comment.
+    #
     # Sorting by descending name length fixes it, because a prefix can only be
     # shorter than the name that contains it. The alternative - a word-boundary
     # match - does not work here: sway variable names begin with `$`, which is
