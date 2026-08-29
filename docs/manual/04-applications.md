@@ -113,7 +113,7 @@ Verified by asking a headless neovim what is actually mapped (`shortcuts
 | `<Esc>` | Clear search highlight |
 | `<C-s>` | Write the file, from normal or insert mode |
 | `<C-q>` | Quit neovim, from normal or insert mode |
-| `<C-h>` / `<C-j>` / `<C-k>` / `<C-l>` | Move between splits |
+| `<C-l>` | Move to the split on the right |
 | `gc` / `gcc` | Comment a motion / comment this line |
 | `J` | Join lines, keeping the cursor in place |
 | `n` / `N` | Next / previous search match, centred |
@@ -128,6 +128,15 @@ Verified by asking a headless neovim what is actually mapped (`shortcuts
 | `<leader>d` | Diagnostic under the cursor |
 | `<leader>q` | List every diagnostic in this file |
 | `<leader>f` | Format the buffer |
+
+**Only one direction of split movement is bound, and the missing three are
+not an oversight.** `Ctrl+K`, `Ctrl+J` and `Ctrl+H` are Escape, Enter and
+Backspace on this machine, rewritten below the compositor, so neovim never
+sees the chord — a mapping for them here would look right in the file and
+could never fire. **`Ctrl+W` then `k`, `j` or `h`** reaches those three
+splits, and is now the only thing that does. See
+[The keyboard](03-the-keyboard.md) for what each of those chords cost
+elsewhere and what replaced it.
 
 Completion is on and triggers automatically as you type — not only on
 `Ctrl-X Ctrl-O` — for any server that supports it.
