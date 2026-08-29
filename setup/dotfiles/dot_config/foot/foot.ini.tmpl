@@ -149,6 +149,12 @@ pipe-scrollback=[{{ .chezmoi.homeDir }}/.local/bin/terminal-copy-all] Control+Sh
 # losing it silently while rebinding its key is the failure this repository
 # keeps meeting, so it moves rather than disappearing.
 #
+# \x16 CARRIES A SECOND JOB NOW, AND IT IS LOAD-BEARING. The same byte is how
+# neovim enters blockwise visual mode, and since TASK-194 gave Ctrl+Q to
+# quitting, this line is the ONLY way into that mode inside this terminal.
+# Deleting it would not cost quoted-insert alone; it would remove a vim mode.
+# The reasoning is written out beside the mapping in nvim's init.lua.
+#
 # Both combinations are only free because copy and paste vacated them above.
 # foot checks that across sections and refuses to start otherwise, so if this
 # file ever parses, the swap is complete in both directions.

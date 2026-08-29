@@ -112,6 +112,7 @@ Verified by asking a headless neovim what is actually mapped (`shortcuts
 | `<Space>` | Leader |
 | `<Esc>` | Clear search highlight |
 | `<C-s>` | Write the file, from normal or insert mode |
+| `<C-q>` | Quit neovim, from normal or insert mode |
 | `<C-h>` / `<C-j>` / `<C-k>` / `<C-l>` | Move between splits |
 | `gc` / `gcc` | Comment a motion / comment this line |
 | `J` | Join lines, keeping the cursor in place |
@@ -180,6 +181,19 @@ modal *"do you really want to write to it?"*, and a prompt arriving a second
 after you stopped typing would eat the next key you pressed. `git checkout`
 under an open buffer is enough to cause it. That one is left for a deliberate
 `Ctrl+S` to answer.
+
+**`Ctrl+Q` leaves.** It closes every window, so it ends the editor rather than
+the split you are in, and it works from insert mode as well as normal mode.
+Anything still unsaved gets the *"Save changes to …?"* prompt rather than
+being discarded — though with autosave above, the buffers that reach that
+prompt are the ones autosave deliberately leaves alone.
+
+It costs one thing, and it is worth knowing before you reach for it: `Ctrl+Q`
+used to be how you entered **blockwise visual** mode. That is vim's own alias
+for `Ctrl+V`, and `Ctrl+V` does not reach neovim in this terminal because foot
+takes it for paste. **Blockwise visual is `Ctrl+Shift+V` here** — the same
+modifier the interrupt and quoted-insert moved to, and for the same reason.
+In any other terminal `Ctrl+V` still works.
 
 **Formatting is not automatic.** `<leader>f` formats the buffer: through the
 attached language server if one offers formatting (`ruff` for Python, `ts_ls`
