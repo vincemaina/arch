@@ -293,24 +293,48 @@ trade that made firefox the default.
 switching between tiled and floating windows, so a browser's own tab-cycling
 on that chord never reaches it.
 
-## The file managers: Thunar and yazi
+## The file managers: yazi and Thunar
 
-**There are two, deliberately, and one of them is going to go.** `$mod+e` opens
-Thunar, `$mod+Ctrl+e` opens yazi, and TASK-190 decides which stays. Both are on
-a key rather than one being demoted to the launcher, because the last time this
-question was asked the answer turned out to be about reachability rather than
-taste — nothing on the desktop opened Thunar, so nobody could have preferred
-it. A comparison needs both to be genuinely to hand.
+**There are two, deliberately, and both stay.** They were on a clock for a
+while — one of them was going to be deleted — and the answer turned out to be
+that they are not two versions of one tool. yazi is keyboard-native and quick
+for a small job done and closed, which is the shape of nearly everything. Thunar
+has thumbnails, a bulk rename with a preview column, a sidebar of drives, and a
+mouse you can drag a file out of into another window. yazi cannot do any of
+those at all. Deleting either would delete a capability rather than a duplicate.
 
-They are different kinds of tool rather than two versions of one. yazi is
-keyboard-native and quick for a small job done and closed. Thunar has a sidebar
-of places and devices, thumbnails, and a mouse. What is being measured is which
-one you actually reach for.
+**`$mod+e` opens the one you have selected. `$mod+Ctrl+e` opens the other.** So
+the everyday one is under your hand and the other is one extra modifier away,
+without switching anything:
 
-### Thunar, on `$mod+e`
+```
+explorer --current      which one $mod+e opens
+explorer --list         both, marking the selected one
+explorer --use yazi     switch
+explorer --use thunar
+```
 
-Opens floating at 1100×700, the same geometry as yazi so the comparison is not
-partly about window size.
+Out of the box that is yazi on `$mod+e` and Thunar on `$mod+Ctrl+e`. Selecting
+Thunar swaps them, and both keys follow immediately — there is no sway reload,
+because the keys run a helper that reads the setting at the moment you press
+them.
+
+The choice is one line in `~/.local/state/explorer` and survives logging out.
+It is machine-local and deliberately not in the repository, the same as your
+theme, so switching leaves no diff and `explorer --current` is the only way to
+find out what a given machine is set to. Opening a folder from another
+application does not follow it — that stays with `terminal-here.desktop`, which
+gives you a terminal in the directory.
+
+This is the same arrangement `browser --use` gives the three browsers, with one
+difference: browsers get a single key, because you want *a* browser and the
+question is only which. These two get a key each at once, because you reach for
+them for different jobs rather than interchangeably.
+
+### Thunar
+
+Opens floating at 1100×700, the same size as yazi — so the window does not
+change shape depending on which one a key is currently set to.
 
 Its keys have been remapped to vim ones, in
 `~/.config/Thunar/accels.scm`:
@@ -336,8 +360,8 @@ accelerator is one chord, never a sequence, so no two-key motion is
 expressible.
 
 That limit is the honest difference between a keyboard-native file manager and
-a graphical one wearing vim keys, and it is the thing to weigh when deciding
-which of the two to keep.
+a graphical one wearing vim keys, and it is why yazi is the default rather than
+this one.
 
 The file is **read-only on purpose**, because Thunar rewrites it on every quit
 and that would mean drift after every session. To change a binding, edit it in
@@ -349,9 +373,10 @@ One collision worth knowing: Thunar's stock key for showing hidden files is
 Backspace, which Thunar reads as *go back*. That is why hidden files are on `.`
 instead.
 
-### yazi, on `$mod+Ctrl+e`
+### yazi
 
-Opens yazi in its own floating terminal (1100×700). Navigation is
+The default, so `$mod+e` unless you have said otherwise. Opens in its own
+floating terminal (1100×700). Navigation is
 yazi's own vim-style scheme — confirmed live with `shortcuts --mode yazi`,
 which is also the fastest way to see the full current list without leaving
 the keyboard.

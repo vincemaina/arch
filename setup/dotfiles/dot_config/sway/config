@@ -20,27 +20,32 @@ set $right l
 # is not on the PATH sway hands to what it spawns.
 set $term ~/.local/bin/terminal
 
-# TWO FILE MANAGERS, DELIBERATELY AND ON A CLOCK - see TASK-189, and TASK-190
-# which ends this. The same bargain as the two browsers above and the two
-# Escape keys in the keyd config: two things doing one job is what this
-# repository argues against, and it is tolerable only while the ticket that
-# removes one of them exists.
+# TWO FILE MANAGERS, DELIBERATELY AND NO LONGER ON A CLOCK. TASK-189 put them
+# both on a key while TASK-190 decided which one to delete; TASK-196 decided
+# neither, and this line is what changed as a result.
 #
-# $explorer is on $mod+e, $explorer_tui on $mod+Ctrl+e. Both are on a key
-# rather than one being demoted to the launcher, because TASK-44 settled the
-# last file-manager question on REACHABILITY - nothing routed to Thunar, so
-# a fortnight of use could only have recorded someone typing its name. A
-# comparison needs both to be genuinely reachable or it measures nothing.
+# The usual argument - two things doing one job is a smell, the bargain struck
+# for the two browsers above and the two Escape keys in the keyd config - does
+# not apply here, and it is worth saying why rather than looking like an
+# exception nobody noticed. yazi and Thunar are not two implementations of one
+# job. yazi is the one the hand reaches for, and Thunar is for the things yazi
+# cannot do at all: thumbnails, bulk rename, dragging a file into another
+# window, a sidebar of drives. Deleting either would delete a capability, not
+# a duplicate. DECISIONS.md carries the reasoning and the cost.
 #
-# Thunar takes no app_id flag and thunar.desktop ships no StartupWMClass, so
-# the app_id is whatever GTK derives at runtime. It is `thunar`, lowercase,
-# read out of `swaymsg -t get_tree` with a window open rather than assumed -
-# 40-window-rules.conf depends on that string and nothing notices if it is
-# wrong except the window failing to float.
-set $explorer thunar
-# The terminal one is a terminal with a distinct app_id - otherwise the window
-# rule that floats it would float every terminal.
-set $explorer_tui foot --app-id=explorer -e yazi
+# So the helper chooses WHICH explorer, not how to open one - exactly what
+# $browser below does, and for the same reason: the choice is machine-local, so
+# switching leaves no diff. `explorer --list` and `explorer --current` say what
+# a machine is set to, since git no longer does.
+#
+# The one difference from $browser, which otherwise this copies exactly: both
+# explorers are on a key AT ONCE. $mod+e opens the selected one and
+# $mod+Ctrl+e opens the other, because unlike three interchangeable browsers
+# these two are reached for differently. See ~/.local/bin/explorer.
+#
+# Called by path, since ~/.local/bin is not on the PATH sway hands to what it
+# spawns.
+set $explorer ~/.local/bin/explorer
 # The helper chooses WHICH browser, not how to open it. It is firefox, since
 # TASK-183 - with Vimium force-installed by policy, so the keyboard-driven
 # browsing qutebrowser was picked for in the first place comes with it. TASK-178

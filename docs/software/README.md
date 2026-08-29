@@ -276,8 +276,8 @@ the line, **↓** means an entry below in this document.
 | `cava` | Terminal spectrum display, reading whatever is audible from the default output's monitor | ↓ |
 | `xdg-user-dirs` | Creates `~/Pictures` and friends | ↓ |
 | `gvfs` | Removable and network volumes for GIO, so a USB stick appears in a Save As dialog | M, D: GVFS |
-| `yazi` | The terminal file manager, now on `$mod+Ctrl+e`. **On trial against Thunar** — TASK-190 keeps one | M, D: No graphical file manager, reversing an earlier decision |
-| `thunar` | The graphical file manager, on `$mod+e`, back after TASK-44 removed it. **On trial against yazi** | ↓ |
+| `yazi` | The terminal file manager, and the default one `$mod+e` opens. Selected by `explorer --use`, so which key reaches it is machine-local | M, D: No graphical file manager, reversing an earlier decision; D: Both file managers stay, behind `explorer --use` |
+| `thunar` | The graphical file manager, on `$mod+Ctrl+e` by default. Kept for what yazi cannot do at all — thumbnails, bulk rename, dragging a file into another window, a sidebar of drives | ↓ |
 | `tumbler` | Thumbnails for Thunar. Declared, not left optional — its absence is what made the last Thunar useless | ↓ |
 | `udisks2` | `udisksctl`, behind yazi's mount manager on `M` — mounts and unmounts a drive without root | ↓ |
 | `imv` | Image viewer | M |
@@ -997,10 +997,13 @@ screenshots and seeing them render, not by checking the package is present.
 | **Resident after the window is closed** | **28.7 MiB** — `tumblerd` 20.3 MiB and `xfconfd` 8.4 MiB, both D-Bus activated on first use and neither exiting afterwards |
 | Window on screen | 157 ms from launch to sway's `window::new`, warm cache, mean of three runs. A `foot` window on the same measurement is 20 ms, so Thunar costs about 137 ms more to appear |
 
-That 28.7 MiB is the figure TASK-190 should weigh. Thunar genuinely starts
-nothing at login — but "no background processes when it is not open" is only
-true until the first time it is opened, and after that two daemons stay for
-the rest of the session.
+That 28.7 MiB is the figure TASK-190 was to have weighed, and TASK-196 weighed
+it and kept Thunar anyway. Thunar genuinely starts nothing at login — but "no
+background processes when it is not open" is only true until the first time it
+is opened, and after that two daemons stay for the rest of the session. The
+point of keeping it on `$mod+Ctrl+e` rather than on `$mod+e` is that the cost
+is now paid only in sessions where it is actually reached for, which for the
+jobs it is kept for is not most of them.
 
 The 157 ms is not comparable to the browser figures elsewhere in
 `DECISIONS.md`, which were keypress-to-mapped-window and cold. This one starts

@@ -95,15 +95,17 @@ def sway_shortcuts():
     # Longest name first, and it is load-bearing. This is a plain string
     # replacement with no word boundary, so a variable whose name is a PREFIX
     # of another corrupts it: $explorer_tui, added beside $explorer in
-    # TASK-189, becomes "thunar_tui" if $explorer is substituted first. A
+    # TASK-189, became "thunar_tui" if $explorer was substituted first. A
     # prefix can only be shorter than the name containing it, so sorting by
     # descending length is the whole fix. checks/sway-commands.sh had the same
-    # bug and the same repair.
+    # bug and the same repair. TASK-196 removed $explorer_tui and the sort
+    # stays, because the next prefix pair will be added by someone who has not
+    # read this.
     by_length = sorted(variables.items(), key=lambda kv: -len(kv[0]))
 
     def expand(value):
-        # Repeatedly, because variables refer to variables - $explorer_tui is
-        # built from foot, and $term from the terminal helper.
+        # Repeatedly, because variables refer to variables - $term is built
+        # from the terminal helper, and $explorer_tui was built from foot.
         for _ in range(5):
             for name, replacement in by_length:
                 value = value.replace(name, replacement)
@@ -173,7 +175,19 @@ def sway_shortcuts():
                 # "qutebrowser" until TASK-183 and had been describing a
                 # command the binding stopped running back in TASK-178.
                 "browser": "Open the browser",
+                # Same shape, and for the same reason: $mod+e runs
+                # ~/.local/bin/explorer, which picks between yazi and thunar
+                # from a state file. Naming either one here would be right
+                # half the time and wrong the other half, with nothing to
+                # notice - see the --other case just below.
+                "explorer": "Open the file explorer",
             }
+            # $mod+Ctrl+e is `explorer --other`, which opens whichever one
+            # $mod+e does not. Checked before HELPERS, or both keys would
+            # describe themselves identically and the panel would show two
+            # rows claiming to do the same thing.
+            if first == "explorer" and len(args) > 1 and args[1].strip() == "--other":
+                return "Open the other file explorer"
             if first in HELPERS:
                 return HELPERS[first]
             if first == "sway-screenshot":
