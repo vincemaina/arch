@@ -230,12 +230,12 @@ crash or reboot never leaves a stuck timer behind.
 `$mod+v`, or "Clipboard" from the launcher, opens everything you have copied
 — text and images both, with real image thumbnails for roughly the most
 recent 60 pictures. `Enter` puts the highlighted entry back on the system
-clipboard; it does **not** paste it for you. That is deliberate: the correct
-paste keystroke differs by application (`Ctrl+Shift+V` in foot,
-`Ctrl+V` almost everywhere else, and `Ctrl+V` inside a shell means something
-else entirely to readline), and there is no reliable way to ask the focused
-window which one it wants — guessing wrong would silently type the wrong
-thing, which is worse than one extra keystroke.
+clipboard; it does **not** paste it for you. That is deliberate: there is no
+reliable way to ask the focused window which keystroke it wants, and guessing
+wrong would silently type the wrong thing, which is worse than one extra
+keystroke. `Ctrl+V` is the answer in most places, the terminal now included
+(chapter 4), but "most" is not "all" — a program that has claimed `Ctrl+V` for
+something of its own would get that instead of a paste.
 
 `Ctrl+d` forgets the highlighted entry. The last row, "Clear the whole
 history", asks for confirmation before wiping everything.

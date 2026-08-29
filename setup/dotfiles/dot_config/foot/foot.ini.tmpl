@@ -73,6 +73,34 @@ visual=yes
 notify=yes
 
 [key-bindings]
+# Copy and paste on Ctrl+C and Ctrl+V, like the rest of the desktop. TASK-187.
+#
+# The terminal was the one place on this machine where copying needed a third
+# finger, and foot's defaults are that way for a reason: Ctrl+C is the
+# interrupt. So this does not add a binding, it swaps two - the interrupt and
+# quoted-insert move up to Ctrl+Shift in [text-bindings] below, and keep
+# working.
+#
+# THERE IS NO COPY-OR-INTERRUPT MIDDLE GROUND, AND IT WAS CHECKED.
+#
+# The obvious wish is for Ctrl+C to copy when something is selected and
+# interrupt when nothing is - which is what a few other terminals do. foot
+# cannot: in 1.27.0's input.c, BIND_ACTION_CLIPBOARD_COPY calls
+# selection_to_clipboard() and then `return true` unconditionally, so the key
+# is consumed whether or not there was a selection. pipe-selected is no way
+# round it either - its failure path is `goto pipe_err`, which also returns
+# true. Read in the 1.27.0 source rather than inferred from behaviour.
+#
+# So Ctrl+C in this terminal copies, always, and never reaches the program.
+# Anything that treats Ctrl+C as cancel - fzf, nvim, btop, a hung command -
+# wants Ctrl+Shift+C now. That is the whole cost of the swap and it is real.
+#
+# XF86Copy and XF86Paste are foot's own defaults for these actions; naming a
+# binding replaces the default list entirely, so they are repeated here or
+# they would be lost.
+clipboard-copy=Control+c XF86Copy
+clipboard-paste=Control+v XF86Paste
+
 # Select all - or the useful half of it. TASK-112.
 #
 # foot 1.27 has no select-all action: `man foot.ini` lists every key-bindings
@@ -86,12 +114,18 @@ notify=yes
 # copies, and raises the notification that stands in for the missing
 # highlight. It carries the full reasoning.
 #
-# Ctrl+Shift+A because Ctrl+Shift+C and Ctrl+Shift+V are already foot's own
-# defaults for copy and paste, which is exactly the inference the task made.
+# Ctrl+Shift+A because Ctrl+Shift+C and Ctrl+Shift+V were foot's own defaults
+# for copy and paste, which is exactly the inference the task made. They are no
+# longer - TASK-187 moved copy and paste down to Ctrl+C and Ctrl+V - but the
+# two keys are still taken, by the interrupt and quoted-insert below, so the
+# reasoning holds and the binding does not move.
+#
 # foot rejects a duplicate binding at parse time rather than silently
 # preferring one - `foot --check-config` reports "already mapped to" and exits
 # non-zero - so this having been accepted is itself the proof that Ctrl+Shift+A
-# was free.
+# was free. That check spans sections: a [text-bindings] entry colliding with a
+# live key binding is rejected the same way, which is what makes the swap below
+# safe to assert rather than hope for.
 #
 # ABSOLUTE PATH, AND WHY THIS FILE IS A .tmpl BEYOND THE COLOURS
 #
@@ -100,6 +134,26 @@ notify=yes
 # `terminal-copy-all` here would resolve to nothing and the key would do
 # nothing, silently. This is the same trap waybar's click commands document.
 pipe-scrollback=[{{ .chezmoi.homeDir }}/.local/bin/terminal-copy-all] Control+Shift+a
+
+[text-bindings]
+# Where the interrupt went. TASK-187.
+#
+# This section maps a key combination to bytes sent to the program, which is
+# how a terminal control character is reproduced once its usual key has been
+# taken for something else. \x03 is ETX, what Ctrl+C has always put on the
+# tty; the line discipline turns it into SIGINT exactly as before, so this is
+# the same interrupt on a different key rather than an imitation of it.
+#
+# \x16 is SYN - Ctrl+V, readline's quoted-insert, the thing you press before a
+# key to insert it literally instead of acting on it. Rarely reached for, but
+# losing it silently while rebinding its key is the failure this repository
+# keeps meeting, so it moves rather than disappearing.
+#
+# Both combinations are only free because copy and paste vacated them above.
+# foot checks that across sections and refuses to start otherwise, so if this
+# file ever parses, the swap is complete in both directions.
+\x03=Control+Shift+c
+\x16=Control+Shift+v
 
 # Machine-local overrides, loaded last. See the file itself for what belongs
 # in it. [main] is re-opened deliberately: foot only accepts `include` in that
