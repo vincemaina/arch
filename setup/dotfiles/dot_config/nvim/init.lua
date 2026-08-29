@@ -264,6 +264,44 @@ vim.keymap.set('n', 'N', 'Nzzzv', { desc = 'Previous match, centred' })
 -- so you keep typing where you were.
 vim.keymap.set({ 'n', 'i' }, '<C-s>', '<cmd>update<CR>', { desc = 'Write the file' })
 
+-- Ctrl+Q leaves, which is the other half of the same habit and the other thing
+-- every editor on this machine already agrees on. `confirm qa` rather than
+-- `qa`: every window, and a prompt rather than a refusal or a silent discard
+-- if something is still unsaved. `confirm` is written out even though
+-- `o.confirm` above already turns the refusal into that dialog - a key whose
+-- whole job is "close everything" should not depend on an option two hundred
+-- lines away staying true.
+--
+-- IT ARRIVES, FOR THE SAME REASON CTRL+S DOES. Ctrl+Q is XON, the resume half
+-- of the flow-control pair Ctrl+S starts: in a shell it un-freezes a terminal,
+-- and zsh binds it to push-line on top of that. Neither is in the way here,
+-- because nvim puts the terminal in raw mode and turns IXON off - and nothing
+-- between claims it either: keyd's [control] layer rewrites k, semicolon, j, h
+-- and l and not q, foot binds nothing on it, and sway took $mod+q rather than
+-- Ctrl+q. Measured by sending a real 0x11 down a pty and watching a <C-q>
+-- mapping fire, rather than by trying it once in a terminal.
+--
+-- WHAT IT COSTS IS BLOCKWISE VISUAL, AND THAT IS NOT A MAPPING.
+--
+-- Ctrl+Q was already doing something. It is vim's own alias for Ctrl+V - enter
+-- blockwise visual mode - and being a built-in command rather than a mapping,
+-- the pruning above never saw it. So this line is an overwrite, not a free key,
+-- and the pruning's promise that nothing here was inherited does not cover it.
+--
+-- That would normally cost nothing, because Ctrl+V is the real key for the
+-- mode. In this terminal Ctrl+V is not available: foot consumes it for paste
+-- (TASK-187) and the program never sees it. Ctrl+Q was therefore the ONLY way
+-- into blockwise visual on this machine, and taking it would have removed the
+-- mode from the editor rather than moved it.
+--
+-- It does not, because foot's [text-bindings] send \x16 - the byte Ctrl+V makes
+-- - on Ctrl+Shift+V. Measured, both halves, by reading the mode indicator back
+-- off a pty rather than inferring it: 0x11 and 0x16 each put nvim in VISUAL
+-- BLOCK today. So blockwise visual is Ctrl+Shift+V here, alongside the
+-- interrupt and quoted-insert that moved to the same modifier for the same
+-- reason. In any other terminal Ctrl+V still works and nothing was spent.
+vim.keymap.set({ 'n', 'i' }, '<C-q>', '<cmd>confirm qa<CR>', { desc = 'Quit neovim' })
+
 -- ---------------------------------------------------------------------------
 -- Autosave
 -- ---------------------------------------------------------------------------
