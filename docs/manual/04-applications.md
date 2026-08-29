@@ -162,6 +162,25 @@ Opening the same file inside a git checkout attaches it with that checkout as
 the root instead. Both were confirmed by running headlessly and asking
 `vim.lsp.get_clients()` what attached and with what `root_dir`.
 
+**The file saves itself.** A buffer with unsaved changes is written about a
+second after you stop typing, in insert mode as well as in normal mode — the
+same behaviour other editors call autosave-after-delay. Typing continuously
+does not write continuously: the second is counted from the last keystroke, so
+a burst of typing is one write at the end of it. `Ctrl+S` still works and is
+still the right thing to press when you want to be certain, but it is no longer
+the only thing standing between you and the swap-file dialog neovim shows when
+a session dies holding changes that never reached the disk.
+
+Four cases are deliberately left alone. Buffers with no file behind them — a
+scratch buffer, a terminal, the help viewer — have nothing to write. Read-only
+files are not written. Nothing is written while the completion popup is up,
+because the write would dismiss it. And if the file has changed on disk since
+neovim read it, autosave stays out of the way entirely: writing there raises a
+modal *"do you really want to write to it?"*, and a prompt arriving a second
+after you stopped typing would eat the next key you pressed. `git checkout`
+under an open buffer is enough to cause it. That one is left for a deliberate
+`Ctrl+S` to answer.
+
 **Formatting is not automatic.** `<leader>f` formats the buffer: through the
 attached language server if one offers formatting (`ruff` for Python, `ts_ls`
 for JS/TS, the `vscode-*` servers for HTML/CSS/JSON), or through `prettier`

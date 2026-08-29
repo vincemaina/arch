@@ -265,6 +265,148 @@ vim.keymap.set('n', 'N', 'Nzzzv', { desc = 'Previous match, centred' })
 vim.keymap.set({ 'n', 'i' }, '<C-s>', '<cmd>update<CR>', { desc = 'Write the file' })
 
 -- ---------------------------------------------------------------------------
+-- Autosave
+-- ---------------------------------------------------------------------------
+--
+-- Ctrl+S above is the write you decide on. This is the one you do not have to
+-- remember, and it is here because forgetting had a visible cost: opening a
+-- notes file was greeting this machine with E325 ATTENTION and a swap file
+-- "modified: YES", which is nvim saying an earlier session died holding
+-- changes that never reached the disk. Closing the terminal instead of
+-- quitting is all it takes, and this machine had four of them.
+--
+-- MEASURED, AND IT IS WHY THERE IS NO SWAP-FILE CODE HERE. A stale swap file
+-- is only a problem when it holds unsaved changes. kill -9 with a dirty buffer
+-- and reopening the file produces the entire dialog; kill -9 after a write
+-- produces nothing at all - nvim compares the swap against the file, finds
+-- them identical, and deletes it on the way in without saying so. Saving IS
+-- the fix. A SwapExists autocmd guessing which swap files are safe to delete
+-- would be answering a question that no longer gets asked.
+--
+-- Debounced rather than on leaving insert mode, which was the other candidate:
+-- a write on <Esc> never lands mid-word, but it also never happens while you
+-- are still typing, which is exactly when the terminal gets closed. The trade
+-- is that anything watching the file sometimes sees a half-finished line.
+-- Accepted deliberately - see DECISIONS.md.
+
+-- A second after the last keystroke: long enough that a burst of typing is one
+-- write rather than dozens, short enough that "did that save?" is never worth
+-- asking.
+local AUTOSAVE_MS = 1000
+
+-- All three are keyed by buffer number and all three are dropped on wipeout:
+-- the pending timer, the mtime the file was last known to have on disk, and
+-- whether writing this buffer has already failed once.
+local autosave_timers = {}
+local autosave_mtime = {}
+local autosave_failed = {}
+
+-- Buffers with no file behind them have nothing to write - the help viewer, a
+-- terminal, the quickfix list, an unnamed scratch buffer. `nomodifiable` and
+-- `readonly` are the ones where writing would be a mistake rather than a
+-- no-op.
+local function autosave_wanted(buf)
+  return vim.api.nvim_buf_is_valid(buf)
+    and not autosave_failed[buf]
+    and vim.bo[buf].buftype == ''
+    and vim.bo[buf].modifiable
+    and not vim.bo[buf].readonly
+    and vim.bo[buf].modified
+    and vim.api.nvim_buf_get_name(buf) ~= ''
+end
+
+-- THE FILE CHANGING UNDERNEATH IS THE ONE CASE THAT MUST NOT BE WRITTEN, and
+-- it is not an error case. `:update` does not fail when the file on disk has
+-- changed since nvim read it - it asks, modally: "do you really want to write
+-- to it (y/n)?". A prompt nobody asked for, arriving a second after you stop
+-- typing, is worse than not saving, because it eats the next thing you press.
+-- `git checkout` under an open buffer is enough to cause it, in this
+-- repository more than most. So compare first and stay out of the way; a
+-- deliberate Ctrl+S is the right place to answer that question.
+local function autosave_file_moved(buf)
+  local was = autosave_mtime[buf]
+  return was ~= nil and vim.fn.getftime(vim.api.nvim_buf_get_name(buf)) ~= was
+end
+
+local function autosave_write(buf)
+  if not autosave_wanted(buf) or autosave_file_moved(buf) then return end
+
+  -- nvim_buf_call because the timer fires whenever it fires: by then the
+  -- window may be showing something else, and `update` writes whatever buffer
+  -- is current.
+  --
+  -- `silent` so "N lines written" does not overwrite the message area for a
+  -- write nobody asked for. NOT `silent!`, which would swallow the errors as
+  -- well - a write failing quietly once a second is the exact shape of bug
+  -- this repository keeps finding.
+  local ok, err = pcall(vim.api.nvim_buf_call, buf, function()
+    vim.cmd('silent update')
+  end)
+
+  -- A write that cannot succeed will not start succeeding on the next
+  -- keystroke: a file that is not writable, a directory that has been removed
+  -- underneath. Say so once and stop, rather than repeating it for as long as
+  -- the buffer is open.
+  if not ok then
+    autosave_failed[buf] = true
+    vim.notify('Autosave stopped for this buffer: ' .. tostring(err),
+      vim.log.levels.WARN)
+  end
+end
+
+local function autosave_schedule(buf)
+  if not autosave_wanted(buf) then return end
+
+  local timer = autosave_timers[buf]
+  if not timer then
+    timer = vim.uv.new_timer()
+    autosave_timers[buf] = timer
+  end
+
+  -- Starting a timer that is already running restarts it, and that restart is
+  -- the whole debounce: the second is counted from the last change, not the
+  -- first.
+  timer:start(AUTOSAVE_MS, 0, vim.schedule_wrap(function()
+    -- The completion popup being up means this is mid-word by definition, and
+    -- writing dismisses it. Wait for the next quiet second instead.
+    if vim.fn.pumvisible() == 1 then
+      autosave_schedule(buf)
+      return
+    end
+    autosave_write(buf)
+  end))
+end
+
+vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI' }, {
+  callback = function(args) autosave_schedule(args.buf) end,
+  desc = 'Autosave a second after the last change',
+})
+
+-- BufNewFile as well as BufReadPost, so a file that does not exist yet starts
+-- with a known mtime (-1) rather than with none - otherwise the first write of
+-- a new file is the one case the guard above cannot check.
+vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufNewFile', 'BufWritePost' }, {
+  callback = function(args)
+    autosave_mtime[args.buf] = vim.fn.getftime(vim.api.nvim_buf_get_name(args.buf))
+  end,
+  desc = 'Remember the mtime the file has on disk',
+})
+
+vim.api.nvim_create_autocmd('BufWipeout', {
+  callback = function(args)
+    local timer = autosave_timers[args.buf]
+    if timer then
+      timer:stop()
+      timer:close()
+    end
+    autosave_timers[args.buf] = nil
+    autosave_mtime[args.buf] = nil
+    autosave_failed[args.buf] = nil
+  end,
+  desc = 'Drop the autosave timer with the buffer',
+})
+
+-- ---------------------------------------------------------------------------
 -- Per-language indentation
 -- ---------------------------------------------------------------------------
 --

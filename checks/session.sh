@@ -1306,6 +1306,87 @@ io.write(table.concat(out, " "))' -c quit 2>/dev/null)"
     else
         pass "the declared treesitter parsers are installed"
     fi
+
+    # AUTOSAVE ACTUALLY WRITES (TASK-192). It is the one promise the editor now
+    # makes that cannot be read off the configuration: a libuv timer that is
+    # created, never fires, and looks entirely correct in the file is this
+    # repository's signature bug, and the manual asserts the behaviour to
+    # someone who has never seen the config.
+    #
+    # DRIVEN OVER RPC FROM A SECOND NEOVIM RATHER THAN WITH feedkeys INSIDE A
+    # HEADLESS -c, and that is not fussiness. TextChanged and TextChangedI do
+    # not fire while there is typeahead, so feedkeys never triggers them, and
+    # vim.wait() pumps the event loop but not the input layer - so nvim_input()
+    # does not help either. Both were tried. Both reported "autosave never
+    # fired" on a machine where it demonstrably does: a measuring apparatus
+    # that is silently not measuring, producing a confident wrong answer.
+    #
+    # So the probe uses a real instance and real keystrokes, and - per the same
+    # lesson - proves it is connected before a missing write is allowed to mean
+    # anything: if the buffer never received the text, that is the harness
+    # failing, not autosave.
+    autosave_probe="$(mktemp -d)"
+    autosave_sock="$autosave_probe/s"
+    printf 'before\n' > "$autosave_probe/probe.md"
+    nvim --headless --listen "$autosave_sock" "$autosave_probe/probe.md" </dev/null &>/dev/null &
+    autosave_pid=$!
+
+    autosave_ready=""
+    for _ in $(seq 50); do
+        if [[ -S "$autosave_sock" ]]; then autosave_ready=yes; break; fi
+        sleep 0.1
+    done
+
+    autosave_typed=""
+    autosave_messages=""
+    if [[ -n "$autosave_ready" ]]; then
+        nvim --server "$autosave_sock" --remote-send 'oautosaved by the check<Esc>' &>/dev/null
+        autosave_typed="$(nvim --server "$autosave_sock" --remote-expr 'getline(2)' 2>/dev/null)"
+
+        # Five seconds against a one-second delay. Polling rather than sleeping
+        # the whole budget, so the usual case costs about a second.
+        for _ in $(seq 50); do
+            if grep -q 'autosaved by the check' "$autosave_probe/probe.md"; then break; fi
+            sleep 0.1
+        done
+        autosave_messages="$(nvim --server "$autosave_sock" --remote-expr 'execute("messages")' 2>/dev/null)"
+    fi
+
+    # Ask it to quit before killing it. A neovim that takes SIGTERM with a
+    # modified buffer preserves its swap file on the way out, so a check that
+    # only killed would litter ~/.local/state/nvim/swap with one entry per
+    # failing run - a check that creates the mess it exists to detect.
+    [[ -n "$autosave_ready" ]] && nvim --server "$autosave_sock" --remote-send ':qa!<CR>' &>/dev/null
+    for _ in $(seq 20); do
+        if ! kill -0 "$autosave_pid" 2>/dev/null; then break; fi
+        sleep 0.1
+    done
+
+    # By pid, never by pattern: `pkill -f nvim` here would match this script's
+    # own command line and every editor the user has open.
+    kill "$autosave_pid" 2>/dev/null
+    wait "$autosave_pid" 2>/dev/null
+
+    if [[ -z "$autosave_ready" ]]; then
+        fail "could not start a headless neovim to test autosave - the check did not run"
+    elif [[ "$autosave_typed" != "autosaved by the check" ]]; then
+        fail "the autosave probe never reached the buffer, so it proves nothing about autosave"
+    elif grep -q 'autosaved by the check' "$autosave_probe/probe.md"; then
+        pass "the editor autosaves a modified buffer without being asked"
+    else
+        fail "the editor did not autosave: a change sat unwritten for five seconds"
+    fi
+
+    # And does it quietly. `silent update` rather than `update` is the whole
+    # difference between a save you never notice and "N lines written" wiping
+    # the message area once a second while you type.
+    if [[ -n "$autosave_ready" ]] && [[ -n "${autosave_messages//[[:space:]]/}" ]]; then
+        fail "autosave prints to the message area: ${autosave_messages//$'\n'/ }"
+    elif [[ -n "$autosave_ready" ]]; then
+        pass "autosave writes silently, leaving the message area alone"
+    fi
+
+    rm -rf "$autosave_probe"
 fi
 
 # ----------------------------------------------------------------------
