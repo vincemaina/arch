@@ -3470,6 +3470,47 @@ The launcher and the terminal now open files by different routes — `gio` from 
 
 ---
 
+## Neovim autosaves, and that is the whole of the swap-file fix
+
+**Decision:** A modified buffer is written about a second after the last change, in insert mode as well as normal, debounced so a burst of typing is one write. There is deliberately no swap-file handling to go with it.
+
+### Why
+
+The symptom was neovim's `E325: ATTENTION` dialog on opening a notes file — a swap file "modified: YES", which is neovim saying an earlier session died holding changes that never reached the disk. Closing the terminal instead of quitting is all it takes, and this machine had accumulated three of them for one file, plus one for a file that had never been written to disk at all. Between them they held five todo items that no longer existed anywhere else.
+
+`Ctrl+S` had already been added (TASK-171) and is not the answer to this: it depends on remembering, and every other editor the user works in does not.
+
+**The measurement decided the shape.** A stale swap file is only a problem when it holds unsaved changes. `kill -9` on a dirty buffer and reopening the file produces the whole dialog; `kill -9` after a write produces nothing at all — neovim compares the swap against the file, finds them identical, and deletes it on the way in without saying so. Both halves were run, including a negative control that reproduced `E325` on demand, so the claim is not "autosave should help". Saving *is* the fix, which is why there is no `SwapExists` autocmd here guessing which swap files are safe to delete.
+
+**Debounced rather than on leaving insert mode**, which was the other candidate offered. A write on `<Esc>` never lands mid-word, but it also never happens while you are still typing — which is precisely when a terminal gets closed, and precisely what produced the swap files above. On-`<Esc>` would have left the causing case uncovered while looking like a fix, which is this repository's signature failure.
+
+The interesting part is not the timer but the four things it refuses to write, each of which is a way this could have gone wrong quietly:
+
+- **Buffers with no file behind them** — a terminal, the help viewer, the quickfix list, an unnamed scratch buffer. A terminal buffer changes on every line of output, so without this it would be the loudest caller of the whole mechanism.
+- **`nomodifiable` and `readonly` buffers**, where writing is a mistake rather than a no-op.
+- **Anything mid-completion.** The write dismisses the popup, and the popup being up means this is mid-word by definition. It reschedules instead.
+- **A file that has changed on disk since neovim read it.** This is the one worth stating: `:update` does not *fail* there, it asks, modally — *"do you really want to write to it (y/n)?"*. A prompt nobody asked for, arriving a second after you stop typing, eats the next key you press. `git checkout` under an open buffer is enough to cause it, in this repository more than most. So the mtime is compared first and autosave stays out of the way, leaving a deliberate `Ctrl+S` to answer the question.
+
+The write is `silent update` — `update` so an unmodified buffer is left alone, `silent` so "N lines written" does not overwrite the message area once a second. Not `silent!`: that would swallow the errors too, and a write failing quietly every second is exactly the class of bug this repository keeps finding. A write that fails stops autosave for that buffer and says so once, rather than repeating itself for as long as the buffer is open.
+
+### Trade-off
+
+Anything watching the file sees half-finished lines. A dev server or a file watcher will rebuild on a sentence you have not finished. That was put to the user against the on-`<Esc>` alternative and accepted.
+
+More subtly, **"close it without saving" stops being an escape hatch.** The file on disk is no longer a checkpoint you control, so undo is the only way back — which is why `undofile` mattering is not incidental: history survives closing the file, so the escape hatch moved rather than disappeared.
+
+Format-on-save stays off, and autosave makes that argument stronger rather than weaker: reformatting the buffer under the cursor a second after you stop typing would be unusable. `<leader>f` remains the only thing that reformats.
+
+### Alternatives considered
+
+**`autowriteall`.** The built-in answer, and it writes on `:next`, on switching buffers and on quitting — but not on being killed, which is the entire case. It would have fixed nothing here.
+
+**A `SwapExists` autocmd that deletes stale swap files whose process is gone.** The usual recipe, and it treats the symptom: it would have thrown away exactly the five todo items that were recovered from these swaps. The measurement above made it unnecessary as well as unwise.
+
+**An autosave plugin (`auto-save.nvim` and friends).** Around 60 lines of Lua against a dependency, a lockfile entry and someone else's decisions about which buffers to skip — and the buffers to skip are the whole design, as above. The same argument that keeps this configuration off a distribution.
+
+---
+
 # Testing Strategy
 
 ## VM-first development
