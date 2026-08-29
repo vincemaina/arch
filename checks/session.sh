@@ -2680,7 +2680,15 @@ Still needs a human, because no script can observe them:
                                                 clicks, so the keypress itself
                                                 is the one link in the chain
                                                 nothing here can test.
-  6. Run:  sounds --preview                     Expect: four sounds, named as
+  6. In a NEW terminal, select some text,       Expect: Ctrl+C copies rather
+     press Ctrl+C, then press Ctrl+Shift+C      than interrupting; Ctrl+V pastes
+     while `sleep 60` is running.               it back; Ctrl+Shift+C stops the
+                                                sleep. Same reason as 5 - the
+                                                keypress is the one link no
+                                                script here can press. A new
+                                                terminal because foot reads its
+                                                config once, at startup.
+  7. Run:  sounds --preview                     Expect: four sounds, named as
                                                 they play, recognisably one
                                                 family and easy to tell apart.
                                                 The checks above prove the right

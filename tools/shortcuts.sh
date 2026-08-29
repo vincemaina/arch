@@ -433,9 +433,11 @@ heading "Terminal — foot"
 # the rendered file is what foot was actually given. On a machine that has not
 # synced they are different, and the one under your fingers is this one.
 #
-# Only what this repository overrides appears here. foot's own defaults - copy
-# and paste among them - are foot's to document; repeating them would be a
-# second copy to go stale.
+# Only what this repository overrides appears here. foot's own remaining
+# defaults are foot's to document; repeating them would be a second copy to go
+# stale. Copy and paste used to be in that category and no longer are - TASK-187
+# moved them onto Ctrl+C and Ctrl+V - so they now show up as rows like anything
+# else this repository decides.
 foot_ini="$HOME/.config/foot/foot.ini"
 
 # What a foot action does, in words. Anything not named here still gets a row
@@ -446,7 +448,27 @@ foot_describe() {
         pipe-scrollback) echo "Copy the whole terminal, scrollback included, to the clipboard" ;;
         pipe-visible)    echo "Copy the visible screen to the clipboard" ;;
         pipe-selected)   echo "Pipe the current selection to a command" ;;
+        clipboard-copy)  echo "Copy the selection" ;;
+        clipboard-paste) echo "Paste from the clipboard" ;;
+        primary-paste)   echo "Paste the primary selection" ;;
         *)               echo "$1" ;;
+    esac
+}
+
+# [text-bindings] maps a combination to bytes sent to the program, and after
+# TASK-187 that is where the interrupt lives. A report that read only
+# [key-bindings] would show Ctrl+C copying and no sign of where Ctrl+C went,
+# which is the exact question this file exists to answer.
+#
+# Named by what the byte means to a terminal rather than by its hex, because
+# "\x03" in a shortcut table tells the reader nothing.
+foot_describe_text() {
+    case "$1" in
+        '\x03') echo "Interrupt - what Ctrl+C sends in a stock terminal (SIGINT)" ;;
+        '\x16') echo "Quoted insert - take the next key literally (readline Ctrl+V)" ;;
+        '\x04') echo "End of input - what Ctrl+D sends in a stock terminal" ;;
+        '\x1a') echo "Suspend - what Ctrl+Z sends in a stock terminal" ;;
+        *)      echo "Send $1 to the program" ;;
     esac
 }
 
@@ -477,11 +499,23 @@ else
             foot_found=1
         done
     done < <(sed -n '/^\[key-bindings\]/,/^\[/p' "$foot_ini" | grep -E '^[a-z][a-z-]*=')
+
+    # Same shape, other section, other direction: here the left-hand side is
+    # the text emitted and the right-hand side is the combination, so the
+    # describe function takes the key rather than the value.
+    while IFS= read -r line; do
+        foot_text="${line%%=*}"
+        for combo in ${line#*=}; do
+            row "$(foot_pretty "$combo")" "$(foot_describe_text "$foot_text")"
+            record "foot" "$combo" "$(foot_describe_text "$foot_text")"
+            foot_found=1
+        done
+    done < <(sed -n '/^\[text-bindings\]/,/^\[/p' "$foot_ini" | grep -E '^\\x[0-9a-fA-F]+=')
+
     if [[ $foot_found -eq 0 ]]; then
         para "foot's config overrides no key bindings, so its defaults apply"
     else
-        note "Everything else in the terminal is a foot default, copy and paste on
-Ctrl+Shift+C and Ctrl+Shift+V included."
+        note "Everything else in the terminal is a foot default."
     fi
 fi
 

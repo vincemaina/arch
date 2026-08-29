@@ -20,10 +20,24 @@ why text stays sharp. A finished command that outlives your attention flashes
 the window and, if it is not focused, raises a desktop notification — mpv
 finishing a build, or a long command completing on another workspace.
 
-Copying out of it is mostly foot's own doing: `Ctrl+Shift+C` copies the
-selection, `Ctrl+Shift+V` pastes. `Ctrl+Shift+A` is this setup's addition — it
-puts the **whole** terminal on the clipboard, scrollback included, and tells
-you how many lines it took.
+Copy and paste are `Ctrl+C` and `Ctrl+V`, the same keys as everywhere else on
+this desktop. That is not how foot ships — it puts them on `Ctrl+Shift+C` and
+`Ctrl+Shift+V`, leaving `Ctrl+C` for the interrupt — so this setup swaps the
+two pairs round. **The interrupt is now `Ctrl+Shift+C`**: that is the key that
+stops a runaway command, and it sends exactly the same byte to the terminal as
+`Ctrl+C` used to. `Ctrl+Shift+V` is readline's quoted-insert, which `Ctrl+V`
+used to be.
+
+**`Ctrl+C` copies whether or not anything is selected, and never reaches the
+program.** foot has no way to make it interrupt when there is no selection —
+the action consumes the key unconditionally — so anything that reads `Ctrl+C`
+as *cancel* rather than *copy* wants `Ctrl+Shift+C` here: `fzf`, `btop`, a
+command you want to stop, and neovim if you use `Ctrl+C` to leave insert mode.
+This was the deliberate trade of the swap; it is written up in
+[DECISIONS.md](../../DECISIONS.md).
+
+`Ctrl+Shift+A` is this setup's other addition — it puts the **whole** terminal
+on the clipboard, scrollback included, and tells you how many lines it took.
 
 It is not really select-all, however much the key suggests it: foot has no
 select-all action and no way to script a selection, so nothing highlights

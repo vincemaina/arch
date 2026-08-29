@@ -1651,6 +1651,70 @@ The visual configuration is intentionally kept in dotfiles so the terminal can l
 
 ---
 
+## Copy and paste are Ctrl+C and Ctrl+V, in the terminal too
+
+**Decision:** Swap foot's copy and paste onto `Ctrl+C` and `Ctrl+V`, and move
+the interrupt and readline's quoted-insert up to `Ctrl+Shift+C` and
+`Ctrl+Shift+V`. (TASK-187.)
+
+### Why
+
+Every other application on this desktop copies with `Ctrl+C`. The terminal was
+the single exception, and the exception is not free: it is a modifier reached
+for many times a day, in the one window you are in most, purely because a
+terminal happens to have claimed that key for something else first.
+
+The something else matters, so this is a swap rather than a theft. `Ctrl+Shift+C`
+sends `\x03` — literally the byte `Ctrl+C` has always put on the tty — so the
+line discipline raises SIGINT exactly as before. Nothing about the interrupt is
+emulated or approximated; it moved. Same for `Ctrl+V`: quoted-insert is rare
+enough that most people never reach for it and would not notice it vanishing,
+which is precisely the kind of silent loss this repository keeps finding, so it
+moved to `Ctrl+Shift+V` rather than being dropped.
+
+The frequency argument is the whole case. Copying out of a terminal happens far
+more often than interrupting a command, and the more frequent action should have
+the easier key.
+
+### Trade-off
+
+**`Ctrl+C` in the terminal now copies unconditionally and never reaches the
+program.** There is no "copy if something is selected, otherwise interrupt"
+middle ground, and this was checked in foot's source rather than inferred:
+`BIND_ACTION_CLIPBOARD_COPY` in 1.27.0's `input.c` calls
+`selection_to_clipboard()` and then `return true` with no condition, so the key
+is consumed either way. `pipe-selected` is not a way round it — its failure path
+`goto pipe_err` also returns true.
+
+So every program that reads `Ctrl+C` as *cancel* rather than *copy* now needs
+`Ctrl+Shift+C`: `fzf`, `btop`, neovim for anyone who leaves insert mode that
+way, and any command you want to stop. That is a real cost paid by a
+less-frequent action to make a more-frequent one cheaper, which is the trade
+being made on purpose.
+
+The reverse direction is safe by construction: foot rejects a duplicate binding
+at parse time, and it checks `[text-bindings]` against `[key-bindings]` too —
+`foot --check-config` reports "already mapped to" and exits non-zero. A config
+that parses is therefore proof the swap is complete in both directions, not just
+in one.
+
+### Alternatives considered
+
+- **Leave it as foot ships it.** The status quo, and defensible — but it makes
+  the terminal the one place the muscle memory fails, and the task asking for
+  this named that directly.
+- **`Ctrl+C` copies when there is a selection, interrupts otherwise.** What
+  several other terminals do, and the obviously nicer answer. foot cannot; see
+  the trade-off above.
+- **Bind copy to `Ctrl+C` and leave the interrupt with no key.** Rejected
+  outright. Losing SIGINT in a terminal is not a trade, it is a break.
+- **Do it in keyd instead**, remapping at the input layer. Rejected: keyd is
+  global, so it would rewrite `Ctrl+C` for every application on the machine —
+  including the ones that already do the right thing. The problem is foot's
+  alone and belongs in foot's config.
+
+---
+
 ## Mako
 
 **Decision:** Use Mako for desktop notifications.
