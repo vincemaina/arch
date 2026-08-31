@@ -17,7 +17,11 @@
 -- the desktop. Running SQL is TASK-83. Keeping those separate is what stops
 -- this file becoming a distribution nobody understands.
 --
--- THE PLUGIN LOCKFILE, WHEN THERE IS ONE
+-- THE PLUGIN LOCKFILE
+--
+-- This paragraph said "when there is one" until TASK-199, which added the first
+-- plugin and turned every sentence below from a plan into a description. The
+-- list itself is lua/plugins.lua.
 --
 -- vim.pack writes $XDG_CONFIG_HOME/nvim/nvim-pack-lock.json - inside the
 -- directory chezmoi owns. That is the same shape as the mimeapps.list problem:
@@ -665,6 +669,23 @@ vim.api.nvim_create_autocmd('FileType', {
 -- Before the language servers, so that if anything below it fails the editor is
 -- at least readable rather than readable-and-grey.
 vim.cmd.colorscheme('arch')
+
+-- ---------------------------------------------------------------------------
+-- Plugins
+-- ---------------------------------------------------------------------------
+--
+-- AFTER the colourscheme, and that is not arbitrary either. The colourscheme is
+-- what sets `vim.o.background` from the theme's declared mode, and the plugin
+-- configuration branches on it - a light palette gets no heading bands. Called
+-- earlier, it would read whatever `background` happened to be and configure the
+-- editor for the wrong half of the themes.
+--
+-- The highlight ordering is unaffected by which side of this line it sits on:
+-- vim.pack does not source a plugin's `plugin/` directory while init.lua is
+-- being sourced, so the groups a plugin registers arrive after everything here
+-- either way - and being registered with `default = true`, they lose to every
+-- group the colourscheme named. lua/plugins.lua writes that out in full.
+require('plugins').setup()
 
 require('lsp').setup()
 

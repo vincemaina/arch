@@ -313,6 +313,26 @@ Editing keyd's file needs `sudo`, and `sudo keyd check` before `sudo keyd
 reload` — a config keyd cannot parse leaves the machine with no working
 keyboard, and the way out is holding Backspace, Escape and Enter together.
 
+### The editor's one plugin
+
+Markdown is drawn rendered rather than raw
+([chapter 4](04-applications.md)), and that is the only plugin neovim has. If
+you want the source back, `:RenderMarkdown disable` turns it off for this
+session and `:RenderMarkdown buf_toggle` for just this buffer. To have it off
+every time, put this in your `~/.config/nvim/local.lua`:
+
+```lua
+require('render-markdown').disable()
+```
+
+Updating it is deliberate rather than automatic, which is the point of a
+lockfile. `:lua vim.pack.update()` opens a buffer of what has changed
+upstream; `:write` accepts it, `:quit` walks away. Having accepted it, the new
+revision is a change to a tracked file like any other, and the next
+`./sync.sh` will tell you so and give you the `chezmoi re-add` line to commit
+it. Until you do, the machine and the repository disagree — visibly, which is
+the whole idea.
+
 **A value that appears in more than one place** is not an override but a
 setting, and lives with the theme in chezmoi's own config at
 `~/.config/chezmoi/chezmoi.toml`. Nothing there is tracked, which is why

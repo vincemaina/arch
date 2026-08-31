@@ -221,6 +221,11 @@ local links = {
   ['@markup.link']          = 'Underlined',
   ['@markup.raw']           = 'String',
   ['@markup.list']          = 'Statement',
+  -- Unnamed until TASK-199, and it showed: the words inside a block quote fell
+  -- through to nvim's own default and arrived salmon, which on a rendered
+  -- document reads as an error rather than as a quotation. A quote is set back
+  -- from the text around it, so it takes the same treatment as a comment.
+  ['@markup.quote']         = 'Comment',
 }
 
 for from, to in pairs(links) do
@@ -264,3 +269,140 @@ hl('DiffText',   { fg = p.bg, bg = p.warning })
 hl('Added',      { fg = p.ok })
 hl('Changed',    { fg = p.warning })
 hl('Removed',    { fg = p.urgent })
+
+-- ---------------------------------------------------------------------------
+-- Rendered markdown
+-- ---------------------------------------------------------------------------
+--
+-- render-markdown.nvim (TASK-199, see lua/plugins.lua). It ships its own
+-- defaults for all of these as links to groups it hopes a colourscheme has -
+-- DiffText for the level-one heading background, DiffAdd for level two - and
+-- this theme sets those two to a foreground and nothing else, so headings would
+-- have arrived with one yellow band and five invisible ones.
+--
+-- EVERY GROUP IS NAMED HERE, not only the wrong ones, and that is deliberate.
+-- `:colorscheme` begins with `highlight clear`, which drops the plugin's
+-- defaults, and the plugin re-derives only its computed colours afterwards -
+-- not the base links. A group this file does not name is therefore fine until
+-- the theme is switched and then quietly gone. That is precisely the shape of
+-- failure this repository keeps finding, so the list is exhaustive on purpose.
+-- The one exception is the heading backgrounds on a light theme, which are left
+-- undefined deliberately and unavoidably - see the note above the loop.
+--
+-- THE ROLE COLOURS ARE NOT ALL SAFE AS FOREGROUNDS. `tertiary` is a background
+-- on the light themes - on `paper` it is #c9c9c2, the focused workspace disc
+-- with dark text on it - so a heading painted with it would be legible on eight
+-- themes and invisible on three. Headings use `accent` and the ANSI colours,
+-- which every theme guarantees are readable against its own background.
+
+-- One table, read twice. The heading's icon and its full-width band come from
+-- the plugin; the heading TEXT comes from treesitter, and if the two were
+-- listed separately they would drift the first time a level was recoloured.
+local headings = {
+  { fg = p.accent,   bg = p.surface_alt },
+  { fg = t.magenta,  bg = p.surface },
+  { fg = t.blue,     bg = p.surface },
+  { fg = t.cyan,     bg = p.surface },
+  { fg = t.green,    bg = p.surface },
+  { fg = p.text_dim, bg = p.surface },
+}
+
+-- THE BAND IS A DARK-THEME FEATURE, and this is measured rather than a taste.
+--
+-- A band moves the background under the heading toward mid-grey. On a dark
+-- theme that is away from the text and costs about a point of contrast; on a
+-- light theme it is toward the text, and `sepia` fell from 4.69:1 to 3.41:1 for
+-- its level-one heading and 4.05:1 for level two - under the 4.5:1 floor this
+-- palette holds everything else to, and worse than the plain background it
+-- replaced. Every dark theme stays at 4.8:1 or better banded; every light theme
+-- is at 4.69:1 or better without.
+--
+-- So it is the same shape of decision the bar's `glow` already is, for the same
+-- reason: bright light needs somewhere dark to be bright against. A light theme
+-- still gets the icon and the coloured, bold heading text - which is what makes
+-- it read as a heading - just not the bar behind it.
+--
+-- The code panel below is NOT treated this way, and the difference is not an
+-- inconsistency. It uses `surface`, which `CursorLine` already puts behind a
+-- whole line of ordinary text on every theme, so a fenced block is no harder to
+-- read than the line the cursor happens to be on - it costs nothing that was
+-- not already being paid. The band is a step further out, to `surface_alt`,
+-- and it lands under `accent` and `magenta`, which are where these palettes
+-- have the least headroom.
+--
+-- TURNING IT OFF IS NOT DONE HERE, and the attempt is worth recording. Clearing
+-- the group is the obvious move and does not work: nvim treats both `{}` and
+-- `{ bg = 'NONE' }` as leaving RenderMarkdownH1Bg UNDEFINED, so the plugin's own
+-- `default = true` link survives and the heading renders with DiffText's
+-- background - the warning colour, full width, on every light theme. Measured by
+-- asking a running editor, after writing it the wrong way twice. So the light
+-- themes leave these groups alone and lua/plugins.lua tells the plugin it has no
+-- background groups at all, which skips the render rather than colouring it.
+local banded = {{ if eq $palette.mode "dark" }}true{{ else }}false{{ end }}
+
+for level, h in ipairs(headings) do
+  -- The icon, and with `position = 'overlay'` the '#'s it covers.
+  hl('RenderMarkdownH' .. level, { fg = h.fg, bold = true })
+  -- The band, which runs the full width of the window. Opaque, unlike Normal:
+  -- a heading that let the wallpaper through would not read as a heading.
+  if banded then
+    hl('RenderMarkdownH' .. level .. 'Bg', { bg = h.bg })
+  end
+  -- The words. Backgroundless, so the band above shows through rather than
+  -- being cut off where the text ends.
+  hl('@markup.heading.' .. level .. '.markdown', { fg = h.fg, bold = true })
+end
+
+-- Code. `surface` is this palette's one raised-panel shade - the cursor line
+-- and the completion menu are already wearing it - so a fenced block sits in
+-- the same plane as everything else that is lifted off the background.
+hl('RenderMarkdownCode',         { bg = p.surface })
+hl('RenderMarkdownCodeBorder',   { bg = p.surface })
+hl('RenderMarkdownCodeInline',   { bg = p.surface })
+hl('RenderMarkdownCodeInfo',     { fg = p.muted })
+hl('RenderMarkdownCodeFallback', { fg = p.text })
+
+-- `==this==`, which is a highlighter pen and should look like one. Same
+-- treatment as a search match, for the same reason: it marks, it does not
+-- decorate.
+hl('RenderMarkdownInlineHighlight', { fg = p.bg, bg = p.warning })
+
+hl('RenderMarkdownBullet', { fg = p.accent })
+-- A thematic break is drawn across the whole window, so it takes the separator
+-- colour rather than the line-number colour the plugin defaults to - at full
+-- width `muted` stops being a rule and becomes a stripe.
+hl('RenderMarkdownDash',        { fg = p.surface_alt })
+hl('RenderMarkdownIndent',      { fg = p.surface_alt })
+hl('RenderMarkdownSign',        { fg = p.muted })
+hl('RenderMarkdownMath',        { fg = t.cyan })
+hl('RenderMarkdownHtmlComment', { fg = t.comment, italic = true })
+
+-- Links. The title is underlined and the icon is not, so the icon reads as a
+-- marker rather than as part of the text you would follow.
+hl('RenderMarkdownLink',      { fg = p.info })
+hl('RenderMarkdownWikiLink',  { fg = p.info })
+hl('RenderMarkdownLinkTitle', { fg = p.info, underline = true })
+
+hl('RenderMarkdownUnchecked', { fg = p.muted })
+hl('RenderMarkdownChecked',   { fg = p.ok })
+hl('RenderMarkdownTodo',      { fg = p.warning })
+
+-- The quote bar, at every nesting depth. All six named rather than left to the
+-- plugin's own Quote1..Quote6 -> Quote links, which `highlight clear` takes.
+hl('RenderMarkdownQuote', { fg = p.muted })
+for level = 1, 6 do
+  hl('RenderMarkdownQuote' .. level, { link = 'RenderMarkdownQuote' })
+end
+
+hl('RenderMarkdownTableHead', { fg = p.secondary, bold = true })
+hl('RenderMarkdownTableRow',  { fg = p.muted })
+
+-- Callouts - > [!NOTE] and friends - stay linked to the diagnostics above, so a
+-- warning in a document is the same amber as a warning from a language server
+-- and a battery about to die. Links rather than colours: the mapping is decided
+-- once, further up this file.
+hl('RenderMarkdownSuccess', { link = 'DiagnosticOk' })
+hl('RenderMarkdownInfo',    { link = 'DiagnosticInfo' })
+hl('RenderMarkdownHint',    { link = 'DiagnosticHint' })
+hl('RenderMarkdownWarn',    { link = 'DiagnosticWarn' })
+hl('RenderMarkdownError',   { link = 'DiagnosticError' })

@@ -81,9 +81,19 @@ if index.exists():
 # ---------------------------------------------------------------- links
 # Every relative link, whether it points at another chapter or out of the
 # manual entirely. README.md promised FLOW.md for months before anyone checked.
+#
+# Code first, though. A manual for a desktop whose editor renders markdown has
+# to be able to WRITE `[text](url)` as an example, and this check read that as
+# a link to a file called "url" and failed - which is a check being wrong about
+# prose that was right. Fenced blocks and inline code are not links.
+def without_code(text):
+    text = re.sub(r"```.*?```", "", text, flags=re.S)
+    return re.sub(r"`[^`\n]*`", "", text)
+
+
 broken = []
 for path, text in text_of.items():
-    for m in re.finditer(r"\[[^\]]+\]\(([^)]+)\)", text):
+    for m in re.finditer(r"\[[^\]]+\]\(([^)]+)\)", without_code(text)):
         href = m.group(1).split("#", 1)[0]
         if not href or href.startswith(("http://", "https://", "mailto:")):
             continue

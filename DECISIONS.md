@@ -4806,6 +4806,120 @@ real person's name, which makes it a joke rather than a project. *Swayve* and
 half of the pitch - stable, no dropped frames, never falls over - that the
 lightness half tends to overshadow.
 
+## The editor's first plugin, and the lockfile that had been waiting for it
+
+**Decision:** Install exactly one Neovim plugin —
+[render-markdown.nvim](https://github.com/MeanderingProgrammer/render-markdown.nvim)
+— through `vim.pack`, pinned by a tracked `nvim-pack-lock.json`, installed at
+apply time by a `run_onchange_` script, and coloured from the selected theme
+rather than from its own defaults.
+
+### Why
+
+A lot of what gets written on this machine is markdown: every Backlog task, the
+manual, this file. Read raw, a link is four times longer than the words it
+labels and a heading is a row of hashes. The plugin draws headings, bullets,
+links, tables, checkboxes, code panels and callouts, and **un-draws the line
+the cursor is on** so that line is ordinary source again — its *anti-conceal*
+feature, and the entire reason it was chosen over the alternatives below. There
+is no preview window, no second mode and nothing to keep in sync; the buffer is
+both the document and the source, depending on where the cursor is.
+
+The prerequisites were already met, which is most of why the cost is small.
+Neovim bundles the `markdown` and `markdown_inline` parsers *with* highlight
+queries, so the guard in `init.lua` — start treesitter only where both a parser
+and a query exist — already turned it on for markdown buffers.
+
+**Measured on this machine, not estimated,** as the mean of nine headless runs
+each:
+
+| | Without | With |
+| --- | --- | --- |
+| Startup, no file | 11.5 ms | 14.4 ms |
+| Startup opening a markdown file | 33.1 ms | 48.2 ms |
+
+Three milliseconds on every start, and about fifteen more the first time a
+markdown buffer is drawn. The header of `init.lua` sets the budget at the 15 ms
+a bare Neovim takes; with the plugin, startup is still inside it.
+
+### Why vim.pack, and why the lockfile is the point
+
+`vim.pack` ships with Neovim 0.12. Installing lazy.nvim or packer to manage one
+plugin would mean taking a dependency in order to take a dependency, and the
+whole configuration exists to show that 0.12 no longer needs one.
+
+The lockfile is what makes this reproducible rather than merely convenient.
+`nvim-pack-lock.json` records the exact revision, it is tracked here, chezmoi
+writes it, and `vim.pack` reads it on its first call — so every machine gets
+that commit rather than whatever the version range resolved to on the day it
+was installed. That is the same argument as `npm ci` for the language servers
+and an explicit install reason for pacman packages, one layer further out.
+`init.lua` had described this arrangement in the future tense since it was
+written; this is the change that made it a description.
+
+Installation is a `run_onchange_` script running `nvim --headless`, hashing both
+the lockfile and `plugins.lua`, for the reason the language-server script
+already learned: the hash is what connects a script to the files it acts on, and
+hashing only one of the two means one kind of change silently does nothing.
+Without the script the first `nvim` on a new machine would clone from GitHub
+before showing a buffer — which is the install finishing somewhere other than in
+the installer.
+
+### Why the theme names every group rather than the wrong ones
+
+The plugin registers its highlight groups as links to groups it hopes exist:
+`DiffText` for the level-one heading background, `DiffAdd` for level two. This
+theme gives both of those a foreground and no background, so headings would have
+arrived as one yellow band and five invisible ones. That much is an ordinary
+override.
+
+Naming *all* of them is the less obvious half. `:colorscheme` begins with
+`highlight clear`, and the plugin re-derives only its computed colours
+afterwards, not its base links — so a group the theme does not name is correct
+until the theme is switched and silently gone after. Exactly the failure this
+repository keeps finding.
+
+One palette rule came out of this and is worth stating: **`tertiary` is not safe
+as a foreground.** On the light themes it is a background — `#c9c9c2` on
+`paper`, the focused workspace disc with dark text on it — so a heading painted
+with it would be legible on eight themes and invisible on three. Headings use
+`accent` and the ANSI colours instead.
+
+### Trade-off
+
+This is the first thing on the built machine fetched from GitHub at install time
+rather than from a package manifest; there is no packaged version in the Arch
+repositories, and the AUR was ruled out under TASK-43. So it is a plugin's
+worth of code that nobody here reviews, bounded in two ways: the version range
+cannot cross into a new major, and the revision is pinned and committed.
+
+A machine with no network that has never installed it gets an editor without
+markdown rendering rather than an editor that will not start — `vim.pack.add()`
+is called inside a `pcall`, and the install script warns rather than aborting.
+Both halves fail in the direction of a working editor.
+
+Signs are turned off for headings and code blocks. `signcolumn = 'number'`
+(TASK-170) means a sign does not sit beside the line number, it replaces it, so
+the defaults would have spent the gutter that task narrowed on a second marker
+for something an icon and a full-width band already announce.
+
+### Alternatives considered
+
+**markview.nvim** does the same job and is visually closer to Typora, with
+rendered rules, block quotes and LaTeX. It is heavier and more opinionated;
+render-markdown is the smaller bet, and its anti-conceal is the feature that was
+actually wanted.
+
+**Neovim's own conceal, with no plugin at all.** The bundled `markdown_inline`
+queries conceal emphasis markers and link destinations, and `conceallevel=2`
+with `concealcursor=''` already reveals them on the cursor's line — so a
+meaningful part of this could have been had for two options and no dependency.
+What it cannot do is headings, bullets, checkboxes, tables, code panels or
+callouts, which is most of what makes a document look like a document.
+
+**A preview in a browser** (`grip`, `glow`) was not seriously considered: a
+second window, kept in sync by hand, that cannot be edited.
+
 ---
 
 # Guiding principle
