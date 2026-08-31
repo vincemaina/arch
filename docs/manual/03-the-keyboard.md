@@ -106,6 +106,36 @@ back the way they started. See [Applications](04-applications.md) →
 "Virtual machines" and `DECISIONS.md` → "Keeping a VM guest's keyboard from
 double-swapping the host's remap".
 
+## Closing a window, and forcing one to close
+
+`$mod+q` closes the focused window, and it is a bare chord rather than a
+`$mod+Shift` one because closing is something you do all day.
+
+What it sends is a **request**. sway's `kill` asks the client to close itself
+and lets the client decide what that means, which is why an editor still gets
+to put up "save before closing?". The same property is its one failure mode:
+a request goes nowhere if the program has stopped listening for it.
+
+`$mod+Shift+q` is the escalation for exactly that case. It asks the window
+nothing. It sends SIGKILL to the process behind it, so it works whether or not
+that process is still running its event loop. It confirms first, naming the
+window, because Shift is the only thing separating it from the everyday close
+and it discards unsaved work without giving the program a say - "Cancel" is
+the row the selection starts on, so a stray Enter does nothing.
+
+Reach for it when a window has stopped repainting or stopped accepting clicks
+and `$mod+q` has visibly done nothing. That is a real failure mode rather than
+a hypothetical one: a GTK file chooser in Deluge once wedged its main thread
+in a loop at 95% CPU, and the dialog's own buttons, `$mod+q` and even SIGTERM
+were all ignored equally, because every one of them needed the main loop that
+had stopped running. `~/.local/bin/sway-force-kill` carries the full account
+and the reasoning for going straight to SIGKILL rather than something gentler.
+
+It refuses in one case, and says why rather than doing nothing: an X11 window
+that never published its own process ID leaves sway reporting Xwayland's pid
+instead of the program's, and killing that would take every X11 application
+down at once.
+
 ## Modes
 
 A **mode** temporarily changes what keys do, shown by a name appearing in
