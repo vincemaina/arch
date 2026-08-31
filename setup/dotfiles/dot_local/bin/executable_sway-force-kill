@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# requires: swaymsg python3 rofi notify-send
+
+# Force quit the focused window: SIGKILL the process behind it, after asking.
+#
+# WHY THIS EXISTS ALONGSIDE $mod+q
+#
+# $mod+q is sway's `kill`, which sends xdg_toplevel.close - a REQUEST the
+# client has to notice and act on. That is the right default, and it fails in
+# exactly one case: a client whose main loop has stopped running. On
+# 2026-08-31 deluge-gtk's "Move Download Folder" chooser hit a GTK3 grab bug
+# and spun its main thread at 95% CPU, logging the same warning about 35,000
+# times a second - journald suppressed just over a million of them per
+# 30-second window. The dialog's own buttons did nothing, $mod+q did nothing,
+# and SIGTERM did nothing either: Python only runs signal handlers between
+# bytecodes in the main thread, and that thread was inside C. Only SIGKILL
+# ended it, and only because a terminal happened to be open at the time.
+#
+# So this is deliberately not a second polite request. A second polite request
+# is not an escalation. It is SIGKILL. See TASK-198.
+#
+# WHY IT CONFIRMS FIRST
+#
+# Shift is the only thing between this and the everyday close, which is not
+# much of a guard for something that discards unsaved work without giving the
+# program a say. The power menu answers the same question the same way (see
+# ~/.local/bin/power-menu): one rofi confirmation with "Cancel" on the first
+# row, so the rofi cursor starts on the safe answer and a stray Enter is
+# harmless. The window is named in the prompt, so what is about to die is on
+# screen before it dies.
+#
+# WHY IT REPORTS THROUGH notify-send
+#
+# Nothing launched from a keybinding has a stderr anyone reads. A refusal that
+# printed to a terminal nobody is looking at is indistinguishable from the
+# binding not being bound, which is the exact failure this repository keeps
+# finding. Refusals are critical urgency so they persist rather than timing
+# out after five seconds unseen.
+
+say() {  # urgency, summary, body
+    notify-send --app-name=sway-force-kill --urgency="$1" "$2" "$3" || true
+}
+
+die() {  # summary, body
+    say critical "$1" "$2"
+    echo "sway-force-kill: $1 - $2" >&2
+    exit 1
+}
+
+# Read the focused window BEFORE rofi opens, because rofi takes the focus and
+# would otherwise be the window this reports on.
+#
+# Asked of sway rather than inferred, and addressed by pid rather than by
+# app_id: `[app_id=x] kill` matches every window of that class, which has
+# already closed this repository's own terminal once - see the scripting-traps
+# skill. There is exactly one focused node, and it is the one under the hands.
+focused="$(swaymsg -t get_tree 2>/dev/null | python3 -c '
+import json, sys
+
+def walk(node):
+    yield node
+    for key in ("nodes", "floating_nodes"):
+        for child in node.get(key, []):
+            yield from walk(child)
+
+try:
+    tree = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+
+for node in walk(tree):
+    if not node.get("focused"):
+        continue
+    props = node.get("window_properties") or {}
+    # \x1f between fields, not a tab. bash strips LEADING fields when IFS is a
+    # whitespace character, so an empty pid followed by a tab would shift the
+    # window name into $pid - and an empty workspace, whose focused node is the
+    # workspace itself, is named for its number. That really did read "kill -KILL
+    # on pid 90 failed" for workspace 90, one EPERM away from killing whatever
+    # unrelated process happened to hold that pid. \x1f is not whitespace, so
+    # empty fields survive.
+    print("\x1f".join(str(x) for x in (
+        node.get("pid") or "",
+        node.get("app_id") or props.get("class") or "",
+        (node.get("name") or "").replace("\n", " "),
+    )))
+    break
+')"
+
+[[ -n "$focused" ]] || die "Nothing to force quit" "No window is focused."
+
+IFS=$'\x1f' read -r pid app_id title <<<"$focused"
+
+# A focused node with no pid is a workspace or a split container, not a window.
+# sway reports focus on one of those whenever a workspace is empty.
+# Checked as a number as well as for emptiness. The two guards look redundant
+# and are not: the first says what happened, and the second is the one that
+# holds if the tree ever hands back something unexpected in that field.
+[[ -n "$pid" ]] || die "Nothing to force quit" \
+    "The focused thing is not a window, so there is no process behind it."
+[[ "$pid" =~ ^[1-9][0-9]*$ ]] || die "Nothing to force quit" \
+    "sway reported '$pid' where a process ID should be."
+
+# X11 clients are the one case where sway's pid is not the client's. wlroots
+# takes it from _NET_WM_PID, and a client that never set that property leaves
+# sway reporting the X server itself - so SIGKILL here would take Xwayland and
+# every X application on the machine with it, rather than the one window that
+# is misbehaving. Refuse and say so; killing the wrong thing wholesale is
+# worse than not killing anything.
+comm="$(cat "/proc/$pid/comm" 2>/dev/null || true)"
+if [[ "$comm" == "Xwayland" ]]; then
+    die "Refusing to force quit" \
+        "$app_id reports Xwayland's own pid ($pid), not its own. Killing it would take every X11 application down with it."
+fi
+[[ -n "$comm" ]] || die "Nothing to force quit" \
+    "Process $pid is already gone."
+
+# What to call the window in the prompt. The title is what the user is looking
+# at; the app_id is what survives a window with no title at all.
+label="${title:-$app_id}"
+label="${label:-pid $pid}"
+[[ ${#label} -le 48 ]] || label="${label:0:47}…"
+
+# Same confirmation shape as ~/.local/bin/power-menu: Cancel first, so the row
+# the cursor starts on is the one that does nothing. -replace because anything
+# launched while rofi is already up hits its pidfile lock.
+choice="$(printf 'Cancel\nForce quit %s\n' "$label" |
+    rofi -dmenu -i -p "Force quit?" -no-custom -replace || true)"
+
+[[ "$choice" == "Force quit $label" ]] || exit 0
+
+# SIGKILL to the whole process, not the window. There is no window-level
+# escalation to reach for - closing the window is what $mod+q already tried.
+if kill -KILL "$pid" 2>/dev/null; then
+    say normal "Force quit ${app_id:-window}" "Sent SIGKILL to pid $pid ($comm)."
+else
+    die "Could not force quit ${app_id:-window}" \
+        "kill -KILL on pid $pid failed. It may have exited already, or belong to another user."
+fi
