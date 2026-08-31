@@ -190,6 +190,38 @@ Filenames use chezmoi's source naming: `dot_config/sway/config` → `~/.config/s
 
 Machine-wide configuration is applied by scripts (`setup/system/` templates + `sed`), user configuration by chezmoi. Keep that boundary. `system/loader/arch.conf` is a template: `03-system.sh` substitutes `__ROOT_UUID__` with the real root UUID discovered via `findmnt`/`blkid`.
 
+### The editor has exactly one plugin, and its lockfile is tracked
+
+`setup/dotfiles/dot_config/nvim/lua/plugins.lua` is the whole plugin list, and
+`render-markdown.nvim` is the whole of it (TASK-199). It is installed by
+`vim.pack`, which ships with nvim 0.12, so there is no plugin manager to
+install.
+
+Four things that are load-bearing and not obvious:
+
+- **`nvim-pack-lock.json` is a tracked dotfile.** chezmoi writes it and
+  `vim.pack` rewrites it when you take an update — the same shape as the
+  `mimeapps.list` problem, resolved the other way. A lockfile changing is a
+  deliberate act, so it should show up as a diff. `sync.sh` already prints the
+  `chezmoi re-add` line for a managed file that differs.
+- **`vim.pack.add()` defaults are wrong for a scripted apply.** `confirm`
+  defaults to true, which hangs `nvim --headless` inside a chezmoi script
+  forever rather than failing; it is off. And `load` defaults to false while
+  init.lua is being sourced, which is what makes the colourscheme win — a
+  plugin registers its highlight groups from `plugin/`, and that runs *after*
+  init.lua.
+- **A theme must name every group a plugin uses, not only the wrong ones.**
+  `:colorscheme` starts with `highlight clear`, and a plugin re-links only what
+  it recomputes. A group the theme does not name works until the theme is
+  switched and is then silently gone.
+- **`tertiary` is not safe as a foreground.** On the light themes it is a
+  background colour. Use `accent` or the ANSI colours for text.
+
+A fresh install gets the plugin from
+`run_onchange_after_install-nvim-plugins.sh.tmpl`, which hashes *both* the
+lockfile and `plugins.lua` — hashing one of the two means the other kind of
+change silently does nothing, exactly as the language-server script found.
+
 ### Disk layout
 
 GPT/UEFI, 1 GiB FAT32 ESP + Btrfs root, subvolumes `@`, `@home`, `@snapshots`, mounted with `compress=zstd`. `01-disk.sh` detects nvme-style names (trailing digit → `p1`/`p2` suffix). No separate `/home` partition and no full-disk encryption — both are deliberate, see `DECISIONS.md`.

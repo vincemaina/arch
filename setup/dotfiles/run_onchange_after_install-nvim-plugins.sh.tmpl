@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Put the editor's plugins on disk, so a machine that has never opened Neovim
+# already has them.
+#
+# vim.pack installs on the first `vim.pack.add()` call, which means without this
+# the first `nvim` after a fresh install spends several seconds cloning from
+# GitHub before showing a buffer - and a first start with no network shows an
+# editor quietly missing half of what the repository says it has. Neither is a
+# manual step exactly, but both are the install finishing somewhere other than
+# in the installer.
+#
+# WHY IT IS SAFE TO RUN NVIM HERE
+#
+# `vim.pack.add()` is called with `confirm = false` (lua/plugins.lua explains
+# why), so nothing waits for an answer that cannot arrive. Without that this
+# script would hang on the question rather than fail, which is the worse of the
+# two - a hung chezmoi apply inside `arch-chroot` looks like a broken install.
+#
+# WHAT MAKES IT RE-RUN
+#
+# The same trick as the language-server script, and the same trap: run_onchange_
+# re-runs when the RENDERED SCRIPT changes, and neither the lockfile nor the
+# plugin list is part of it. So both are hashed below, and both are needed:
+#
+#   * the lockfile decides which revision is installed, so taking an update has
+#     to reach the machine;
+#   * plugins.lua is where a plugin is ADDED, and a new one does not appear in
+#     the lockfile until something has already run Neovim - which is the thing
+#     this script exists to do.
+#
+# Hashing only one of them means one of those two changes silently does nothing.
+#
+# lockfile:   {{ include "dot_config/nvim/nvim-pack-lock.json" | sha256sum }}
+# plugin list:{{ include "dot_config/nvim/lua/plugins.lua" | sha256sum }}
+
+if ! command -v nvim >/dev/null; then
+    echo "    neovim is not installed, so its plugins cannot be installed." >&2
+    echo "    It is declared in packages/dev.txt - run ./sync.sh." >&2
+    exit 0
+fi
+
+echo "    Installing Neovim plugins from the lockfile"
+
+# --headless with an immediate quit: init.lua runs, vim.pack.add() clones
+# whatever is missing at the lockfile's revision, and the editor exits.
+#
+# The count comes from vim.pack.get() rather than from counting directories
+# under site/pack/core/opt. Same reason the checks in this repository ask
+# `swaymsg` instead of reading the sway config: this is the editor reporting
+# what it actually has, and it cannot go stale if the plugin directory moves.
+# vim.pack's own progress lines go to stderr as well, hence the prefix to pick
+# ours back out - and the pattern is NOT anchored, because those progress lines
+# end in a carriage return rather than a newline. On the run that actually
+# installs something, the count lands glued to the end of "100% Installing
+# plugins (1/1)" and an anchored match finds nothing. Which it did: the first
+# version of this printed a blank count on exactly the fresh install it exists
+# for, and worked perfectly every time there was nothing to do.
+if ! output=$(nvim --headless \
+        -c 'lua io.stderr:write("PLUGIN_COUNT=" .. #vim.pack.get() .. "\n")' \
+        -c 'quitall!' 2>&1); then
+    # Failure warns rather than aborts. The likely reason to get here is no
+    # network, and a machine that cannot reach GitHub should still finish its
+    # sync and end up with a working editor - just one without rendered
+    # markdown until the next run. lua/plugins.lua makes the same call on the
+    # other side, catching the error so the editor starts either way.
+    echo "    Neovim exited non-zero while installing plugins - most likely no" >&2
+    echo "    network. The editor still works; re-run ./sync.sh when connected." >&2
+    exit 0
+fi
+
+count=$(sed -n 's/.*PLUGIN_COUNT=\([0-9]*\).*/\1/p' <<<"$output" | tail -1)
+echo "    ${count:-no} plugin(s) installed"

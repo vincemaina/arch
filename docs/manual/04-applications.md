@@ -92,10 +92,13 @@ no reload here.
 ## The editor: neovim
 
 `nvim <file>` from any terminal, or `Enter` on a file in yazi (below). There
-is no plugin manager doing anything at the moment and no distribution
-underneath it — the configuration is built directly on what neovim 0.12
-ships: `vim.lsp.config` for language servers, built-in treesitter, and native
-completion.
+is no distribution underneath it — the configuration is built directly on what
+neovim 0.12 ships: `vim.lsp.config` for language servers, built-in treesitter,
+native completion, and `vim.pack` as the plugin manager.
+
+**Exactly one plugin is installed**, and it is
+[render-markdown.nvim](https://github.com/MeanderingProgrammer/render-markdown.nvim),
+described below. Everything else in this section is neovim itself.
 
 **Nearly every default keybinding neovim ships has been deliberately
 deleted** — 69 of them, on startup, confirmed by reading `g:removed_default_mappings`
@@ -148,6 +151,25 @@ anything into clears the marker instead — which is how a list ends, without
 deleting anything by hand. It is the one binding missing from the table above,
 and deliberately so: it exists only in markdown buffers, and the table is
 derived from the ones that exist everywhere.
+
+**Markdown is shown rendered rather than raw, except on the line you are
+editing.** Headings get an icon and their own colour — and on a dark theme a
+band across the window, which the light themes do without because it costs
+more contrast than it buys there. `-` becomes a bullet, `[text](url)` shows only *text* with a small icon for where
+it points, `- [ ]` becomes a checkbox, tables are drawn with borders and
+columns lined up, `---` becomes a rule, and a fenced block sits on a shaded
+panel with its language above it. `> [!NOTE]` and its siblings become
+callouts, coloured the same amber, red and blue the rest of the desktop uses
+for warnings, errors and information.
+
+Put the cursor on a line and that line — and only that line — goes back to
+being markdown source, so the URL reappears the moment you want to change it
+and disappears again when you leave. This is the whole point of it, and it is
+why editing does not have to happen in a different mode or a different window.
+
+It follows the theme like everything else: change the theme and the headings,
+the code panels and the callouts change with it. Nothing here needs to be
+turned on, and there is no preview window to keep in sync.
 
 There is no column of `~` below the last line of a file. The missing line
 number already says the line is not there, and it says it in the same column.
